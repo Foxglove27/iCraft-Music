@@ -6,6 +6,10 @@
 
   "creativetab.icraft.ipod": "iCraft",
 
-  "screen.icraft.ipod": "iPod"
+  "screen.icraft.ipod": "iPod",
+
+  "screen.icraft.ipod.stop": "Stop",
+
+  "screen.icraft.ipod.empty": "No discs. Right-click a disc onto the iPod in your inventory."
 
 }
