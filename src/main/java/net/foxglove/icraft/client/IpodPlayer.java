@@ -1,11 +1,14 @@
 package net.foxglove.icraft.client;
 
 import net.foxglove.icraft.block.ModBlocks;
+import net.foxglove.icraft.client.audio.FileSoundInstance;
+import net.foxglove.icraft.client.audio.LocalMusic;
 import net.foxglove.icraft.item.IpodItem;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.resources.sounds.SimpleSoundInstance;
 import net.minecraft.client.resources.sounds.SoundInstance;
 import net.minecraft.core.BlockPos;
+import net.minecraft.network.chat.Component;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.entity.player.Inventory;
@@ -15,11 +18,13 @@ import net.minecraft.world.item.JukeboxSong;
 import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.Nullable;
 
+import java.nio.file.Path;
+
 public class IpodPlayer {
     private static final float SPEAKER_VOLUME = 1.0F; // range = volume x 16 blocks
 
     private static SoundInstance current;
-    private static ItemStack currentDisc = ItemStack.EMPTY;
+    private static ItemStack currentDisc = ItemStack.EMPTY; // empty while a file is playing
     @Nullable
     private static BlockPos currentSpeaker; // null when playing directly on the player
 
@@ -28,25 +33,46 @@ public class IpodPlayer {
         if (mc.level == null) return;
 
         JukeboxSong.fromStack(mc.level.registryAccess(), disc).ifPresent(song -> {
-            stop();
-            mc.getMusicManager().stopPlaying();
-
             SoundEvent sound = song.value().soundEvent().value();
-            if (speaker != null && mc.level.getBlockState(speaker).is(ModBlocks.SPEAKER.get())) {
-                Vec3 pos = Vec3.atCenterOf(speaker);
-                current = new SimpleSoundInstance(sound.getLocation(), SoundSource.RECORDS,
+            BlockPos used = validSpeaker(mc, speaker);
+
+            SoundInstance instance;
+            if (used != null) {
+                Vec3 pos = Vec3.atCenterOf(used);
+                instance = new SimpleSoundInstance(sound.getLocation(), SoundSource.RECORDS,
                         SPEAKER_VOLUME, 1.0F, SoundInstance.createUnseededRandom(), false, 0,
                         SoundInstance.Attenuation.LINEAR, pos.x, pos.y, pos.z, false);
-                currentSpeaker = speaker;
             } else {
-                current = SimpleSoundInstance.forMusic(sound);
-                currentSpeaker = null;
+                instance = SimpleSoundInstance.forMusic(sound);
             }
-
-            currentDisc = disc.copy();
-            mc.getSoundManager().play(current);
-            mc.gui.setNowPlaying(song.value().description());
+            start(instance, disc.copy(), used, song.value().description());
         });
+    }
+
+    public static void playFile(Path file, @Nullable BlockPos speaker) {
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.level == null) return;
+
+        BlockPos used = validSpeaker(mc, speaker);
+        Vec3 pos = used != null ? Vec3.atCenterOf(used) : null;
+        start(new FileSoundInstance(file, pos, SPEAKER_VOLUME), ItemStack.EMPTY, used,
+                Component.literal(LocalMusic.displayName(file)));
+    }
+
+    private static void start(SoundInstance instance, ItemStack disc, @Nullable BlockPos speaker, Component name) {
+        Minecraft mc = Minecraft.getInstance();
+        stop();
+        mc.getMusicManager().stopPlaying();
+        current = instance;
+        currentDisc = disc;
+        currentSpeaker = speaker;
+        mc.getSoundManager().play(instance);
+        mc.gui.setNowPlaying(name);
+    }
+
+    @Nullable
+    private static BlockPos validSpeaker(Minecraft mc, @Nullable BlockPos speaker) {
+        return (speaker != null && mc.level.getBlockState(speaker).is(ModBlocks.SPEAKER.get())) ? speaker : null;
     }
 
     public static void stop() {
@@ -74,12 +100,11 @@ public class IpodPlayer {
         Minecraft mc = Minecraft.getInstance();
         Player player = mc.player;
 
-        if (player == null || mc.level == null || !holdsPlayingDisc(player)) {
+        if (player == null || mc.level == null || !holdsIpod(player)) {
             stop();
             return;
         }
 
-        // speaker was broken or replaced: stop (only if that chunk is actually loaded)
         if (currentSpeaker != null
                 && mc.level.hasChunkAt(currentSpeaker)
                 && !mc.level.getBlockState(currentSpeaker).is(ModBlocks.SPEAKER.get())) {
@@ -87,17 +112,18 @@ public class IpodPlayer {
         }
     }
 
-    private static boolean holdsPlayingDisc(Player player) {
-        if (carriesDisc(player.containerMenu.getCarried())) return true; // iPod on the cursor
-        Inventory inv = player.getInventory(); // main slots, armor, and offhand
+    private static boolean holdsIpod(Player player) {
+        if (carriesPlaying(player.containerMenu.getCarried())) return true; // iPod on the cursor
+        Inventory inv = player.getInventory();
         for (int i = 0; i < inv.getContainerSize(); i++) {
-            if (carriesDisc(inv.getItem(i))) return true;
+            if (carriesPlaying(inv.getItem(i))) return true;
         }
         return false;
     }
 
-    private static boolean carriesDisc(ItemStack stack) {
+    private static boolean carriesPlaying(ItemStack stack) {
         if (!(stack.getItem() instanceof IpodItem)) return false;
+        if (currentDisc.isEmpty()) return true; // a file is playing: any iPod will do
         for (ItemStack disc : IpodItem.getDiscs(stack)) {
             if (ItemStack.isSameItemSameComponents(disc, currentDisc)) return true;
         }
