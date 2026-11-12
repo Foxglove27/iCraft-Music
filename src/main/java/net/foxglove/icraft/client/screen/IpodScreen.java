@@ -5,9 +5,11 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.JukeboxSong;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
 
@@ -17,11 +19,14 @@ public class IpodScreen extends Screen {
     private static final int BUTTON_H = 20;
 
     private final List<ItemStack> discs;
+    @Nullable
+    private final BlockPos speaker;
     private int listTop;
 
-    public IpodScreen(List<ItemStack> discs) {
+    public IpodScreen(List<ItemStack> discs, @Nullable BlockPos speaker) {
         super(Component.translatable("screen.icraft.ipod"));
         this.discs = discs;
+        this.speaker = speaker;
     }
 
     private static Component discName(ItemStack disc) {
@@ -43,7 +48,7 @@ public class IpodScreen extends Screen {
 
         int y = listTop;
         for (ItemStack disc : discs) {
-            addRenderableWidget(Button.builder(discName(disc), b -> IpodPlayer.play(disc))
+            addRenderableWidget(Button.builder(discName(disc), b -> IpodPlayer.play(disc, speaker))
                     .bounds(cx - BUTTON_W / 2, y, BUTTON_W, BUTTON_H).build());
             y += ROW_H;
         }

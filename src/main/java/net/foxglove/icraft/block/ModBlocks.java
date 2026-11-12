@@ -18,10 +18,8 @@ public class ModBlocks {
             DeferredRegister.createBlocks(iCraft.MOD_ID);
 
     public static final DeferredBlock<Block> SPEAKER = registerBlock("speaker",
-            () -> new Block(BlockBehaviour.Properties.of()
+            () -> new SpeakerBlock(BlockBehaviour.Properties.of()
                     .strength(4f).requiresCorrectToolForDrops().sound(SoundType.METAL)));
-
-
 
     private static <T extends Block> DeferredBlock<T> registerBlock(String name, Supplier<T> block) {
         DeferredBlock<T> toReturn =BLOCKS.register(name, block);

@@ -2,6 +2,7 @@ package net.foxglove.icraft;
 
 import net.foxglove.icraft.block.ModBlocks;
 import net.foxglove.icraft.item.ModCreativeModeTabs;
+import net.foxglove.icraft.item.ModDataComponents;
 import net.foxglove.icraft.item.ModItems;
 import net.minecraft.world.item.CreativeModeTabs;
 import org.slf4j.Logger;
@@ -39,9 +40,9 @@ public class iCraft {
         NeoForge.EVENT_BUS.register(this);
 
         ModCreativeModeTabs.register(modEventBus);
-
         ModItems.register(modEventBus);
         ModBlocks.register(modEventBus);
+        ModDataComponents.register(modEventBus);
 
         // Register the item to a creative tab
         modEventBus.addListener(this::addCreative);
