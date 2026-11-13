@@ -48,6 +48,11 @@ public class Config {
 
     @SubscribeEvent
     static void onLoad(final ModConfigEvent event) {
+        // This runs for EVERY config file our mod has, so ignore any that aren't ours
+        if (event.getConfig().getSpec() != SPEC) {
+            return;
+        }
+
         logDirtBlock = LOG_DIRT_BLOCK.get();
         magicNumber = MAGIC_NUMBER.get();
         magicNumberIntroduction = MAGIC_NUMBER_INTRODUCTION.get();

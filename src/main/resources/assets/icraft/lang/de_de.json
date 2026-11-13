@@ -1,0 +1,21 @@
+{
+
+  "item.icraft.ipod": "iPod",
+
+  "block.icraft.speaker": "Lautsprecher",
+
+  "creativetab.icraft.ipod": "iCraft",
+
+  "screen.icraft.ipod": "iPod",
+  "screen.icraft.ipod.empty": "Keine CDs oder Musik Dateien gefunden",
+  "screen.icraft.ipod.discs": "Musik CDs",
+  "screen.icraft.ipod.back": "< Alben",
+  "screen.icraft.ipod.tracks": "%s tracks",
+  "screen.icraft.ipod.pause": "Pausieren",
+  "screen.icraft.ipod.play": "Start",
+  "screen.icraft.ipod.stop": "Stopp",
+  "screen.icraft.ipod.volume": "Lautstärke: %s%%",
+
+  "message.icraft.ipod.linked": "iPod mit Lautsprecher verbunden"
+
+}

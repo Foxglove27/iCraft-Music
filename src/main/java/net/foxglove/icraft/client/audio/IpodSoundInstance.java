@@ -12,6 +12,7 @@ import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.Nullable;
+import net.foxglove.icraft.client.IpodPlayer;
 
 import java.io.IOException;
 import java.nio.file.Path;
@@ -58,18 +59,17 @@ public class IpodSoundInstance extends AbstractTickableSoundInstance {
         }
     }
 
-    // The game calls this every tick. We have nothing to update ourselves,
-    // but being "tickable" is what makes the game re-read getVolume() each tick.
+    // The game calls this every tick while the sound exists.
+// We use it so the sound checks for itself whether the iPod is still with the player.
     @Override
     public void tick() {
+        IpodPlayer.tick(this);
     }
 
-    // Our own volume multiplied by the slider value
     @Override
     public float getVolume() {
         return super.getVolume() * IpodVolume.get();
     }
-
     // Without this, the game refuses to start a sound whose volume is 0
     @Override
     public boolean canStartSilent() {

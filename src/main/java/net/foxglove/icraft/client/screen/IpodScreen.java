@@ -1,10 +1,12 @@
 package net.foxglove.icraft.client.screen;
 
 import net.foxglove.icraft.client.IpodPlayer;
+import net.foxglove.icraft.client.IpodVolume;
 import net.foxglove.icraft.client.audio.CoverArt;
 import net.foxglove.icraft.client.audio.LocalMusic;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.components.AbstractSliderButton;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.core.BlockPos;
@@ -14,8 +16,6 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.JukeboxSong;
 import org.jetbrains.annotations.Nullable;
-import net.foxglove.icraft.client.IpodVolume;
-import net.minecraft.client.gui.components.AbstractSliderButton;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -30,18 +30,43 @@ public class IpodScreen extends Screen {
     private static final int COVER_SMALL = 32;
     private static final int COVER_LARGE = 48;
     private static final int HEADER_H = COVER_LARGE + 6;
-    private static final int FOOTER_H = 4 + ROW_H + BUTTON_H; // stop button + page row
+    private static final int FOOTER_H = 4 + ROW_H + BUTTON_H; // controls row + page row
     private static final int TOP_MARGIN = 30;
     private static final int BOTTOM_MARGIN = 20;
+
+    // widths of the controls row: [Pause/Play] [Stop] [volume slider]
+    private static final int PLAY_W = 52;
+    private static final int STOP_W = 40;
+    private static final int GAP = 4;
 
     private record Track(Component name, Runnable play) {}
     private record AlbumView(Component name, @Nullable Path cover, @Nullable ItemStack icon, List<Track> tracks) {}
     private record CoverSlot(AlbumView album, int x, int y, int size) {}
 
+    // A slider that edits IpodVolume
+    private static class VolumeSlider extends AbstractSliderButton {
+        public VolumeSlider(int x, int y, int width, int height) {
+            super(x, y, width, height, Component.empty(), IpodVolume.get());
+            updateMessage();
+        }
+
+        @Override
+        protected void updateMessage() {
+            setMessage(Component.translatable("screen.icraft.ipod.volume", (int) Math.round(value * 100)));
+        }
+
+        @Override
+        protected void applyValue() {
+            IpodVolume.set((float) value);
+        }
+    }
+
     private final List<AlbumView> albums = new ArrayList<>();
     private final List<CoverSlot> coverSlots = new ArrayList<>();
     @Nullable
     private AlbumView open; // null = showing the album list
+    @Nullable
+    private Button pauseButton;
     private int page;
     private int pageCount = 1;
     private int listTop = TOP_MARGIN;
@@ -132,11 +157,21 @@ public class IpodScreen extends Screen {
             }
         }
 
+        // controls row: [Pause/Play] [Stop] [volume slider]
         int stopY = listTop + headerH + rows * rowH + 4;
+        pauseButton = Button.builder(Component.translatable("screen.icraft.ipod.pause"),
+                        b -> IpodPlayer.togglePause())
+                .bounds(left, stopY, PLAY_W, BUTTON_H).build();
+        addRenderableWidget(pauseButton);
+
         addRenderableWidget(Button.builder(Component.translatable("screen.icraft.ipod.stop"),
                         b -> IpodPlayer.stop())
-                .bounds(left, stopY, 60, BUTTON_H).build());
-        addRenderableWidget(new VolumeSlider(left + 66, stopY, BUTTON_W - 66, BUTTON_H));
+                .bounds(left + PLAY_W + GAP, stopY, STOP_W, BUTTON_H).build());
+
+        int sliderX = left + PLAY_W + STOP_W + 2 * GAP;
+        addRenderableWidget(new VolumeSlider(sliderX, stopY, BUTTON_W - (sliderX - left), BUTTON_H));
+
+        updatePauseButton();
 
         if (pageCount > 1) {
             navY = stopY + ROW_H;
@@ -151,22 +186,17 @@ public class IpodScreen extends Screen {
         }
     }
 
-    // A slider that edits IpodVolume
-    private static class VolumeSlider extends AbstractSliderButton {
-        public VolumeSlider(int x, int y, int width, int height) {
-            super(x, y, width, height, Component.empty(), IpodVolume.get());
-            updateMessage();
-        }
+    // Runs every tick while the screen is open: keeps the Pause/Play button up to date
+    @Override
+    public void tick() {
+        updatePauseButton();
+    }
 
-        @Override
-        protected void updateMessage() {
-            setMessage(Component.translatable("screen.icraft.ipod.volume", (int) Math.round(value * 100)));
-        }
-
-        @Override
-        protected void applyValue() {
-            IpodVolume.set((float) value);
-        }
+    private void updatePauseButton() {
+        if (pauseButton == null) return;
+        pauseButton.setMessage(Component.translatable(
+                IpodPlayer.isPaused() ? "screen.icraft.ipod.play" : "screen.icraft.ipod.pause"));
+        pauseButton.active = IpodPlayer.canTogglePause(); // greyed out while nothing plays or during the cooldown
     }
 
     @Override
@@ -224,6 +254,11 @@ public class IpodScreen extends Screen {
             String initial = name.isEmpty() ? "?" : name.substring(0, 1).toUpperCase(Locale.ROOT);
             g.drawCenteredString(this.font, initial, x + s / 2, y + s / 2 - 4, 0xAAAAAA);
         }
+    }
+
+    @Override
+    public void removed() {
+        IpodVolume.save(); // write the volume to the config file when the screen closes
     }
 
     @Override
