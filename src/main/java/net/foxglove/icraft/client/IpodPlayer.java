@@ -1,16 +1,14 @@
 package net.foxglove.icraft.client;
 
 import net.foxglove.icraft.block.ModBlocks;
-import net.foxglove.icraft.client.audio.FileSoundInstance;
+import net.foxglove.icraft.client.audio.IpodSoundInstance;
 import net.foxglove.icraft.client.audio.LocalMusic;
 import net.foxglove.icraft.item.IpodItem;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.resources.sounds.SimpleSoundInstance;
 import net.minecraft.client.resources.sounds.SoundInstance;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.sounds.SoundEvent;
-import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
@@ -35,17 +33,10 @@ public class IpodPlayer {
         JukeboxSong.fromStack(mc.level.registryAccess(), disc).ifPresent(song -> {
             SoundEvent sound = song.value().soundEvent().value();
             BlockPos used = validSpeaker(mc, speaker);
+            Vec3 pos = used != null ? Vec3.atCenterOf(used) : null;
 
-            SoundInstance instance;
-            if (used != null) {
-                Vec3 pos = Vec3.atCenterOf(used);
-                instance = new SimpleSoundInstance(sound.getLocation(), SoundSource.RECORDS,
-                        SPEAKER_VOLUME, 1.0F, SoundInstance.createUnseededRandom(), false, 0,
-                        SoundInstance.Attenuation.LINEAR, pos.x, pos.y, pos.z, false);
-            } else {
-                instance = SimpleSoundInstance.forMusic(sound);
-            }
-            start(instance, disc.copy(), used, song.value().description());
+            start(IpodSoundInstance.forDisc(sound, pos, SPEAKER_VOLUME), disc.copy(), used,
+                    song.value().description());
         });
     }
 
@@ -55,7 +46,8 @@ public class IpodPlayer {
 
         BlockPos used = validSpeaker(mc, speaker);
         Vec3 pos = used != null ? Vec3.atCenterOf(used) : null;
-        start(new FileSoundInstance(file, pos, SPEAKER_VOLUME), ItemStack.EMPTY, used,
+
+        start(IpodSoundInstance.forFile(file, pos, SPEAKER_VOLUME), ItemStack.EMPTY, used,
                 Component.literal(LocalMusic.displayName(file)));
     }
 

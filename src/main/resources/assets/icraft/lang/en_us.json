@@ -12,6 +12,7 @@
   "screen.icraft.ipod.discs": "Music Discs",
   "screen.icraft.ipod.back": "< Albums",
   "screen.icraft.ipod.tracks": "%s tracks",
+  "screen.icraft.ipod.volume": "Volume: %s%%",
 
   "message.icraft.ipod.linked": "iPod linked to speaker"
 

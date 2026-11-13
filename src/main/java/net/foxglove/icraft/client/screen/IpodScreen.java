@@ -14,6 +14,8 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.JukeboxSong;
 import org.jetbrains.annotations.Nullable;
+import net.foxglove.icraft.client.IpodVolume;
+import net.minecraft.client.gui.components.AbstractSliderButton;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -133,7 +135,8 @@ public class IpodScreen extends Screen {
         int stopY = listTop + headerH + rows * rowH + 4;
         addRenderableWidget(Button.builder(Component.translatable("screen.icraft.ipod.stop"),
                         b -> IpodPlayer.stop())
-                .bounds(left, stopY, BUTTON_W, BUTTON_H).build());
+                .bounds(left, stopY, 60, BUTTON_H).build());
+        addRenderableWidget(new VolumeSlider(left + 66, stopY, BUTTON_W - 66, BUTTON_H));
 
         if (pageCount > 1) {
             navY = stopY + ROW_H;
@@ -145,6 +148,24 @@ public class IpodScreen extends Screen {
             next.active = page < pageCount - 1;
             addRenderableWidget(prev);
             addRenderableWidget(next);
+        }
+    }
+
+    // A slider that edits IpodVolume
+    private static class VolumeSlider extends AbstractSliderButton {
+        public VolumeSlider(int x, int y, int width, int height) {
+            super(x, y, width, height, Component.empty(), IpodVolume.get());
+            updateMessage();
+        }
+
+        @Override
+        protected void updateMessage() {
+            setMessage(Component.translatable("screen.icraft.ipod.volume", (int) Math.round(value * 100)));
+        }
+
+        @Override
+        protected void applyValue() {
+            IpodVolume.set((float) value);
         }
     }
 
