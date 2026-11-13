@@ -11,7 +11,7 @@ public class ClientHooks {
     public static void openIpodScreen(ItemStack ipod) {
         Minecraft.getInstance().setScreen(new IpodScreen(
                 IpodItem.getDiscs(ipod),
-                LocalMusic.list(),
+                LocalMusic.albums(),
                 ipod.get(ModDataComponents.LINKED_SPEAKER.get())));
     }
 

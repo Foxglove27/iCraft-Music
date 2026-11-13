@@ -9,6 +9,9 @@
   "screen.icraft.ipod": "iPod",
   "screen.icraft.ipod.stop": "Stop",
   "screen.icraft.ipod.empty": "No discs or music files found",
+  "screen.icraft.ipod.discs": "Music Discs",
+  "screen.icraft.ipod.back": "< Albums",
+  "screen.icraft.ipod.tracks": "%s tracks",
 
   "message.icraft.ipod.linked": "iPod linked to speaker"
 
