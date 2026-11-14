@@ -30,14 +30,14 @@ public class IpodScreen extends Screen {
     private static final int COVER_SMALL = 32;
     private static final int COVER_LARGE = 48;
     private static final int HEADER_H = COVER_LARGE + 6;
-    private static final int FOOTER_H = 4 + ROW_H + BUTTON_H; // controls row + page row
+    // controls: transport row + volume row, plus the page row when there are several pages
+    private static final int FOOTER_H = 4 + 2 * ROW_H + BUTTON_H;
     private static final int TOP_MARGIN = 30;
     private static final int BOTTOM_MARGIN = 20;
 
-    // widths of the controls row: [Pause/Play] [Stop] [volume slider]
-    private static final int PLAY_W = 52;
-    private static final int STOP_W = 40;
+    // transport row: [Prev] [Pause/Play] [Next] [Stop], all the same width
     private static final int GAP = 4;
+    private static final int TRANSPORT_W = (BUTTON_W - 3 * GAP) / 4;
 
     private record Track(Component name, Runnable play) {}
     private record AlbumView(Component name, @Nullable Path cover, @Nullable ItemStack icon, List<Track> tracks) {}
@@ -66,7 +66,11 @@ public class IpodScreen extends Screen {
     @Nullable
     private AlbumView open; // null = showing the album list
     @Nullable
+    private Button prevButton;
+    @Nullable
     private Button pauseButton;
+    @Nullable
+    private Button nextButton;
     private int page;
     private int pageCount = 1;
     private int listTop = TOP_MARGIN;
@@ -122,7 +126,7 @@ public class IpodScreen extends Screen {
         page = Math.min(page, pageCount - 1);
 
         int rows = Math.max(1, Math.min(perPage, itemCount));
-        int blockHeight = headerH + rows * rowH + 4 + BUTTON_H + (pageCount > 1 ? ROW_H : 0);
+        int blockHeight = headerH + rows * rowH + 4 + BUTTON_H + ROW_H + (pageCount > 1 ? ROW_H : 0);
         listTop = Math.max(TOP_MARGIN, (this.height - blockHeight) / 2);
 
         int y = listTop + headerH;
@@ -131,9 +135,14 @@ public class IpodScreen extends Screen {
 
         if (tracksView) {
             coverSlots.add(new CoverSlot(open, left, listTop, COVER_LARGE));
+
+            // the whole album as a list of "start this track" actions, for Next/Previous
+            List<Runnable> actions = open.tracks().stream().map(Track::play).toList();
+
             for (int i = start; i < end; i++) {
                 Track track = open.tracks().get(i);
-                addRenderableWidget(Button.builder(track.name(), b -> track.play().run())
+                int index = i; // a copy of i, because the button's code below needs a value that never changes
+                addRenderableWidget(Button.builder(track.name(), b -> IpodPlayer.playQueue(actions, index))
                         .bounds(left, y, BUTTON_W, BUTTON_H).build());
                 y += rowH;
             }
@@ -157,24 +166,35 @@ public class IpodScreen extends Screen {
             }
         }
 
-        // controls row: [Pause/Play] [Stop] [volume slider]
-        int stopY = listTop + headerH + rows * rowH + 4;
+        // transport row: [Prev] [Pause/Play] [Next] [Stop]
+        int controlsY = listTop + headerH + rows * rowH + 4;
+        int step = TRANSPORT_W + GAP; // distance from one button's left edge to the next
+
+        prevButton = Button.builder(Component.translatable("screen.icraft.ipod.previous"),
+                        b -> IpodPlayer.previous())
+                .bounds(left, controlsY, TRANSPORT_W, BUTTON_H).build();
         pauseButton = Button.builder(Component.translatable("screen.icraft.ipod.pause"),
                         b -> IpodPlayer.togglePause())
-                .bounds(left, stopY, PLAY_W, BUTTON_H).build();
-        addRenderableWidget(pauseButton);
-
-        addRenderableWidget(Button.builder(Component.translatable("screen.icraft.ipod.stop"),
+                .bounds(left + step, controlsY, TRANSPORT_W, BUTTON_H).build();
+        nextButton = Button.builder(Component.translatable("screen.icraft.ipod.next"),
+                        b -> IpodPlayer.next())
+                .bounds(left + 2 * step, controlsY, TRANSPORT_W, BUTTON_H).build();
+        Button stopButton = Button.builder(Component.translatable("screen.icraft.ipod.stop"),
                         b -> IpodPlayer.stop())
-                .bounds(left + PLAY_W + GAP, stopY, STOP_W, BUTTON_H).build());
+                .bounds(left + 3 * step, controlsY, TRANSPORT_W, BUTTON_H).build();
 
-        int sliderX = left + PLAY_W + STOP_W + 2 * GAP;
-        addRenderableWidget(new VolumeSlider(sliderX, stopY, BUTTON_W - (sliderX - left), BUTTON_H));
+        addRenderableWidget(prevButton);
+        addRenderableWidget(pauseButton);
+        addRenderableWidget(nextButton);
+        addRenderableWidget(stopButton);
 
-        updatePauseButton();
+        // volume slider on its own row
+        addRenderableWidget(new VolumeSlider(left, controlsY + ROW_H, BUTTON_W, BUTTON_H));
+
+        updateControls();
 
         if (pageCount > 1) {
-            navY = stopY + ROW_H;
+            navY = controlsY + 2 * ROW_H;
             Button prev = Button.builder(Component.literal("<"), b -> { page--; rebuildWidgets(); })
                     .bounds(left, navY, 40, BUTTON_H).build();
             Button next = Button.builder(Component.literal(">"), b -> { page++; rebuildWidgets(); })
@@ -186,17 +206,21 @@ public class IpodScreen extends Screen {
         }
     }
 
-    // Runs every tick while the screen is open: keeps the Pause/Play button up to date
+    // Runs every tick while the screen is open: keeps the transport buttons up to date
     @Override
     public void tick() {
-        updatePauseButton();
+        updateControls();
     }
 
-    private void updatePauseButton() {
-        if (pauseButton == null) return;
-        pauseButton.setMessage(Component.translatable(
-                IpodPlayer.isPaused() ? "screen.icraft.ipod.play" : "screen.icraft.ipod.pause"));
-        pauseButton.active = IpodPlayer.canTogglePause(); // greyed out while nothing plays or during the cooldown
+    private void updateControls() {
+        if (pauseButton != null) {
+            pauseButton.setMessage(Component.translatable(
+                    IpodPlayer.isPaused() ? "screen.icraft.ipod.play" : "screen.icraft.ipod.pause"));
+            pauseButton.active = IpodPlayer.canTogglePause();
+        }
+        // Prev/Next only make sense once a track has been started from a list
+        if (prevButton != null) prevButton.active = IpodPlayer.hasQueue();
+        if (nextButton != null) nextButton.active = IpodPlayer.hasQueue();
     }
 
     @Override

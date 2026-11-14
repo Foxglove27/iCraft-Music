@@ -20,6 +20,7 @@ import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.Nullable;
 
 import java.nio.file.Path;
+import java.util.List;
 
 public class IpodPlayer {
     private static final float SPEAKER_VOLUME = 1.0F; // range = volume x 16 blocks
@@ -32,6 +33,10 @@ public class IpodPlayer {
     private static boolean paused = false;
     // true when we paused it because the iPod left your inventory (so we can resume it on return)
     private static boolean autoPaused = false;
+
+    // The list of tracks the current song came from, and our position in it
+    private static List<Runnable> queue = List.of();
+    private static int queueIndex = -1;
 
     public static void play(ItemStack disc, @Nullable BlockPos speaker) {
         Minecraft mc = Minecraft.getInstance();
@@ -60,7 +65,7 @@ public class IpodPlayer {
 
     private static void start(SoundInstance instance, ItemStack disc, @Nullable BlockPos speaker, Component name) {
         Minecraft mc = Minecraft.getInstance();
-        stop(); // ends any current song and resets the paused flags
+        endCurrent(); // ends any current sound, but keeps the track list
         mc.getMusicManager().stopPlaying();
         current = instance;
         currentDisc = disc;
@@ -74,8 +79,16 @@ public class IpodPlayer {
         return (speaker != null && mc.level.getBlockState(speaker).is(ModBlocks.SPEAKER.get())) ? speaker : null;
     }
 
-    // Ends the song completely. Playing again starts from the beginning.
+    // Ends the song completely and forgets the track list.
+    // Playing again starts from the beginning.
     public static void stop() {
+        endCurrent();
+        queue = List.of();
+        queueIndex = -1;
+    }
+
+    // Ends the current sound but keeps the track list (used when switching tracks)
+    private static void endCurrent() {
         if (current != null) {
             Minecraft.getInstance().getSoundManager().stop(current);
             current = null;
@@ -108,6 +121,32 @@ public class IpodPlayer {
         } else {
             pause();
         }
+    }
+
+    // Starts a track and remembers the list it came from, so Next/Previous know where to go
+    public static void playQueue(List<Runnable> tracks, int index) {
+        queue = tracks;
+        queueIndex = index;
+        tracks.get(index).run();
+    }
+
+    public static void next() {
+        skip(1);
+    }
+
+    public static void previous() {
+        skip(-1);
+    }
+
+    private static void skip(int step) {
+        if (queue.isEmpty()) return;
+        // floorMod keeps the position inside the list and wraps around at both ends
+        queueIndex = Math.floorMod(queueIndex + step, queue.size());
+        queue.get(queueIndex).run();
+    }
+
+    public static boolean hasQueue() {
+        return !queue.isEmpty();
     }
 
     // Pause/Play only works while a song is loaded

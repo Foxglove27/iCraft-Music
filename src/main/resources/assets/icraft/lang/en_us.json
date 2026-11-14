@@ -11,9 +11,11 @@
   "screen.icraft.ipod.discs": "Music Discs",
   "screen.icraft.ipod.back": "< Albums",
   "screen.icraft.ipod.tracks": "%s tracks",
-  "screen.icraft.ipod.pause": "Pause",
-  "screen.icraft.ipod.play": "Play",
-  "screen.icraft.ipod.stop": "Stop",
+  "screen.icraft.ipod.previous": "⏮",
+  "screen.icraft.ipod.pause": "⏸",
+  "screen.icraft.ipod.play": "▶",
+  "screen.icraft.ipod.next": "⏭",
+  "screen.icraft.ipod.stop": "⏹",
   "screen.icraft.ipod.volume": "Volume %s%%",
 
   "message.icraft.ipod.linked": "iPod linked to speaker"
