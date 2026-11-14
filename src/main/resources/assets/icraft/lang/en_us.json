@@ -7,9 +7,7 @@
   "creativetab.icraft.ipod": "iCraft",
 
   "screen.icraft.ipod": "iPod",
-  "screen.icraft.ipod.empty": "No discs or music files found",
   "screen.icraft.ipod.discs": "Music Discs",
-  "screen.icraft.ipod.back": "< Albums",
   "screen.icraft.ipod.tracks": "%s tracks",
   "screen.icraft.ipod.previous": "⏮",
   "screen.icraft.ipod.pause": "⏸",
@@ -17,6 +15,8 @@
   "screen.icraft.ipod.next": "⏭",
   "screen.icraft.ipod.stop": "⏹",
   "screen.icraft.ipod.volume": "Volume %s%%",
+  "screen.icraft.ipod.albums": "Albums",
+  "screen.icraft.ipod.empty": "No music found. Add discs, or put files in the ipod_music folder.",
 
   "message.icraft.ipod.linked": "iPod linked to speaker"
 

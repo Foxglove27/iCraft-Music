@@ -1,21 +1,24 @@
 package net.foxglove.icraft.client.screen;
 
+import com.mojang.math.Axis;
 import net.foxglove.icraft.client.IpodPlayer;
 import net.foxglove.icraft.client.IpodVolume;
 import net.foxglove.icraft.client.audio.CoverArt;
 import net.foxglove.icraft.client.audio.LocalMusic;
+import net.foxglove.icraft.iCraft;
+import net.minecraft.Util;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.components.AbstractSliderButton;
-import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.util.Mth;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.JukeboxSong;
 import org.jetbrains.annotations.Nullable;
+import org.lwjgl.glfw.GLFW;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -23,58 +26,67 @@ import java.util.List;
 import java.util.Locale;
 
 public class IpodScreen extends Screen {
-    private static final int BUTTON_W = 180;
-    private static final int BUTTON_H = 20;
-    private static final int ROW_H = 22;
-    private static final int ALBUM_ROW_H = 36;
-    private static final int COVER_SMALL = 32;
-    private static final int COVER_LARGE = 48;
-    private static final int HEADER_H = COVER_LARGE + 6;
-    // controls: transport row + volume row, plus the page row when there are several pages
-    private static final int FOOTER_H = 4 + 2 * ROW_H + BUTTON_H;
-    private static final int TOP_MARGIN = 30;
-    private static final int BOTTOM_MARGIN = 20;
+    // ---- The texture ----
+    private static final ResourceLocation TEXTURE =
+            ResourceLocation.fromNamespaceAndPath(iCraft.MOD_ID, "textures/gui/ipod_gui.png");
+    private static final int TEX_SIZE = 1280; // the file is 1280 x 1280 pixels
 
-    // transport row: [Prev] [Pause/Play] [Next] [Stop], all the same width
-    private static final int GAP = 4;
-    private static final int TRANSPORT_W = (BUTTON_W - 3 * GAP) / 4;
+    // Where the iPod is inside that file (x, y, width, height in file pixels)
+    private static final int SRC_X = 288;
+    private static final int SRC_Y = 144;
+    private static final int SRC_W = 704;
+    private static final int SRC_H = 1024;
+
+    // ---- Sizes ----
+    // How many GUI pixels one pixel of the artwork is drawn as. Change this to resize the iPod.
+    private static final int PX = 3;
+
+    private static final int BODY_W = 44 * PX;
+    private static final int BODY_H = 64 * PX;
+
+    // The display, measured from the iPod's top-left corner
+    private static final int DISPLAY_X = 6 * PX;
+    private static final int DISPLAY_Y = 6 * PX;
+    private static final int DISPLAY_W = 32 * PX;
+    private static final int DISPLAY_H = 23 * PX;
+    private static final int HEADER_H = 5 * PX; // the light blue strip at the top of the display
+
+    // The click wheel
+    private static final int WHEEL_X = 22 * PX; // centre of the wheel
+    private static final int WHEEL_Y = 46 * PX;
+    private static final int WHEEL_R = 13 * PX; // outer radius
+    private static final int CENTER_R = 5 * PX; // radius of the middle button
+
+    // The list inside the display
+    private static final int LIST_Y = DISPLAY_Y + HEADER_H;
+    private static final int ROW_H = 12;
+    private static final int ROWS = 4;
+    private static final int PAD = 3;
+    private static final int THUMB = 10; // size of the little album cover
+
+    // The open/close animation lasts this many milliseconds
+    private static final long ANIM_MS = 280;
+
+    // Two clicks on the middle button closer together than this count as a double-click
+    private static final long DOUBLE_CLICK_MS = 300;
+
+    // When a single click on the middle button is waiting to see if a second one follows,
+    // this is the time (in milliseconds) when we give up waiting. -1 means nothing is waiting.
+    private long pendingActivateAt = -1;
 
     private record Track(Component name, Runnable play) {}
     private record AlbumView(Component name, @Nullable Path cover, @Nullable ItemStack icon, List<Track> tracks) {}
-    private record CoverSlot(AlbumView album, int x, int y, int size) {}
-
-    // A slider that edits IpodVolume
-    private static class VolumeSlider extends AbstractSliderButton {
-        public VolumeSlider(int x, int y, int width, int height) {
-            super(x, y, width, height, Component.empty(), IpodVolume.get());
-            updateMessage();
-        }
-
-        @Override
-        protected void updateMessage() {
-            setMessage(Component.translatable("screen.icraft.ipod.volume", (int) Math.round(value * 100)));
-        }
-
-        @Override
-        protected void applyValue() {
-            IpodVolume.set((float) value);
-        }
-    }
 
     private final List<AlbumView> albums = new ArrayList<>();
-    private final List<CoverSlot> coverSlots = new ArrayList<>();
     @Nullable
-    private AlbumView open; // null = showing the album list
-    @Nullable
-    private Button prevButton;
-    @Nullable
-    private Button pauseButton;
-    @Nullable
-    private Button nextButton;
-    private int page;
-    private int pageCount = 1;
-    private int listTop = TOP_MARGIN;
-    private int navY;
+    private AlbumView open;   // null = showing the album list
+    private int openedIndex;  // which album we opened, so Menu can jump back to it
+    private int selected;     // the highlighted row in the current list
+    private int scroll;       // index of the first row that is visible
+
+    private long animStart;
+    private boolean closing;
+    private float closeFrom;
 
     public IpodScreen(List<ItemStack> discs, List<LocalMusic.Album> library, @Nullable BlockPos speaker) {
         super(Component.translatable("screen.icraft.ipod"));
@@ -96,6 +108,8 @@ public class IpodScreen extends Screen {
             }
             albums.add(new AlbumView(Component.literal(album.name()), album.cover(), null, tracks));
         }
+
+        animStart = Util.getMillis();
     }
 
     private static Component discName(ItemStack disc) {
@@ -108,157 +122,156 @@ public class IpodScreen extends Screen {
         return disc.getHoverName();
     }
 
+    // =====================================================================
+    // Animation
+    // =====================================================================
+
+    // 0 = the iPod is off the bottom of the screen, 1 = it is in place
+    private float progress() {
+        float t = Mth.clamp((Util.getMillis() - animStart) / (float) ANIM_MS, 0.0F, 1.0F);
+        if (closing) {
+            return closeFrom * (1.0F - t * t * t);   // speeds up as it leaves
+        }
+        float inv = 1.0F - t;
+        return 1.0F - inv * inv * inv;               // slows down as it arrives
+    }
+
+    // True once the iPod has arrived: only then do we accept clicks
+    private boolean settled() {
+        return !closing && progress() >= 1.0F;
+    }
+
+    // Shrinks the iPod if the window is too small to show it fully
+    private float fitScale() {
+        return Math.min(1.0F, (this.height - 16) / (float) BODY_H);
+    }
+
+    // Esc (and anything else that closes the screen) starts the closing animation instead
     @Override
-    protected void init() {
-        coverSlots.clear();
-        int cx = this.width / 2;
-        int left = cx - BUTTON_W / 2;
-        boolean tracksView = open != null;
+    public void onClose() {
+        if (closing) return;
+        closeFrom = progress();
+        closing = true;
+        animStart = Util.getMillis();
+    }
 
-        int rowH = tracksView ? ROW_H : ALBUM_ROW_H;
-        int headerH = tracksView ? HEADER_H : 0;
-        int itemCount = tracksView ? open.tracks().size() : albums.size();
+    @Override
+    public void tick() {
+        // A single click on the middle button has waited long enough: no second click came, so do it now
+        if (pendingActivateAt >= 0 && Util.getMillis() >= pendingActivateAt) {
+            pendingActivateAt = -1;
+            activate();
+        }
 
-        // fit as many rows as the window allows
-        int available = this.height - TOP_MARGIN - BOTTOM_MARGIN - headerH - FOOTER_H;
-        int perPage = Math.max(1, Math.min(8, available / rowH));
-        pageCount = Math.max(1, (itemCount + perPage - 1) / perPage);
-        page = Math.min(page, pageCount - 1);
+        if (closing && progress() <= 0.0F) {
+            super.onClose(); // the animation has finished, so really close the screen
+        }
+    }
 
-        int rows = Math.max(1, Math.min(perPage, itemCount));
-        int blockHeight = headerH + rows * rowH + 4 + BUTTON_H + ROW_H + (pageCount > 1 ? ROW_H : 0);
-        listTop = Math.max(TOP_MARGIN, (this.height - blockHeight) / 2);
+    // =====================================================================
+    // Drawing
+    // =====================================================================
 
-        int y = listTop + headerH;
-        int start = page * perPage;
-        int end = Math.min(start + perPage, itemCount);
+    @Override
+    public void renderBackground(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
+        // No blur, so the world stays visible. Just a light dim that fades in as the iPod arrives.
+        int alpha = (int) (progress() * 90);
+        g.fill(0, 0, this.width, this.height, alpha << 24);
+    }
 
-        if (tracksView) {
-            coverSlots.add(new CoverSlot(open, left, listTop, COVER_LARGE));
+    @Override
+    public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
+        this.renderBackground(g, mouseX, mouseY, partialTick);
 
-            // the whole album as a list of "start this track" actions, for Next/Previous
-            List<Runnable> actions = open.tracks().stream().map(Track::play).toList();
+        float p = progress();
+        float fit = fitScale();
+        float scale = fit * (0.85F + 0.15F * p);                               // grows as it arrives
+        float slide = (1.0F - p) * (this.height * 0.5F + BODY_H * 0.5F * fit); // starts below the screen
 
-            for (int i = start; i < end; i++) {
-                Track track = open.tracks().get(i);
-                int index = i; // a copy of i, because the button's code below needs a value that never changes
-                addRenderableWidget(Button.builder(track.name(), b -> IpodPlayer.playQueue(actions, index))
-                        .bounds(left, y, BUTTON_W, BUTTON_H).build());
-                y += rowH;
+        // Everything between pushPose and popPose is drawn in "iPod coordinates":
+        // (0, 0) is the iPod's top-left corner, and the whole animation is applied to it at once.
+        g.pose().pushPose();
+        g.pose().translate(this.width / 2.0F, this.height / 2.0F + slide, 0.0F);
+        g.pose().mulPose(Axis.ZP.rotationDegrees((1.0F - p) * -8.0F));          // tilts as if picked up
+        g.pose().scale(scale, scale, 1.0F);
+        g.pose().translate(-BODY_W / 2.0F, -BODY_H / 2.0F, 0.0F);
+
+        // 1) the iPod picture
+        g.blit(TEXTURE, 0, 0, BODY_W, BODY_H, SRC_X, SRC_Y, SRC_W, SRC_H, TEX_SIZE, TEX_SIZE);
+
+        // 2) the contents of the display
+        drawDisplay(g);
+
+        g.pose().popPose();
+    }
+
+    private void drawDisplay(GuiGraphics g) {
+        int left = DISPLAY_X + PAD;
+        int right = DISPLAY_X + DISPLAY_W - PAD;
+        int count = listSize();
+        keepSelectionVisible();
+
+        // Header: dark text on the light blue strip, plus a play/pause symbol
+        Component title = open == null ? Component.translatable("screen.icraft.ipod.albums") : open.name();
+        g.drawString(this.font, fit(title.getString(), right - left - 10), left,
+                DISPLAY_Y + (HEADER_H - 8) / 2, 0xFF0A2A66, false);
+        drawStatusIcon(g, right - 5, DISPLAY_Y + (HEADER_H - 5) / 2);
+
+        // Nothing to show
+        if (count == 0) {
+            g.drawWordWrap(this.font, Component.translatable("screen.icraft.ipod.empty"),
+                    left, LIST_Y + 3, right - left, 0xFFFFFFFF);
+        }
+
+        // The rows
+        for (int row = 0; row < ROWS; row++) {
+            int index = scroll + row;
+            if (index >= count) break;
+
+            int rowY = LIST_Y + row * ROW_H;
+            boolean isSelected = index == selected;
+            if (isSelected) {
+                g.fill(DISPLAY_X + 1, rowY, DISPLAY_X + DISPLAY_W - 1, rowY + ROW_H - 1, 0xDDFFFFFF);
             }
-            addRenderableWidget(Button.builder(Component.translatable("screen.icraft.ipod.back"), b -> {
-                open = null;
-                page = 0;
-                rebuildWidgets();
-            }).bounds(8, 8, 70, BUTTON_H).build());
+
+            int textX = left;
+            Component name;
+            if (open == null) {
+                AlbumView album = albums.get(index);
+                drawCover(g, album, left, rowY + 1, THUMB);
+                textX = left + THUMB + 3;
+                name = album.name();
+            } else {
+                name = open.tracks().get(index).name();
+            }
+
+            int color = isSelected ? 0xFF0A3A8C : 0xFFFFFFFF;
+            g.drawString(this.font, fit(name.getString(), right - textX), textX, rowY + 2, color, !isSelected);
+        }
+
+        // Volume bar along the bottom of the display
+        int barY = LIST_Y + ROWS * ROW_H + 1;
+        int barW = right - left;
+        g.fill(left, barY, left + barW, barY + 2, 0x66000000);
+        g.fill(left, barY, left + (int) (barW * IpodVolume.get()), barY + 2, 0xFFFFFFFF);
+    }
+
+    // A small triangle while playing, two bars while paused, nothing when idle
+    private void drawStatusIcon(GuiGraphics g, int x, int y) {
+        if (!IpodPlayer.isPlaying()) return;
+        int color = 0xFF0A2A66;
+        if (IpodPlayer.isPaused()) {
+            g.fill(x, y, x + 2, y + 5, color);
+            g.fill(x + 3, y, x + 5, y + 5, color);
         } else {
-            for (int i = start; i < end; i++) {
-                AlbumView album = albums.get(i);
-                coverSlots.add(new CoverSlot(album, left, y + 2, COVER_SMALL));
-                Component label = album.name().copy()
-                        .append(Component.literal(" (" + album.tracks().size() + ")"));
-                addRenderableWidget(Button.builder(label, b -> {
-                    open = album;
-                    page = 0;
-                    rebuildWidgets();
-                }).bounds(left + COVER_SMALL + 6, y + 8, BUTTON_W - COVER_SMALL - 6, BUTTON_H).build());
-                y += rowH;
+            for (int i = 0; i < 5; i++) {
+                int width = Math.min(i, 4 - i) + 1;
+                g.fill(x, y + i, x + width, y + i + 1, color);
             }
         }
-
-        // transport row: [Prev] [Pause/Play] [Next] [Stop]
-        int controlsY = listTop + headerH + rows * rowH + 4;
-        int step = TRANSPORT_W + GAP; // distance from one button's left edge to the next
-
-        prevButton = Button.builder(Component.translatable("screen.icraft.ipod.previous"),
-                        b -> IpodPlayer.previous())
-                .bounds(left, controlsY, TRANSPORT_W, BUTTON_H).build();
-        pauseButton = Button.builder(Component.translatable("screen.icraft.ipod.pause"),
-                        b -> IpodPlayer.togglePause())
-                .bounds(left + step, controlsY, TRANSPORT_W, BUTTON_H).build();
-        nextButton = Button.builder(Component.translatable("screen.icraft.ipod.next"),
-                        b -> IpodPlayer.next())
-                .bounds(left + 2 * step, controlsY, TRANSPORT_W, BUTTON_H).build();
-        Button stopButton = Button.builder(Component.translatable("screen.icraft.ipod.stop"),
-                        b -> IpodPlayer.stop())
-                .bounds(left + 3 * step, controlsY, TRANSPORT_W, BUTTON_H).build();
-
-        addRenderableWidget(prevButton);
-        addRenderableWidget(pauseButton);
-        addRenderableWidget(nextButton);
-        addRenderableWidget(stopButton);
-
-        // volume slider on its own row
-        addRenderableWidget(new VolumeSlider(left, controlsY + ROW_H, BUTTON_W, BUTTON_H));
-
-        updateControls();
-
-        if (pageCount > 1) {
-            navY = controlsY + 2 * ROW_H;
-            Button prev = Button.builder(Component.literal("<"), b -> { page--; rebuildWidgets(); })
-                    .bounds(left, navY, 40, BUTTON_H).build();
-            Button next = Button.builder(Component.literal(">"), b -> { page++; rebuildWidgets(); })
-                    .bounds(left + BUTTON_W - 40, navY, 40, BUTTON_H).build();
-            prev.active = page > 0;
-            next.active = page < pageCount - 1;
-            addRenderableWidget(prev);
-            addRenderableWidget(next);
-        }
     }
 
-    // Runs every tick while the screen is open: keeps the transport buttons up to date
-    @Override
-    public void tick() {
-        updateControls();
-    }
-
-    private void updateControls() {
-        if (pauseButton != null) {
-            pauseButton.setMessage(Component.translatable(
-                    IpodPlayer.isPaused() ? "screen.icraft.ipod.play" : "screen.icraft.ipod.pause"));
-            pauseButton.active = IpodPlayer.canTogglePause();
-        }
-        // Prev/Next only make sense once a track has been started from a list
-        if (prevButton != null) prevButton.active = IpodPlayer.hasQueue();
-        if (nextButton != null) nextButton.active = IpodPlayer.hasQueue();
-    }
-
-    @Override
-    public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        super.render(graphics, mouseX, mouseY, partialTick);
-        graphics.drawCenteredString(this.font, this.title, this.width / 2, listTop - 20, 0xFFFFFF);
-
-        for (CoverSlot slot : coverSlots) {
-            drawCover(graphics, slot);
-        }
-
-        if (open != null) {
-            int textX = this.width / 2 - BUTTON_W / 2 + COVER_LARGE + 8;
-            graphics.drawString(this.font, open.name(), textX, listTop + 8, 0xFFFFFF);
-            graphics.drawString(this.font,
-                    Component.translatable("screen.icraft.ipod.tracks", open.tracks().size()),
-                    textX, listTop + 22, 0xAAAAAA);
-        }
-
-        if (albums.isEmpty()) {
-            graphics.drawCenteredString(this.font,
-                    Component.translatable("screen.icraft.ipod.empty"),
-                    this.width / 2, listTop + 6, 0xAAAAAA);
-        }
-
-        if (pageCount > 1) {
-            graphics.drawCenteredString(this.font,
-                    Component.literal((page + 1) + " / " + pageCount),
-                    this.width / 2, navY + 6, 0xAAAAAA);
-        }
-    }
-
-    private void drawCover(GuiGraphics g, CoverSlot slot) {
-        int x = slot.x();
-        int y = slot.y();
-        int s = slot.size();
-        AlbumView album = slot.album();
-
+    private void drawCover(GuiGraphics g, AlbumView album, int x, int y, int s) {
         ResourceLocation texture = album.cover() != null ? CoverArt.get(album.cover()) : null;
         if (texture != null) {
             g.blit(texture, x, y, s, s, 0, 0, CoverArt.SIZE, CoverArt.SIZE, CoverArt.SIZE, CoverArt.SIZE);
@@ -278,6 +291,178 @@ public class IpodScreen extends Screen {
             String initial = name.isEmpty() ? "?" : name.substring(0, 1).toUpperCase(Locale.ROOT);
             g.drawCenteredString(this.font, initial, x + s / 2, y + s / 2 - 4, 0xAAAAAA);
         }
+    }
+
+    // Cuts text short with "..." so it fits in the given width
+    private String fit(String text, int maxWidth) {
+        if (this.font.width(text) <= maxWidth) return text;
+        return this.font.plainSubstrByWidth(text, maxWidth - this.font.width("...")) + "...";
+    }
+
+    // =====================================================================
+    // The list: what is selected and what pressing things does
+    // =====================================================================
+
+    private int listSize() {
+        return open != null ? open.tracks().size() : albums.size();
+    }
+
+    // Keeps the highlighted row inside the 4 visible rows
+    private void keepSelectionVisible() {
+        int count = listSize();
+        selected = Mth.clamp(selected, 0, Math.max(0, count - 1));
+        if (selected < scroll) scroll = selected;
+        if (selected >= scroll + ROWS) scroll = selected - ROWS + 1;
+        scroll = Mth.clamp(scroll, 0, Math.max(0, count - ROWS));
+    }
+
+    private void move(int step) {
+        selected = Mth.clamp(selected + step, 0, Math.max(0, listSize() - 1));
+    }
+
+    // The middle button (or Enter, or clicking a row): open the album / play the track
+    private void activate() {
+        if (listSize() == 0) return;
+        if (open == null) {
+            openedIndex = selected;
+            open = albums.get(selected);
+            selected = 0;
+            scroll = 0;
+        } else {
+            List<Runnable> actions = open.tracks().stream().map(Track::play).toList();
+            IpodPlayer.playQueue(actions, selected);
+        }
+    }
+
+    // The Menu button: back from the tracks to the album list
+    private void menu() {
+        if (open != null) {
+            open = null;
+            selected = openedIndex;
+        }
+    }
+
+    // =====================================================================
+    // Mouse and keyboard
+    // =====================================================================
+
+    // Turn a mouse position on the screen into iPod coordinates (0,0 = the iPod's top-left).
+    // Only correct once the animation has finished, which is the only time we use it.
+    private double localX(double mouseX) {
+        return (mouseX - this.width / 2.0) / fitScale() + BODY_W / 2.0;
+    }
+
+    private double localY(double mouseY) {
+        return (mouseY - this.height / 2.0) / fitScale() + BODY_H / 2.0;
+    }
+
+    @Override
+    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        if (button != 0 || !settled()) {
+            return super.mouseClicked(mouseX, mouseY, button);
+        }
+        double x = localX(mouseX);
+        double y = localY(mouseY);
+
+        // Where is the click relative to the wheel?
+        double dx = x - WHEEL_X;
+        double dy = y - WHEEL_Y;
+        double distSq = dx * dx + dy * dy;
+        boolean onMiddle = distSq <= (double) CENTER_R * CENTER_R;
+
+        // Clicking anywhere else cancels a middle-button click that was still waiting
+        if (!onMiddle) {
+            pendingActivateAt = -1;
+        }
+
+        // A click on one of the rows
+        if (x >= DISPLAY_X && x < DISPLAY_X + DISPLAY_W && y >= LIST_Y && y < LIST_Y + ROWS * ROW_H) {
+            int index = scroll + (int) ((y - LIST_Y) / ROW_H);
+            if (index < listSize()) {
+                selected = index;
+                activate();
+            }
+            return true;
+        }
+
+        // A click on the wheel
+        if (distSq <= (double) WHEEL_R * WHEEL_R) {
+            if (onMiddle) {
+                onMiddleClick();
+            } else if (Math.abs(dx) > Math.abs(dy)) {
+                if (dx < 0) {
+                    IpodPlayer.previous();          // left
+                } else {
+                    IpodPlayer.next();              // right
+                }
+            } else {
+                if (dy < 0) {
+                    menu();                         // top
+                } else {
+                    IpodPlayer.togglePause();       // bottom
+                }
+            }
+            return true;
+        }
+        return super.mouseClicked(mouseX, mouseY, button);
+    }
+
+    // The middle button: one click opens/plays (after a short wait), two quick clicks stop
+    private void onMiddleClick() {
+        if (pendingActivateAt >= 0) {
+            // A click was already waiting, so this is the second one: a double-click
+            pendingActivateAt = -1;
+            if (IpodPlayer.isPlaying()) {
+                IpodPlayer.stop();
+            } else {
+                activate(); // nothing to stop, so treat it as a normal click
+            }
+        } else {
+            // First click: don't act yet, wait to see whether a second one follows
+            pendingActivateAt = Util.getMillis() + DOUBLE_CLICK_MS;
+        }
+    }
+
+    @Override
+    public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
+        if (!settled()) return false;
+        double x = localX(mouseX);
+        double y = localY(mouseY);
+
+        // Over the display: move the highlight
+        if (x >= DISPLAY_X && x < DISPLAY_X + DISPLAY_W && y >= DISPLAY_Y && y < DISPLAY_Y + DISPLAY_H) {
+            move(scrollY > 0 ? -1 : 1);
+            return true;
+        }
+        // Over the wheel: change the volume
+        if (Math.hypot(x - WHEEL_X, y - WHEEL_Y) <= WHEEL_R) {
+            IpodVolume.set(IpodVolume.get() + (float) scrollY * 0.05F);
+            return true;
+        }
+        return super.mouseScrolled(mouseX, mouseY, scrollX, scrollY);
+    }
+
+    @Override
+    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        if (settled()) {
+            if (keyCode == GLFW.GLFW_KEY_UP) {
+                move(-1);
+                return true;
+            }
+            if (keyCode == GLFW.GLFW_KEY_DOWN) {
+                move(1);
+                return true;
+            }
+            if (keyCode == GLFW.GLFW_KEY_ENTER || keyCode == GLFW.GLFW_KEY_KP_ENTER) {
+                activate();
+                return true;
+            }
+            if (keyCode == GLFW.GLFW_KEY_BACKSPACE) {
+                menu();
+                return true;
+            }
+        }
+        return super.keyPressed(keyCode, scanCode, modifiers);
     }
 
     @Override
