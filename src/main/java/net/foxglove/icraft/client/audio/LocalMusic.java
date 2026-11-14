@@ -84,4 +84,19 @@ public class LocalMusic {
         int dot = name.lastIndexOf('.');
         return dot > 0 ? name.substring(0, dot) : name;
     }
+
+    // The album a file belongs to: its folder name, or "Singles" for loose files
+    public static String albumNameFor(Path file) {
+        Path dir = file.getParent();
+        if (dir == null || dir.equals(folder())) return "Singles";
+        return dir.getFileName().toString();
+    }
+
+    // The cover image in a file's album folder, or null if there isn't one
+    @Nullable
+    public static Path coverFor(Path file) {
+        Path dir = file.getParent();
+        if (dir == null || dir.equals(folder())) return null; // loose files have no album folder
+        return findCover(dir);
+    }
 }

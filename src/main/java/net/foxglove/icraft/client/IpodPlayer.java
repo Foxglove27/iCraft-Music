@@ -38,6 +38,29 @@ public class IpodPlayer {
     private static List<Runnable> queue = List.of();
     private static int queueIndex = -1;
 
+    public static Component getNowPlaying() {
+        return currentName;
+    }
+
+    public static Component getNowPlayingSubtitle() {
+        return currentSubtitle;
+    }
+
+    @Nullable
+    public static Path getNowPlayingCover() {
+        return currentCover;
+    }
+
+    public static ItemStack getNowPlayingDisc() {
+        return currentDisc;
+    }
+
+    // What is playing right now, for the on-screen display
+    private static Component currentName = Component.empty();
+    private static Component currentSubtitle = Component.empty();
+    @Nullable
+    private static Path currentCover;
+
     public static void play(ItemStack disc, @Nullable BlockPos speaker) {
         Minecraft mc = Minecraft.getInstance();
         if (mc.level == null) return;
@@ -48,7 +71,9 @@ public class IpodPlayer {
             Vec3 pos = used != null ? Vec3.atCenterOf(used) : null;
 
             start(IpodSoundInstance.forDisc(sound, pos, SPEAKER_VOLUME), disc.copy(), used,
-                    song.value().description());
+                    song.value().description(),
+                    Component.translatable("screen.icraft.ipod.discs"),
+                    null);
         });
     }
 
@@ -60,18 +85,38 @@ public class IpodPlayer {
         Vec3 pos = used != null ? Vec3.atCenterOf(used) : null;
 
         start(IpodSoundInstance.forFile(file, pos, SPEAKER_VOLUME), ItemStack.EMPTY, used,
-                Component.literal(LocalMusic.displayName(file)));
+                Component.literal(LocalMusic.displayName(file)),
+                Component.literal(LocalMusic.albumNameFor(file)),
+                LocalMusic.coverFor(file));
     }
 
-    private static void start(SoundInstance instance, ItemStack disc, @Nullable BlockPos speaker, Component name) {
+    private static void start(SoundInstance instance, ItemStack disc, @Nullable BlockPos speaker,
+                              Component name, Component subtitle, @Nullable Path cover) {
         Minecraft mc = Minecraft.getInstance();
         endCurrent(); // ends any current sound, but keeps the track list
         mc.getMusicManager().stopPlaying();
         current = instance;
         currentDisc = disc;
         currentSpeaker = speaker;
+        currentName = name;
+        currentSubtitle = subtitle;
+        currentCover = cover;
         mc.getSoundManager().play(instance);
-        mc.gui.setNowPlaying(name);
+    }
+
+    // Ends the current sound but keeps the track list (used when switching tracks)
+    private static void endCurrent() {
+        if (current != null) {
+            Minecraft.getInstance().getSoundManager().stop(current);
+            current = null;
+        }
+        currentDisc = ItemStack.EMPTY;
+        currentSpeaker = null;
+        currentName = Component.empty();
+        currentSubtitle = Component.empty();
+        currentCover = null;
+        paused = false;
+        autoPaused = false;
     }
 
     @Nullable
@@ -85,18 +130,6 @@ public class IpodPlayer {
         endCurrent();
         queue = List.of();
         queueIndex = -1;
-    }
-
-    // Ends the current sound but keeps the track list (used when switching tracks)
-    private static void endCurrent() {
-        if (current != null) {
-            Minecraft.getInstance().getSoundManager().stop(current);
-            current = null;
-        }
-        currentDisc = ItemStack.EMPTY;
-        currentSpeaker = null;
-        paused = false;
-        autoPaused = false;
     }
 
     // Freezes the song exactly where it is
