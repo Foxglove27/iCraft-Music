@@ -13,5 +13,6 @@
   "screen.icraft.ipod.albums": "Albums",
   "screen.icraft.ipod.discs": "Music Discs",
   "screen.icraft.ipod.empty": "No music found. Add discs, or put files in the ipod_music folder.",
-  "message.icraft.ipod.linked": "iPod linked to speaker"
+  "message.icraft.ipod.linked": "iPod linked to speaker",
+  "message.icraft.ipod.load_failed": "Could not play %s"
 }

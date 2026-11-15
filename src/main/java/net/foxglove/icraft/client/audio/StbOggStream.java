@@ -12,6 +12,7 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.IntBuffer;
 import java.nio.ShortBuffer;
+import java.nio.channels.SeekableByteChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
@@ -23,9 +24,24 @@ public class StbOggStream implements AudioStream {
     private final int outChannels;    // channels we hand to OpenAL
     private final AudioFormat format;
 
+    private static final long MAX_AUDIO_FILE_BYTES = 256L * 1024 * 1024;
+
     public StbOggStream(Path file, boolean downmixToMono) throws IOException {
+        long fileSize = Files.size(file);
+        if (fileSize > MAX_AUDIO_FILE_BYTES) {
+            throw new IOException(file.getFileName() + " is larger than the "
+                    + (MAX_AUDIO_FILE_BYTES / (1024 * 1024)) + " MiB limit");
+        }
+
+        // Read straight into the off-heap buffer, with no second copy on the Java heap
+        encoded = BufferUtils.createByteBuffer((int) fileSize);
+        try (SeekableByteChannel in = Files.newByteChannel(file)) {
+            while (encoded.hasRemaining()) {
+                if (in.read(encoded) < 0) break;
+            }
+        }
+        encoded.flip();
         byte[] bytes = Files.readAllBytes(file);
-        encoded = BufferUtils.createByteBuffer(bytes.length);
         encoded.put(bytes).flip();
 
         try (MemoryStack stack = MemoryStack.stackPush()) {

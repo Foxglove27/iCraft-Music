@@ -2,6 +2,7 @@ package net.foxglove.icraft.client.audio;
 
 import net.foxglove.icraft.client.IpodVolume;
 import net.minecraft.Util;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.resources.sounds.AbstractTickableSoundInstance;
 import net.minecraft.client.resources.sounds.Sound;
 import net.minecraft.client.resources.sounds.SoundInstance;
@@ -84,18 +85,27 @@ public class IpodSoundInstance extends AbstractTickableSoundInstance {
 
     @Override
     public CompletableFuture<AudioStream> getStream(SoundBufferLibrary soundBuffers, Sound sound, boolean looping) {
+        CompletableFuture<AudioStream> future;
         if (file == null) {
             // a normal disc: let the game load its own audio file as usual
-            return super.getStream(soundBuffers, sound, looping);
+            future = super.getStream(soundBuffers, sound, looping);
+        } else {
+            // a file from disk: convert if needed, then decode it ourselves
+            future = CompletableFuture.supplyAsync(() -> {
+                try {
+                    Path playable = AudioConverter.toOgg(file);
+                    return new StbOggStream(playable, positional);
+                } catch (IOException e) {
+                    throw new CompletionException(e);
+                }
+            }, Util.backgroundExecutor());
         }
-        // a file from disk: convert if needed, then decode it ourselves
-        return CompletableFuture.supplyAsync(() -> {
-            try {
-                Path playable = AudioConverter.toOgg(file);
-                return new StbOggStream(playable, positional);
-            } catch (IOException e) {
-                throw new CompletionException(e);
+
+        // If loading fails, tell the player (back on the main thread)
+        return future.whenComplete((stream, error) -> {
+            if (error != null) {
+                Minecraft.getInstance().execute(() -> IpodPlayer.onLoadFailed(this, error));
             }
-        }, Util.backgroundExecutor());
+        });
     }
 }

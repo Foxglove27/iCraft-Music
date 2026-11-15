@@ -1,6 +1,7 @@
 package net.foxglove.icraft.client;
 
 import com.mojang.blaze3d.audio.Channel;
+import com.mojang.logging.LogUtils;
 import net.foxglove.icraft.block.ModBlocks;
 import net.foxglove.icraft.client.audio.IpodSoundInstance;
 import net.foxglove.icraft.client.audio.LocalMusic;
@@ -21,6 +22,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.nio.file.Path;
 import java.util.List;
+import org.slf4j.Logger;
 
 public class IpodPlayer {
     private static final float SPEAKER_VOLUME = 1.0F; // range = volume x 16 blocks
@@ -61,6 +63,24 @@ public class IpodPlayer {
     @Nullable
     private static Path currentCover;
 
+    private static final Logger LOGGER = LogUtils.getLogger();
+
+    // Called on the main thread when a track could not be loaded
+    // (corrupt file, file too large, ffmpeg missing...)
+    public static void onLoadFailed(SoundInstance who, Throwable error) {
+        if (who != current) return; // an old track nobody is waiting for anymore
+
+        Throwable cause = error.getCause() != null ? error.getCause() : error;
+        LOGGER.warn("Could not play {}", currentName.getString(), cause);
+
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.player != null) {
+            mc.player.displayClientMessage(
+                    Component.translatable("message.icraft.ipod.load_failed", currentName), true);
+        }
+        stop(); // clears the track, so the HUD disappears too
+    }
+    
     public static void play(ItemStack disc, @Nullable BlockPos speaker) {
         Minecraft mc = Minecraft.getInstance();
         if (mc.level == null) return;
