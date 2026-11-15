@@ -17,7 +17,8 @@ public enum IpodColor {
     PINK("ipod_pink", "pink"),
     PURPLE("ipod_purple", "purple"),
     RED("ipod_red", "red"),
-    YELLOW("ipod_yellow", "yellow");
+    YELLOW("ipod_yellow", "yellow"),
+    CYAN("ipod_cyan", "cyan");
 
     private final String itemName;
     private final ResourceLocation guiTexture;

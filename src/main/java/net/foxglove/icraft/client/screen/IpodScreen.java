@@ -36,7 +36,7 @@ public class IpodScreen extends Screen {
 
     // ---- Sizes ----
     // How many GUI pixels one pixel of the artwork is drawn as. Change this to resize the iPod.
-    private static final int PX = 3;
+    private static final int PX = 4;
 
     private static final int BODY_W = 44 * PX;
     private static final int BODY_H = 64 * PX;
@@ -57,7 +57,7 @@ public class IpodScreen extends Screen {
     // The list inside the display
     private static final int LIST_Y = DISPLAY_Y + HEADER_H;
     private static final int ROW_H = 12;
-    private static final int ROWS = 4;
+    private static final int ROWS = 5;
     private static final int PAD = 3;
     private static final int THUMB = 10; // size of the little album cover
 
