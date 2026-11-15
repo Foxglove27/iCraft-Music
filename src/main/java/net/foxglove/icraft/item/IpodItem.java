@@ -24,8 +24,16 @@ import java.util.List;
 public class IpodItem extends Item {
     public static final int MAX_DISCS = 8;
 
-    public IpodItem(Properties properties) {
+    private final IpodColor color;
+
+    public IpodItem(Properties properties, IpodColor color) {
         super(properties);
+        this.color = color;
+    }
+
+    // The colour of this iPod, which decides its GUI skin.
+    public IpodColor getColor() {
+        return color;
     }
 
     public static List<ItemStack> getDiscs(ItemStack ipod) {

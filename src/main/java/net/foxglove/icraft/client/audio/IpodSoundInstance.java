@@ -60,9 +60,15 @@ public class IpodSoundInstance extends AbstractTickableSoundInstance {
     }
 
     // The game calls this every tick while the sound exists.
-// We use it so the sound checks for itself whether the iPod is still with the player.
+    // We use it so the sound checks for itself whether the iPod is still with the player.
     @Override
     public void tick() {
+        if (!IpodPlayer.isCurrent(this)) {
+            // This sound was replaced or stopped while it was still loading.
+            // Without this check it could start playing later with nothing controlling it.
+            stop();
+            return;
+        }
         IpodPlayer.tick(this);
     }
 

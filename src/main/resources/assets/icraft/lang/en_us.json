@@ -1,23 +1,17 @@
 {
-
   "item.icraft.ipod": "iPod",
-
+  "item.icraft.ipod_black": "Black iPod",
+  "item.icraft.ipod_blue": "Blue iPod",
+  "item.icraft.ipod_green": "Green iPod",
+  "item.icraft.ipod_pink": "Pink iPod",
+  "item.icraft.ipod_purple": "Purple iPod",
+  "item.icraft.ipod_red": "Red iPod",
+  "item.icraft.ipod_yellow": "Yellow iPod",
   "block.icraft.speaker": "Speaker",
-
   "creativetab.icraft.ipod": "iCraft",
-
   "screen.icraft.ipod": "iPod",
-  "screen.icraft.ipod.discs": "Music Discs",
-  "screen.icraft.ipod.tracks": "%s tracks",
-  "screen.icraft.ipod.previous": "⏮",
-  "screen.icraft.ipod.pause": "⏸",
-  "screen.icraft.ipod.play": "▶",
-  "screen.icraft.ipod.next": "⏭",
-  "screen.icraft.ipod.stop": "⏹",
-  "screen.icraft.ipod.volume": "Volume %s%%",
   "screen.icraft.ipod.albums": "Albums",
+  "screen.icraft.ipod.discs": "Music Discs",
   "screen.icraft.ipod.empty": "No music found. Add discs, or put files in the ipod_music folder.",
-
   "message.icraft.ipod.linked": "iPod linked to speaker"
-
 }

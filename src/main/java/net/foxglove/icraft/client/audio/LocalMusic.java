@@ -1,6 +1,7 @@
 package net.foxglove.icraft.client.audio;
 
 import net.minecraft.client.Minecraft;
+import net.minecraft.network.chat.Component;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.IOException;
@@ -13,7 +14,7 @@ import java.util.Set;
 import java.util.stream.Stream;
 
 public class LocalMusic {
-    public record Album(String name, @Nullable Path cover, List<Path> files) {}
+    public record Album(Component name, @Nullable Path cover, List<Path> files) {}
 
     private static final Set<String> AUDIO = Set.of("ogg", "mp3", "flac", "wav", "m4a");
     private static final Set<String> COVERS = Set.of("cover.png", "cover.jpg", "cover.jpeg",
@@ -32,7 +33,7 @@ public class LocalMusic {
 
             List<Path> singles = listAudio(root);
             if (!singles.isEmpty()) {
-                albums.add(new Album("Singles", null, singles));
+                albums.add(new Album(Component.translatable("screen.icraft.ipod.singles"), null, singles));
             }
 
             List<Path> dirs;
@@ -45,7 +46,7 @@ public class LocalMusic {
             for (Path dir : dirs) {
                 List<Path> files = listAudio(dir);
                 if (!files.isEmpty()) {
-                    albums.add(new Album(dir.getFileName().toString(), findCover(dir), files));
+                    albums.add(new Album(Component.literal(dir.getFileName().toString()), findCover(dir), files));
                 }
             }
         } catch (IOException ignored) {
@@ -86,10 +87,10 @@ public class LocalMusic {
     }
 
     // The album a file belongs to: its folder name, or "Singles" for loose files
-    public static String albumNameFor(Path file) {
+    public static Component albumNameFor(Path file) {
         Path dir = file.getParent();
-        if (dir == null || dir.equals(folder())) return "Singles";
-        return dir.getFileName().toString();
+        if (dir == null || dir.equals(folder())) return Component.translatable("screen.icraft.ipod.singles");
+        return Component.literal(dir.getFileName().toString());
     }
 
     // The cover image in a file's album folder, or null if there isn't one

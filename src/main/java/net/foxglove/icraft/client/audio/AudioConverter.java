@@ -9,8 +9,10 @@ import java.util.concurrent.TimeUnit;
 
 public class AudioConverter {
 
-    // Returns a playable .ogg for the given file, converting (and caching) if needed
-    public static Path toOgg(Path source) throws IOException {
+    // Returns a playable .ogg for the given file, converting (and caching) if needed.
+    // synchronized: only one conversion runs at a time, so two requests for the same file
+    // can never write the same temporary file. The second caller finds the finished result.
+    public static synchronized Path toOgg(Path source) throws IOException {
         String name = source.getFileName().toString();
         if (name.toLowerCase(Locale.ROOT).endsWith(".ogg")) {
             return source;
@@ -26,7 +28,7 @@ public class AudioConverter {
         }
 
         Path tmp = cacheDir.resolve(name + ".tmp.ogg");
-        ProcessBuilder pb = new ProcessBuilder("ffmpeg", "-y", "-loglevel", "error",
+        ProcessBuilder pb = new ProcessBuilder("ffmpeg", "-nostdin", "-y", "-loglevel", "error",
                 "-i", source.toString(), "-vn", "-c:a", "libvorbis", "-q:a", "5", tmp.toString());
         pb.inheritIO(); // ffmpeg errors show up in the game console
 
@@ -40,6 +42,7 @@ public class AudioConverter {
                 throw new IOException("ffmpeg failed to convert " + name);
             }
         } catch (IOException e) {
+            Files.deleteIfExists(tmp); // don't leave a half-written file behind
             throw new IOException("Could not convert " + name + " (is ffmpeg installed and on PATH?)", e);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();

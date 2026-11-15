@@ -35,14 +35,14 @@ public class NowPlayingOverlay {
     // Called every frame
     private static void render(GuiGraphics g, DeltaTracker deltaTracker) {
         Minecraft mc = Minecraft.getInstance();
-        if (mc.options.hideGui || !IpodPlayer.isPlaying()) return; // F1 hides it, and so does silence
+        if (mc.options.hideGui || !IpodPlayer.hasTrack()) return; // F1 hides it, and so does stopping
 
         Font font = mc.font;
         int x = g.guiWidth() - W - MARGIN;   // bottom-right corner
         int y = g.guiHeight() - H - MARGIN;
 
         // the panel
-        g.fill(x, y, x + W, y + H, 0xB0101014);
+        g.fill(x, y, x + W, y + H, 0x80101014);
 
         // the picture on the left
         drawThumb(g, x + 5, y + (H - THUMB) / 2);

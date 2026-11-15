@@ -86,7 +86,7 @@ public class IpodPlayer {
 
         start(IpodSoundInstance.forFile(file, pos, SPEAKER_VOLUME), ItemStack.EMPTY, used,
                 Component.literal(LocalMusic.displayName(file)),
-                Component.literal(LocalMusic.albumNameFor(file)),
+                LocalMusic.albumNameFor(file),
                 LocalMusic.coverFor(file));
     }
 
@@ -178,10 +178,6 @@ public class IpodPlayer {
         queue.get(queueIndex).run();
     }
 
-    public static boolean hasQueue() {
-        return !queue.isEmpty();
-    }
-
     // Pause/Play only works while a song is loaded
     public static boolean canTogglePause() {
         return isPlaying();
@@ -199,6 +195,18 @@ public class IpodPlayer {
 
     public static boolean isPlaying() {
         return current != null && Minecraft.getInstance().getSoundManager().isActive(current);
+    }
+
+    // True while any track is loaded (even paused or still loading), so the HUD can stay on
+    // through Next/Previous transitions. Becomes false only once we stop completely.
+    public static boolean hasTrack() {
+        return !currentName.getString().isEmpty();
+    }
+
+    // True if this is the sound the player is currently tracking.
+    // A sound that is no longer current has been replaced or stopped, and should end itself.
+    public static boolean isCurrent(SoundInstance sound) {
+        return sound == current;
     }
 
     // Pauses or unpauses the real audio channel that our sound is playing on.

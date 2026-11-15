@@ -5,7 +5,6 @@ import net.foxglove.icraft.client.IpodPlayer;
 import net.foxglove.icraft.client.IpodVolume;
 import net.foxglove.icraft.client.audio.CoverArt;
 import net.foxglove.icraft.client.audio.LocalMusic;
-import net.foxglove.icraft.iCraft;
 import net.minecraft.Util;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
@@ -27,8 +26,6 @@ import java.util.Locale;
 
 public class IpodScreen extends Screen {
     // ---- The texture ----
-    private static final ResourceLocation TEXTURE =
-            ResourceLocation.fromNamespaceAndPath(iCraft.MOD_ID, "textures/gui/ipod_gui.png");
     private static final int TEX_SIZE = 1280; // the file is 1280 x 1280 pixels
 
     // Where the iPod is inside that file (x, y, width, height in file pixels)
@@ -77,6 +74,7 @@ public class IpodScreen extends Screen {
     private record Track(Component name, Runnable play) {}
     private record AlbumView(Component name, @Nullable Path cover, @Nullable ItemStack icon, List<Track> tracks) {}
 
+    private final ResourceLocation skin; // the GUI texture for this iPod's colour
     private final List<AlbumView> albums = new ArrayList<>();
     @Nullable
     private AlbumView open;   // null = showing the album list
@@ -88,8 +86,10 @@ public class IpodScreen extends Screen {
     private boolean closing;
     private float closeFrom;
 
-    public IpodScreen(List<ItemStack> discs, List<LocalMusic.Album> library, @Nullable BlockPos speaker) {
+    public IpodScreen(List<ItemStack> discs, List<LocalMusic.Album> library,
+                      @Nullable BlockPos speaker, ResourceLocation skin) {
         super(Component.translatable("screen.icraft.ipod"));
+        this.skin = skin;
 
         if (!discs.isEmpty()) {
             List<Track> tracks = new ArrayList<>();
@@ -106,7 +106,7 @@ public class IpodScreen extends Screen {
                 tracks.add(new Track(Component.literal(LocalMusic.displayName(file)),
                         () -> IpodPlayer.playFile(file, speaker)));
             }
-            albums.add(new AlbumView(Component.literal(album.name()), album.cover(), null, tracks));
+            albums.add(new AlbumView(album.name(), album.cover(), null, tracks));
         }
 
         animStart = Util.getMillis();
@@ -197,7 +197,7 @@ public class IpodScreen extends Screen {
         g.pose().translate(-BODY_W / 2.0F, -BODY_H / 2.0F, 0.0F);
 
         // 1) the iPod picture
-        g.blit(TEXTURE, 0, 0, BODY_W, BODY_H, SRC_X, SRC_Y, SRC_W, SRC_H, TEX_SIZE, TEX_SIZE);
+        g.blit(skin, 0, 0, BODY_W, BODY_H, SRC_X, SRC_Y, SRC_W, SRC_H, TEX_SIZE, TEX_SIZE);
 
         // 2) the contents of the display
         drawDisplay(g);
