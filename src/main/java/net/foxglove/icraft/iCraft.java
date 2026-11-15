@@ -4,6 +4,7 @@ import net.foxglove.icraft.block.ModBlocks;
 import net.foxglove.icraft.item.ModCreativeModeTabs;
 import net.foxglove.icraft.item.ModDataComponents;
 import net.foxglove.icraft.item.ModItems;
+import net.foxglove.icraft.recipe.ModRecipes;
 import net.minecraft.world.item.CreativeModeTabs;
 
 import net.neoforged.bus.api.IEventBus;
@@ -25,6 +26,7 @@ public class iCraft {
         ModItems.register(modEventBus);
         ModBlocks.register(modEventBus);
         ModDataComponents.register(modEventBus);
+        ModRecipes.register(modEventBus);
 
         // Add the iPod and speaker to the vanilla creative tabs (the custom iCraft tab is built in ModCreativeModeTabs)
         modEventBus.addListener(this::addCreative);

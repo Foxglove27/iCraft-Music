@@ -1,12 +1,12 @@
 {
-  "type": "minecraft:crafting_shapeless",
+  "type": "icraft:ipod_dye",
   "category": "misc",
   "ingredients": [
     {
       "tag": "icraft:ipods"
     },
     {
-      "item": "minecraft:purple_dye"
+      "tag": "c:dyes/purple"
     }
   ],
   "result": {

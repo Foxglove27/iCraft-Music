@@ -22,7 +22,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class IpodItem extends Item {
-    public static final int MAX_DISCS = 8;
+    public static final int MAX_DISCS = 32; // vanilla has 19 discs, so this leaves room for modded ones
 
     private final IpodColor color;
 
@@ -41,6 +41,15 @@ public class IpodItem extends Item {
         ipod.getOrDefault(DataComponents.CONTAINER, ItemContainerContents.EMPTY)
                 .nonEmptyItems().forEach(s -> discs.add(s.copy()));
         return discs;
+    }
+
+    // True if this iPod holds a disc equal to the given one. Unlike getDiscs, it makes no copies,
+    // so it is cheap enough to call every tick even with many discs loaded.
+    public static boolean hasDisc(ItemStack ipod, ItemStack disc) {
+        for (ItemStack stored : ipod.getOrDefault(DataComponents.CONTAINER, ItemContainerContents.EMPTY).nonEmptyItems()) {
+            if (ItemStack.isSameItemSameComponents(stored, disc)) return true;
+        }
+        return false;
     }
 
     private static void setDiscs(ItemStack ipod, List<ItemStack> discs) {

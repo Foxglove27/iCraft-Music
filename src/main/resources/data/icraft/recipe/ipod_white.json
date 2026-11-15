@@ -1,0 +1,15 @@
+{
+  "type": "icraft:ipod_dye",
+  "category": "misc",
+  "ingredients": [
+    {
+      "tag": "icraft:ipods"
+    },
+    {
+      "tag": "c:dyes/white"
+    }
+  ],
+  "result": {
+    "id": "icraft:ipod"
+  }
+}

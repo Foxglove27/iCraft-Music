@@ -295,9 +295,6 @@ public class IpodPlayer {
     private static boolean carriesPlaying(ItemStack stack) {
         if (!(stack.getItem() instanceof IpodItem)) return false;
         if (currentDisc.isEmpty()) return true; // a file is playing: any iPod will do
-        for (ItemStack disc : IpodItem.getDiscs(stack)) {
-            if (ItemStack.isSameItemSameComponents(disc, currentDisc)) return true;
-        }
-        return false;
+        return IpodItem.hasDisc(stack, currentDisc);
     }
 }
