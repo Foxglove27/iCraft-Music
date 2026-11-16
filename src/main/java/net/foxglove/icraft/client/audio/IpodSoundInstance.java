@@ -24,6 +24,8 @@ public class IpodSoundInstance extends AbstractTickableSoundInstance {
     @Nullable
     private final Path file;      // null means "a normal sound event" (a music disc)
     private final boolean positional;
+    @Nullable
+    private volatile PcmAudioStream stream; // set once a file has been opened; null for discs
 
     // A vanilla music disc sound
     public static IpodSoundInstance forDisc(SoundEvent sound, @Nullable Vec3 pos, float volume) {
@@ -60,6 +62,23 @@ public class IpodSoundInstance extends AbstractTickableSoundInstance {
         }
     }
 
+    /** True for a file from the ipod_music folder, false for a vanilla disc. */
+    public boolean isFile() {
+        return file != null;
+    }
+
+    /** A file track whose decoder has run out of samples. */
+    public boolean streamEnded() {
+        PcmAudioStream s = stream;
+        return s != null && s.hasReachedEnd();
+    }
+
+    /** A file track whose decoding failed during playback. */
+    public boolean streamFailed() {
+        PcmAudioStream s = stream;
+        return s != null && s.hasFailed();
+    }
+
     // The game calls this every tick while the sound exists.
     // We use it so the sound checks for itself whether the iPod is still with the player.
     @Override
@@ -93,18 +112,21 @@ public class IpodSoundInstance extends AbstractTickableSoundInstance {
             // a file from disk: decode it ourselves, streaming
             future = CompletableFuture.supplyAsync(() -> {
                 try {
-                    return AudioDecoders.open(file, positional);
+                    PcmAudioStream opened = AudioDecoders.open(file, positional);
+                    stream = opened;
+                    return opened;
                 } catch (IOException e) {
                     throw new CompletionException(e);
                 }
             }, Util.backgroundExecutor());
         }
 
-        // If loading fails, tell the player (back on the main thread)
-        return future.whenComplete((stream, error) -> {
-            if (error != null) {
-                Minecraft.getInstance().execute(() -> IpodPlayer.onLoadFailed(this, error));
-            }
+        // If loading fails, tell the player (back on the main thread) and give the engine a short
+        // silent stream instead of a failed one, so it releases the sound channel (see SilentAudioStream)
+        return future.handle((stream, error) -> {
+            if (error == null) return stream;
+            Minecraft.getInstance().execute(() -> IpodPlayer.onLoadFailed(this, error));
+            return new SilentAudioStream();
         });
     }
 }

@@ -16,6 +16,8 @@ public class PcmAudioStream implements AudioStream {
     private static final Logger LOGGER = LogUtils.getLogger();
 
     private boolean errorLogged;
+    private volatile boolean reachedEnd; // the decoder has no more samples (the last buffers may still be playing)
+    private volatile boolean failed;     // reading failed part-way through
     private final PcmSource source;
     private final int channels;     // channels in the file
     private final int outChannels;  // channels we hand to OpenAL
@@ -43,6 +45,7 @@ public class PcmAudioStream implements AudioStream {
             got = source.read(scratch, frames);
         } catch (IOException | RuntimeException e) {
             // the engine only sees a failed stream; make sure the reason reaches the log
+            failed = true;
             if (!errorLogged) {
                 errorLogged = true;
                 LOGGER.warn("Decoding {} failed during playback", source.getClass().getSimpleName(), e);
@@ -57,7 +60,18 @@ public class PcmAudioStream implements AudioStream {
             for (int i = 0; i < got; i++) out.putShort((short) ((scratch[2 * i] + scratch[2 * i + 1]) / 2));
         }
         out.flip();
+        if (got == 0) reachedEnd = true;
         return out; // empty buffer = end of stream
+    }
+
+    /** True once the decoder ran out of samples. The sound may still be playing its last buffers. */
+    public boolean hasReachedEnd() {
+        return reachedEnd;
+    }
+
+    /** True if reading the file failed after playback had started. */
+    public boolean hasFailed() {
+        return failed;
     }
 
     /** Jumps to a sample frame. Not used by the player yet (planned for relinking and audiobooks). */

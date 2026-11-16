@@ -47,6 +47,12 @@ public class IpodPlayer {
     private static List<Runnable> queue = List.of();
     private static int queueIndex = -1;
 
+    // True once the current sound has really started playing (it is only ticked then).
+    // Until then "not active" just means "still loading".
+    private static boolean started = false;
+    // Tracks in a row that failed to play. When it reaches the list size, everything is broken: stop.
+    private static int consecutiveFailures = 0;
+
     public static Component getNowPlaying() {
         return currentName;
     }
@@ -80,12 +86,48 @@ public class IpodPlayer {
         Throwable cause = error.getCause() != null ? error.getCause() : error;
         LOGGER.warn("Could not play {}", currentName.getString(), cause);
 
+        showLoadFailed();
+        advanceAfterEnd(true);
+    }
+
+    // Called once per client tick (see ClientEvents). Starts the next track when one has finished.
+    public static void clientTick() {
+        if (current == null || !started || paused) return;
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.getSoundManager().isActive(current)) return; // still playing
+
+        if (current instanceof IpodSoundInstance sound && sound.isFile()) {
+            if (sound.streamFailed()) {
+                showLoadFailed();
+                advanceAfterEnd(true);
+            } else if (sound.streamEnded()) {
+                advanceAfterEnd(false);
+            }
+            // else: the sound engine stopped it mid-song (for example an audio device switch). Leave it.
+        } else {
+            advanceAfterEnd(false); // a vanilla disc has no end-of-stream flag; inactive after starting = finished
+        }
+    }
+
+    // The track is over (finished or failed): go to the next one in the list, or stop after the last.
+    // Unlike Next, this does not wrap around (repeat comes later).
+    private static void advanceAfterEnd(boolean failed) {
+        consecutiveFailures = failed ? consecutiveFailures + 1 : 0;
+        int next = queueIndex + 1;
+        if (queue.isEmpty() || next >= queue.size() || consecutiveFailures >= queue.size()) {
+            stop(); // clears the track, so the HUD disappears too
+            return;
+        }
+        queueIndex = next;
+        queue.get(next).run();
+    }
+
+    private static void showLoadFailed() {
         Minecraft mc = Minecraft.getInstance();
         if (mc.player != null) {
             mc.player.displayClientMessage(
                     Component.translatable("message.icraft.ipod.load_failed", currentName), true);
         }
-        stop(); // clears the track, so the HUD disappears too
     }
     
     public static void play(ItemStack disc, @Nullable BlockPos speaker, @Nullable UUID ipod) {
@@ -147,6 +189,7 @@ public class IpodPlayer {
         currentIpod = null;
         paused = false;
         autoPaused = false;
+        started = false;
     }
 
     @Nullable
@@ -190,6 +233,7 @@ public class IpodPlayer {
     public static void playQueue(List<Runnable> tracks, int index) {
         queue = tracks;
         queueIndex = index;
+        consecutiveFailures = 0;
         tracks.get(index).run();
     }
 
@@ -259,6 +303,11 @@ public class IpodPlayer {
     // Called every tick by the playing sound itself. 'who' is the sound calling us.
     public static void tick(SoundInstance who) {
         if (who != current) return; // an old sound that has already been replaced
+
+        if (!started) {
+            started = true;
+            consecutiveFailures = 0; // it loaded and plays, so earlier failures no longer count
+        }
 
         Minecraft mc = Minecraft.getInstance();
         Player player = mc.player;
