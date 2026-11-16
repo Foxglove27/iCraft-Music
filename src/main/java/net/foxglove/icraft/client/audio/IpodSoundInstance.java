@@ -90,11 +90,10 @@ public class IpodSoundInstance extends AbstractTickableSoundInstance {
             // a normal disc: let the game load its own audio file as usual
             future = super.getStream(soundBuffers, sound, looping);
         } else {
-            // a file from disk: convert if needed, then decode it ourselves
+            // a file from disk: decode it ourselves, streaming
             future = CompletableFuture.supplyAsync(() -> {
                 try {
-                    Path playable = AudioConverter.toOgg(file);
-                    return new StbOggStream(playable, positional);
+                    return AudioDecoders.open(file, positional);
                 } catch (IOException e) {
                     throw new CompletionException(e);
                 }

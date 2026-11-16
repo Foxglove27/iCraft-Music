@@ -1,11 +1,13 @@
 package net.foxglove.icraft.client.audio;
 
 import com.mojang.blaze3d.platform.NativeImage;
+import com.mojang.logging.LogUtils;
 import net.foxglove.icraft.iCraft;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.texture.DynamicTexture;
 import net.minecraft.resources.ResourceLocation;
 import org.jetbrains.annotations.Nullable;
+import org.slf4j.Logger;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
@@ -20,6 +22,7 @@ import java.util.Set;
 
 public class CoverArt {
     public static final int SIZE = 128;
+    private static final Logger LOGGER = LogUtils.getLogger();
 
     private static final Map<Path, ResourceLocation> LOADED = new HashMap<>();
     private static final Set<Path> FAILED = new HashSet<>();
@@ -34,7 +37,8 @@ public class CoverArt {
 
         try {
             BufferedImage source = ImageIO.read(imageFile.toFile());
-            if (source == null) throw new IOException("Unsupported image format");
+            if (source == null) throw new IOException("Unsupported image format (ImageIO can read: "
+                    + String.join(", ", ImageIO.getReaderFileSuffixes()) + ")");
 
             BufferedImage thumb = new BufferedImage(SIZE, SIZE, BufferedImage.TYPE_INT_ARGB);
             for (int y = 0; y < SIZE; y++) {
@@ -55,7 +59,8 @@ public class CoverArt {
 
             LOADED.put(imageFile, id);
             return id;
-        } catch (IOException | RuntimeException e) {
+        } catch (IOException | RuntimeException | LinkageError e) {
+            LOGGER.warn("Could not load cover image {}", imageFile, e); // once per file, see FAILED
             FAILED.add(imageFile);
             return null;
         }

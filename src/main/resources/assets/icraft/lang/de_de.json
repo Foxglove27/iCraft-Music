@@ -15,5 +15,6 @@
   "screen.icraft.ipod.discs": "Schallplatten",
   "screen.icraft.ipod.empty": "Keine Musik gefunden. Füge Schallplatten hinzu oder lege Dateien im ipod_music-Ordner ab.",
   "message.icraft.ipod.linked": "iPod mit Lautsprecher verbunden",
+  "screen.icraft.ipod.singles": "Einzeltitel",
   "message.icraft.ipod.load_failed": "%s konnte nicht abgespielt werden"
 }

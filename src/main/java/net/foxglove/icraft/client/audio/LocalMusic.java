@@ -1,8 +1,10 @@
 package net.foxglove.icraft.client.audio;
 
+import com.mojang.logging.LogUtils;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
 import org.jetbrains.annotations.Nullable;
+import org.slf4j.Logger;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -16,7 +18,10 @@ import java.util.stream.Stream;
 public class LocalMusic {
     public record Album(Component name, @Nullable Path cover, List<Path> files) {}
 
-    private static final Set<String> AUDIO = Set.of("ogg", "mp3", "flac", "wav", "m4a");
+    private static final Logger LOGGER = LogUtils.getLogger();
+    private static boolean encodingWarned;
+
+    private static final Set<String> AUDIO = Set.of("ogg", "mp3", "flac", "wav");
     private static final Set<String> COVERS = Set.of("cover.png", "cover.jpg", "cover.jpeg",
             "folder.png", "folder.jpg", "folder.jpeg");
 
@@ -44,6 +49,7 @@ public class LocalMusic {
                         .toList();
             }
             for (Path dir : dirs) {
+                checkEncoding(dir);
                 List<Path> files = listAudio(dir);
                 if (!files.isEmpty()) {
                     albums.add(new Album(Component.literal(dir.getFileName().toString()), findCover(dir), files));
@@ -52,6 +58,24 @@ public class LocalMusic {
         } catch (IOException ignored) {
         }
         return albums;
+    }
+
+    /**
+     * On Linux/macOS the JVM decodes file names with the locale of the process that started it.
+     * A launcher without a UTF-8 locale turns every non-ASCII character (like the I with a bar in
+     * AVICI) into '?', and Java can then no longer open or list those files. Nothing in the mod can
+     * recover the real name, so say what to do, once.
+     */
+    private static void checkEncoding(Path entry) {
+        if (encodingWarned) return;
+        String name = entry.getFileName().toString();
+        String jnu = System.getProperty("sun.jnu.encoding", "");
+        if ((name.indexOf('?') >= 0 || name.indexOf('\uFFFD') >= 0) && !jnu.equalsIgnoreCase("UTF-8")) {
+            encodingWarned = true;
+            LOGGER.warn("The file name '{}' contains characters Java cannot read (file name encoding is {}). "
+                    + "Files and folders with non-ASCII names will not play. Start Minecraft with a UTF-8 "
+                    + "locale, e.g. set the environment variable LC_ALL=C.UTF-8 in your launcher.", name, jnu);
+        }
     }
 
     private static List<Path> listAudio(Path dir) {
