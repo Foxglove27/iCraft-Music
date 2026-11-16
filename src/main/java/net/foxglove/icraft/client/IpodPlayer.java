@@ -13,6 +13,7 @@ import net.minecraft.client.resources.sounds.SoundInstance;
 import net.minecraft.client.sounds.ChannelAccess;
 import net.minecraft.client.sounds.SoundEngine;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.GlobalPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.world.entity.player.Inventory;
@@ -24,6 +25,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Objects;
 import java.util.Random;
 import java.util.UUID;
 import org.slf4j.Logger;
@@ -35,6 +37,11 @@ public class IpodPlayer {
     private static ItemStack currentDisc = ItemStack.EMPTY; // empty while a file is playing
     @Nullable
     private static BlockPos currentSpeaker; // null when playing directly on the player
+    // The link of the playing iPod at the moment the track started (null = none). When the iPod's link
+    // differs from this, the track restarts on the new output. Compared as links, not as usable speakers,
+    // so walking away from a speaker (unloaded chunk) never counts as a change.
+    @Nullable
+    private static GlobalPos currentLink;
 
     private static boolean paused = false;
     // true when we paused it because the iPod left your inventory (so we can resume it on return)
@@ -100,6 +107,16 @@ public class IpodPlayer {
     public static void clientTick() {
         if (current == null || !started || paused) return;
         Minecraft mc = Minecraft.getInstance();
+
+        // The iPod was linked, unlinked or linked to another speaker: restart the track on the new output
+        if (currentIpod != null && mc.player != null && queueIndex >= 0 && queueIndex < order.length) {
+            ItemStack ipod = findIpod(mc.player, currentIpod);
+            if (ipod != null && !Objects.equals(ipod.get(ModDataComponents.LINKED_SPEAKER.get()), currentLink)) {
+                queue.get(order[queueIndex]).run(); // resolves the link again and records it, so this happens once
+                return;
+            }
+        }
+
         if (mc.getSoundManager().isActive(current)) return; // still playing
 
         if (current instanceof IpodSoundInstance sound && sound.isFile()) {
@@ -197,37 +214,40 @@ public class IpodPlayer {
         }
     }
     
-    public static void play(ItemStack disc, @Nullable BlockPos speaker, @Nullable UUID ipod) {
+    public static void play(ItemStack disc, @Nullable UUID ipod) {
         Minecraft mc = Minecraft.getInstance();
         if (mc.level == null) return;
 
+        GlobalPos link = linkedSpeakerOf(ipod);
+
         JukeboxSong.fromStack(mc.level.registryAccess(), disc).ifPresent(song -> {
             SoundEvent sound = song.value().soundEvent().value();
-            BlockPos used = validSpeaker(mc, speaker);
+            BlockPos used = validSpeaker(mc, link);
             Vec3 pos = used != null ? Vec3.atCenterOf(used) : null;
 
-            start(IpodSoundInstance.forDisc(sound, pos, SPEAKER_VOLUME), disc.copy(), used,
+            start(IpodSoundInstance.forDisc(sound, pos, SPEAKER_VOLUME), disc.copy(), used, link,
                     song.value().description(),
                     Component.translatable("screen.icraft.ipod.discs"),
                     null, ipod);
         });
     }
 
-    public static void playFile(Path file, @Nullable BlockPos speaker, @Nullable UUID ipod) {
+    public static void playFile(Path file, @Nullable UUID ipod) {
         Minecraft mc = Minecraft.getInstance();
         if (mc.level == null) return;
 
-        BlockPos used = validSpeaker(mc, speaker);
+        GlobalPos link = linkedSpeakerOf(ipod);
+        BlockPos used = validSpeaker(mc, link);
         Vec3 pos = used != null ? Vec3.atCenterOf(used) : null;
 
-        start(IpodSoundInstance.forFile(file, pos, SPEAKER_VOLUME), ItemStack.EMPTY, used,
+        start(IpodSoundInstance.forFile(file, pos, SPEAKER_VOLUME), ItemStack.EMPTY, used, link,
                 Component.literal(LocalMusic.displayName(file)),
                 LocalMusic.albumNameFor(file),
                 LocalMusic.coverFor(file), ipod);
     }
 
     private static void start(SoundInstance instance, ItemStack disc, @Nullable BlockPos speaker,
-                              Component name, Component subtitle, @Nullable Path cover,
+                              @Nullable GlobalPos link, Component name, Component subtitle, @Nullable Path cover,
                               @Nullable UUID ipod) {
         Minecraft mc = Minecraft.getInstance();
         endCurrent(); // ends any current sound, but keeps the track list
@@ -235,6 +255,7 @@ public class IpodPlayer {
         current = instance;
         currentDisc = disc;
         currentSpeaker = speaker;
+        currentLink = link;
         currentName = name;
         currentSubtitle = subtitle;
         currentCover = cover;
@@ -250,6 +271,7 @@ public class IpodPlayer {
         }
         currentDisc = ItemStack.EMPTY;
         currentSpeaker = null;
+        currentLink = null;
         currentName = Component.empty();
         currentSubtitle = Component.empty();
         currentCover = null;
@@ -260,8 +282,44 @@ public class IpodPlayer {
     }
 
     @Nullable
-    private static BlockPos validSpeaker(Minecraft mc, @Nullable BlockPos speaker) {
-        return (speaker != null && mc.level.getBlockState(speaker).is(ModBlocks.SPEAKER.get())) ? speaker : null;
+    private static BlockPos validSpeaker(Minecraft mc, @Nullable GlobalPos link) {
+        if (link == null || !link.dimension().equals(mc.level.dimension())) return null;
+        return mc.level.getBlockState(link.pos()).is(ModBlocks.SPEAKER.get()) ? link.pos() : null;
+    }
+
+    // The speaker the iPod with this ID is linked to right now (read from the stack in the player's inventory)
+    @Nullable
+    private static GlobalPos linkedSpeakerOf(@Nullable UUID ipod) {
+        Player player = Minecraft.getInstance().player;
+        ItemStack stack = player != null ? findIpod(player, ipod) : null;
+        return stack != null ? stack.get(ModDataComponents.LINKED_SPEAKER.get()) : null;
+    }
+
+    // The iPod with this ID in the inventory (or on the cursor), or null
+    @Nullable
+    private static ItemStack findIpod(Player player, @Nullable UUID id) {
+        if (id == null) return null;
+        ItemStack carried = player.containerMenu.getCarried();
+        if (isIpodWithId(carried, id)) return carried;
+        Inventory inv = player.getInventory();
+        for (int i = 0; i < inv.getContainerSize(); i++) {
+            if (isIpodWithId(inv.getItem(i), id)) return inv.getItem(i);
+        }
+        return null;
+    }
+
+    private static boolean isIpodWithId(ItemStack stack, UUID id) {
+        return stack.getItem() instanceof IpodItem && id.equals(stack.get(ModDataComponents.IPOD_ID.get()));
+    }
+
+    /** The position in the list (not the play order) of the track that is playing, or -1. For the GUI highlight. */
+    public static int playingQueueIndex() {
+        return (current != null && queueIndex >= 0 && queueIndex < order.length) ? order[queueIndex] : -1;
+    }
+
+    /** True if the player is playing from exactly this list of tracks. */
+    public static boolean isQueue(List<Runnable> tracks) {
+        return queue == tracks;
     }
 
     // Ends the song completely and forgets the track list.

@@ -1,7 +1,7 @@
 package net.foxglove.icraft.item;
 
 import net.foxglove.icraft.iCraft;
-import net.minecraft.core.BlockPos;
+import net.minecraft.core.GlobalPos;
 import net.minecraft.core.UUIDUtil;
 import net.minecraft.core.component.DataComponentType;
 import net.minecraft.core.registries.Registries;
@@ -15,10 +15,12 @@ public class ModDataComponents {
     public static final DeferredRegister<DataComponentType<?>> COMPONENTS =
             DeferredRegister.create(Registries.DATA_COMPONENT_TYPE, iCraft.MOD_ID);
 
-    public static final Supplier<DataComponentType<BlockPos>> LINKED_SPEAKER =
-            COMPONENTS.register("linked_speaker", () -> DataComponentType.<BlockPos>builder()
-                    .persistent(BlockPos.CODEC)
-                    .networkSynchronized(BlockPos.STREAM_CODEC)
+    // The speaker an iPod is linked to: dimension + position, so a speaker at the same
+    // coordinates in another dimension does not match
+    public static final Supplier<DataComponentType<GlobalPos>> LINKED_SPEAKER =
+            COMPONENTS.register("linked_speaker", () -> DataComponentType.<GlobalPos>builder()
+                    .persistent(GlobalPos.CODEC)
+                    .networkSynchronized(GlobalPos.STREAM_CODEC)
                     .build());
 
     // The discs loaded into an iPod (our own component, so other mods don't mistake it for a container)

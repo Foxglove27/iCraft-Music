@@ -7,6 +7,9 @@ All notable changes to iCraft are listed here, newest first. The format follows
 ## [Unreleased]
 
 ### Added
+- **Unlink a speaker**: right-click the speaker an iPod is linked to once more. Linking another speaker switches the link.
+- Changing the link (link, unlink or switch) while a song plays restarts that song from its beginning on the new
+  output (the speaker or your own ears). If the iPod is paused, this happens when it plays again.
 - **Shuffle and repeat.** New Settings page with `Shuffle: On/Off` and `Repeat: Off/List/One`. Both are
   global (stored in `config/icraft-client.toml`, not per iPod) and take effect immediately, also while a
   song is playing. Next/Previous follow the shuffled order.
@@ -24,11 +27,15 @@ All notable changes to iCraft are listed here, newest first. The format follows
   `LC_ALL=C.UTF-8` for the launcher).
 
 ### Changed
+- The speaker link now remembers its dimension. **Existing links must be set again** (right-click the speaker).
 - Discs are stored in the mod's own component and every iPod has an ID, so a playing song belongs to one specific iPod.
 - Ogg files are memory-mapped instead of loaded whole; the 256 MiB file size limit is gone (2 GiB per file).
 - `.m4a` is no longer listed in the library (it was only playable through ffmpeg).
 
 ### Fixed
+- The highlighted row in the track list now follows the song when you press Next/Previous, and when the next
+  song starts by itself.
+- A speaker at the same coordinates in another dimension no longer counts as the linked speaker.
 - After a track failed to load, the sound engine ran out of streaming channels ("Maximum sound pool size 8
   reached") and no file could play any more, most visible with a linked speaker.
 - Missing lang key for the Singles album.

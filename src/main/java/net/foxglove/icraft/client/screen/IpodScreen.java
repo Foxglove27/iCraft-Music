@@ -10,7 +10,6 @@ import net.minecraft.Util;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
@@ -96,19 +95,27 @@ public class IpodScreen extends Screen {
     private int selected;     // the highlighted row in the current list
     private int scroll;       // index of the first row that is visible
 
+    // The album whose list was last started from this screen, with the list handed to the player.
+    // Lets the highlight follow the song when it changes (Next, Previous, autoplay, shuffle).
+    @Nullable
+    private AlbumView playedAlbum;
+    @Nullable
+    private List<Runnable> playedActions;
+    private int lastPlayingSeen = -1;
+
     private long animStart;
     private boolean closing;
     private float closeFrom;
 
     public IpodScreen(List<ItemStack> discs, List<LocalMusic.Album> library,
-                      @Nullable BlockPos speaker, ResourceLocation skin, @Nullable UUID ipod) {
+                      ResourceLocation skin, @Nullable UUID ipod) {
         super(Component.translatable("screen.icraft.ipod"));
         this.skin = skin;
 
         if (!discs.isEmpty()) {
             List<Track> tracks = new ArrayList<>();
             for (ItemStack disc : discs) {
-                tracks.add(new Track(discName(disc), () -> IpodPlayer.play(disc, speaker, ipod)));
+                tracks.add(new Track(discName(disc), () -> IpodPlayer.play(disc, ipod)));
             }
             albums.add(new AlbumView(Component.translatable("screen.icraft.ipod.discs"),
                     null, new ItemStack(Items.MUSIC_DISC_CAT), tracks));
@@ -118,7 +125,7 @@ public class IpodScreen extends Screen {
             List<Track> tracks = new ArrayList<>();
             for (Path file : album.files()) {
                 tracks.add(new Track(Component.literal(LocalMusic.displayName(file)),
-                        () -> IpodPlayer.playFile(file, speaker, ipod)));
+                        () -> IpodPlayer.playFile(file, ipod)));
             }
             albums.add(new AlbumView(album.name(), album.cover(), null, tracks));
         }
@@ -175,6 +182,16 @@ public class IpodScreen extends Screen {
         if (pendingActivateAt >= 0 && Util.getMillis() >= pendingActivateAt) {
             pendingActivateAt = -1;
             activate();
+        }
+
+        // The song changed by itself or through Next/Previous: move the highlight to it
+        if (page == Page.TRACKS && open == playedAlbum && playedActions != null
+                && IpodPlayer.isQueue(playedActions)) {
+            int playing = IpodPlayer.playingQueueIndex();
+            if (playing >= 0 && playing != lastPlayingSeen) {
+                lastPlayingSeen = playing;
+                selected = playing; // keepSelectionVisible scrolls it into view when drawing
+            }
         }
 
         if (closing && progress() <= 0.0F) {
@@ -381,6 +398,9 @@ public class IpodScreen extends Screen {
             }
             case TRACKS -> {
                 List<Runnable> actions = open.tracks().stream().map(Track::play).toList();
+                playedAlbum = open;
+                playedActions = actions;
+                lastPlayingSeen = selected;
                 IpodPlayer.playQueue(actions, selected);
             }
             case SETTINGS -> {

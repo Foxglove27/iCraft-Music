@@ -3,6 +3,7 @@ package net.foxglove.icraft.item;
 import net.foxglove.icraft.block.ModBlocks;
 import net.foxglove.icraft.client.ClientHooks;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.GlobalPos;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.InteractionHand;
@@ -131,10 +132,18 @@ public class IpodItem extends Item {
 
         if (level.getBlockState(pos).is(ModBlocks.SPEAKER.get())) {
             if (!level.isClientSide()) {
-                context.getItemInHand().set(ModDataComponents.LINKED_SPEAKER.get(), pos);
+                ItemStack ipod = context.getItemInHand();
+                GlobalPos target = GlobalPos.of(level.dimension(), pos);
+                // clicking the speaker the iPod is already linked to unlinks it
+                boolean unlink = target.equals(ipod.get(ModDataComponents.LINKED_SPEAKER.get()));
+                if (unlink) {
+                    ipod.remove(ModDataComponents.LINKED_SPEAKER.get());
+                } else {
+                    ipod.set(ModDataComponents.LINKED_SPEAKER.get(), target);
+                }
                 if (context.getPlayer() != null) {
-                    context.getPlayer().displayClientMessage(
-                            Component.translatable("message.icraft.ipod.linked"), true);
+                    context.getPlayer().displayClientMessage(Component.translatable(
+                            unlink ? "message.icraft.ipod.unlinked" : "message.icraft.ipod.linked"), true);
                 }
             }
             return InteractionResult.sidedSuccess(level.isClientSide());
