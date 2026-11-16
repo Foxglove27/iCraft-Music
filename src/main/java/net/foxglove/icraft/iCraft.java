@@ -36,13 +36,14 @@ public class iCraft {
 
     }
 
-    // Add the iPod to the "Resources" tab and the speaker to the "Building Blocks" tab
+    // The iPod goes in "Tools & Utilities" and the speaker in "Functional Blocks", next to the jukebox.
+    // The other iPod colours are only in the iCraft tab (see ModCreativeModeTabs).
     private void addCreative(BuildCreativeModeTabContentsEvent event) {
-        if(event.getTabKey() == CreativeModeTabs.INGREDIENTS) {
+        if (event.getTabKey() == CreativeModeTabs.TOOLS_AND_UTILITIES) {
             event.accept(ModItems.IPOD);
         }
 
-        if(event.getTabKey() == CreativeModeTabs.BUILDING_BLOCKS){
+        if (event.getTabKey() == CreativeModeTabs.FUNCTIONAL_BLOCKS) {
             event.accept(ModBlocks.SPEAKER);
         }
     }

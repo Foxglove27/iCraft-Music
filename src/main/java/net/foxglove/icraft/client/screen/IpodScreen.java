@@ -23,6 +23,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.UUID;
 
 public class IpodScreen extends Screen {
     // ---- The texture ----
@@ -87,14 +88,14 @@ public class IpodScreen extends Screen {
     private float closeFrom;
 
     public IpodScreen(List<ItemStack> discs, List<LocalMusic.Album> library,
-                      @Nullable BlockPos speaker, ResourceLocation skin) {
+                      @Nullable BlockPos speaker, ResourceLocation skin, @Nullable UUID ipod) {
         super(Component.translatable("screen.icraft.ipod"));
         this.skin = skin;
 
         if (!discs.isEmpty()) {
             List<Track> tracks = new ArrayList<>();
             for (ItemStack disc : discs) {
-                tracks.add(new Track(discName(disc), () -> IpodPlayer.play(disc, speaker)));
+                tracks.add(new Track(discName(disc), () -> IpodPlayer.play(disc, speaker, ipod)));
             }
             albums.add(new AlbumView(Component.translatable("screen.icraft.ipod.discs"),
                     null, new ItemStack(Items.MUSIC_DISC_CAT), tracks));
@@ -104,7 +105,7 @@ public class IpodScreen extends Screen {
             List<Track> tracks = new ArrayList<>();
             for (Path file : album.files()) {
                 tracks.add(new Track(Component.literal(LocalMusic.displayName(file)),
-                        () -> IpodPlayer.playFile(file, speaker)));
+                        () -> IpodPlayer.playFile(file, speaker, ipod)));
             }
             albums.add(new AlbumView(album.name(), album.cover(), null, tracks));
         }

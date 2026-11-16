@@ -8,18 +8,19 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.InteractionResultHolder;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.SlotAccess;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.ClickAction;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.component.ItemContainerContents;
 import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.world.level.Level;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 public class IpodItem extends Item {
     public static final int MAX_DISCS = 32; // vanilla has 19 discs, so this leaves room for modded ones
@@ -31,29 +32,43 @@ public class IpodItem extends Item {
         this.color = color;
     }
 
-    // The colour of this iPod, which decides its GUI skin.
+    /** The colour of this iPod, which decides its GUI skin. */
     public IpodColor getColor() {
         return color;
     }
 
     public static List<ItemStack> getDiscs(ItemStack ipod) {
         List<ItemStack> discs = new ArrayList<>();
-        ipod.getOrDefault(DataComponents.CONTAINER, ItemContainerContents.EMPTY)
-                .nonEmptyItems().forEach(s -> discs.add(s.copy()));
+        for (ItemStack stored : ipod.getOrDefault(ModDataComponents.DISCS.get(), IpodDiscs.EMPTY).discs()) {
+            discs.add(stored.copy());
+        }
         return discs;
     }
 
     // True if this iPod holds a disc equal to the given one. Unlike getDiscs, it makes no copies,
     // so it is cheap enough to call every tick even with many discs loaded.
     public static boolean hasDisc(ItemStack ipod, ItemStack disc) {
-        for (ItemStack stored : ipod.getOrDefault(DataComponents.CONTAINER, ItemContainerContents.EMPTY).nonEmptyItems()) {
+        for (ItemStack stored : ipod.getOrDefault(ModDataComponents.DISCS.get(), IpodDiscs.EMPTY).discs()) {
             if (ItemStack.isSameItemSameComponents(stored, disc)) return true;
         }
         return false;
     }
 
     private static void setDiscs(ItemStack ipod, List<ItemStack> discs) {
-        ipod.set(DataComponents.CONTAINER, ItemContainerContents.fromItems(discs));
+        if (discs.isEmpty()) {
+            ipod.remove(ModDataComponents.DISCS.get()); // an empty iPod stays identical to a fresh one
+        } else {
+            ipod.set(ModDataComponents.DISCS.get(), new IpodDiscs(discs));
+        }
+    }
+
+    // Gives every iPod its own ID the first time the server sees it in an inventory.
+    // The ID is a data component, so it survives dyeing, dropping and picking the iPod up again.
+    @Override
+    public void inventoryTick(ItemStack stack, Level level, Entity entity, int slotId, boolean isSelected) {
+        if (!level.isClientSide() && !stack.has(ModDataComponents.IPOD_ID.get())) {
+            stack.set(ModDataComponents.IPOD_ID.get(), UUID.randomUUID());
+        }
     }
 
     @Override

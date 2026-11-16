@@ -6,6 +6,7 @@ import net.foxglove.icraft.block.ModBlocks;
 import net.foxglove.icraft.client.audio.IpodSoundInstance;
 import net.foxglove.icraft.client.audio.LocalMusic;
 import net.foxglove.icraft.item.IpodItem;
+import net.foxglove.icraft.item.ModDataComponents;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.resources.sounds.SoundInstance;
 import net.minecraft.client.sounds.ChannelAccess;
@@ -22,6 +23,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.nio.file.Path;
 import java.util.List;
+import java.util.UUID;
 import org.slf4j.Logger;
 
 public class IpodPlayer {
@@ -35,6 +37,11 @@ public class IpodPlayer {
     private static boolean paused = false;
     // true when we paused it because the iPod left your inventory (so we can resume it on return)
     private static boolean autoPaused = false;
+
+    // The ID of the iPod that started the current song. The song belongs to that iPod:
+    // when it leaves the inventory the music pauses, even if you carry other iPods.
+    @Nullable
+    private static UUID currentIpod;
 
     // The list of tracks the current song came from, and our position in it
     private static List<Runnable> queue = List.of();
@@ -81,7 +88,7 @@ public class IpodPlayer {
         stop(); // clears the track, so the HUD disappears too
     }
     
-    public static void play(ItemStack disc, @Nullable BlockPos speaker) {
+    public static void play(ItemStack disc, @Nullable BlockPos speaker, @Nullable UUID ipod) {
         Minecraft mc = Minecraft.getInstance();
         if (mc.level == null) return;
 
@@ -93,11 +100,11 @@ public class IpodPlayer {
             start(IpodSoundInstance.forDisc(sound, pos, SPEAKER_VOLUME), disc.copy(), used,
                     song.value().description(),
                     Component.translatable("screen.icraft.ipod.discs"),
-                    null);
+                    null, ipod);
         });
     }
 
-    public static void playFile(Path file, @Nullable BlockPos speaker) {
+    public static void playFile(Path file, @Nullable BlockPos speaker, @Nullable UUID ipod) {
         Minecraft mc = Minecraft.getInstance();
         if (mc.level == null) return;
 
@@ -107,11 +114,12 @@ public class IpodPlayer {
         start(IpodSoundInstance.forFile(file, pos, SPEAKER_VOLUME), ItemStack.EMPTY, used,
                 Component.literal(LocalMusic.displayName(file)),
                 LocalMusic.albumNameFor(file),
-                LocalMusic.coverFor(file));
+                LocalMusic.coverFor(file), ipod);
     }
 
     private static void start(SoundInstance instance, ItemStack disc, @Nullable BlockPos speaker,
-                              Component name, Component subtitle, @Nullable Path cover) {
+                              Component name, Component subtitle, @Nullable Path cover,
+                              @Nullable UUID ipod) {
         Minecraft mc = Minecraft.getInstance();
         endCurrent(); // ends any current sound, but keeps the track list
         mc.getMusicManager().stopPlaying();
@@ -121,6 +129,7 @@ public class IpodPlayer {
         currentName = name;
         currentSubtitle = subtitle;
         currentCover = cover;
+        currentIpod = ipod;
         mc.getSoundManager().play(instance);
     }
 
@@ -135,6 +144,7 @@ public class IpodPlayer {
         currentName = Component.empty();
         currentSubtitle = Component.empty();
         currentCover = null;
+        currentIpod = null;
         paused = false;
         autoPaused = false;
     }
@@ -294,6 +304,13 @@ public class IpodPlayer {
 
     private static boolean carriesPlaying(ItemStack stack) {
         if (!(stack.getItem() instanceof IpodItem)) return false;
+
+        // The song belongs to the specific iPod that started it
+        if (currentIpod != null) {
+            return currentIpod.equals(stack.get(ModDataComponents.IPOD_ID.get()));
+        }
+
+        // Fallback for an iPod that had no ID yet when the song started
         if (currentDisc.isEmpty()) return true; // a file is playing: any iPod will do
         return IpodItem.hasDisc(stack, currentDisc);
     }
