@@ -7,6 +7,8 @@ All notable changes to iCraft are listed here, newest first. The format follows
 ## [Unreleased]
 
 ### Added
+- **Apple Lossless (ALAC) files** in `.m4a` and `.m4b` containers play (the format iTunes and Apple Music use for
+  lossless music). The decoder is bit-exact with ffmpeg on the files I tested (16 and 24 bit, 44.1 and 48 kHz).
 - **Podcasts.** A Podcasts entry in the menu, working like audiobooks: put one folder per show in `ipod/podcasts`
   and the episodes inside it. Shows can have a cover, episodes play in order and stop after the last one, and the
   iPod remembers where you stopped in every episode. Opening a show highlights the next episode you have not
@@ -54,6 +56,8 @@ All notable changes to iCraft are listed here, newest first. The format follows
 - Ogg files are memory-mapped instead of loaded whole; the 256 MiB file size limit is gone (2 GiB per file).
 
 ### Fixed
+- `.m4a` music files from iTunes / Apple Music did not play (they are Apple Lossless, which was not supported).
+  Unsupported audio codecs inside an MP4 file now say which codec it is in the log.
 - Songs whose file names contain numbers now play in the right order (`Track 10` no longer comes before `Track 2`).
 - The highlighted row in the track list now follows the song when you press Next/Previous, and when the next
   song starts by itself.

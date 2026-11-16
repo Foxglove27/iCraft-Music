@@ -5,7 +5,6 @@ import net.sourceforge.jaad.aac.Decoder;
 import net.sourceforge.jaad.aac.SampleBuffer;
 
 import java.io.IOException;
-import java.nio.file.Path;
 import java.util.Arrays;
 
 /**
@@ -29,9 +28,11 @@ public final class AacSource extends BlockSource {
     private int lastFrameLength = 1024;
     private boolean firstPending; // the first block is decoded in the constructor to learn the real format
 
-    public AacSource(Path path) throws IOException {
-        mp4 = Mp4File.open(path);
+    /** Takes ownership of {@code mp4} (it is closed if opening fails, and by {@link #close()}). */
+    public AacSource(Mp4File mp4) throws IOException {
+        this.mp4 = mp4;
         try {
+            if (mp4.codec() != Mp4File.Codec.AAC) throw new IOException("Not an AAC track");
             decoder = new Decoder(mp4.specificInfo());
             if (!decodeNext()) throw new IOException("The file contains no audio frames");
             firstPending = true;

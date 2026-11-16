@@ -21,11 +21,15 @@ public final class Mp4File implements AutoCloseable {
     /** A chapter marker inside the file. */
     public record Marker(String title, double startSeconds) {}
 
+    /** The audio codec of the track. {@link #specificInfo()} holds that codec's config bytes. */
+    public enum Codec { AAC, ALAC }
+
     private static final long MAX_MOOV_BYTES = 512L * 1024 * 1024;
 
     private final RandomAccessFile file;
 
-    private byte[] specificInfo;        // the AAC AudioSpecificConfig
+    private Codec codec;
+    private byte[] specificInfo;        // AAC: the AudioSpecificConfig; ALAC: the 24-byte ALAC config
     private int timescale;
     private double durationSeconds;
     private int[] sampleSizes;          // size of every audio frame
@@ -60,6 +64,10 @@ public final class Mp4File implements AutoCloseable {
         } catch (IOException | RuntimeException e) {
             return List.of();
         }
+    }
+
+    public Codec codec() {
+        return codec;
     }
 
     public byte[] specificInfo() {
@@ -144,15 +152,22 @@ public final class Mp4File implements AutoCloseable {
             Track t = parseTrack(moov, trak);
             if (t != null) all.add(t);
         }
+        String unsupported = null;
         for (Track t : all) {
-            if (t.handler.equals("soun") && t.specificInfo != null) {
+            if (!t.handler.equals("soun")) continue;
+            if (t.specificInfo != null) {
                 audio = t;
                 break;
             }
+            if (unsupported == null) unsupported = t.codecName;
         }
-        if (audio == null) throw new IOException("No AAC audio track found");
+        if (audio == null) {
+            throw new IOException(unsupported != null ? "Unsupported audio codec: " + unsupported
+                    : "No audio track found");
+        }
         if (audio.sampleSizes.length == 0) throw new IOException("Fragmented MP4 files are not supported");
 
+        codec = audio.codec;
         specificInfo = audio.specificInfo;
         timescale = audio.timescale;
         sampleSizes = audio.sampleSizes;
@@ -250,6 +265,8 @@ public final class Mp4File implements AutoCloseable {
         int timescale;
         int[] chapterTrackIds = new int[0];
         // audio
+        Codec codec;
+        String codecName = "unknown";
         byte[] specificInfo;
         // sample tables (all tracks)
         int[] sampleSizes = new int[0];
@@ -350,26 +367,43 @@ public final class Mp4File implements AutoCloseable {
 
         Box stsd = find(b, stbl, "stsd");
         if (stsd != null && t.handler.equals("soun")) {
-            t.specificInfo = readSpecificInfo(b, stsd);
+            readAudioEntry(b, stsd, t);
         }
         return t;
     }
 
-    /** The AAC AudioSpecificConfig from the 'esds' box of an 'mp4a' sample entry, or null. */
-    private static byte[] readSpecificInfo(ByteBuffer b, Box stsd) {
+    /**
+     * Reads the audio sample entry: an 'mp4a' entry holds the AAC AudioSpecificConfig in its 'esds' box,
+     * an 'alac' entry holds the 24-byte ALAC config in a child box 'alac'. Anything else is left as an
+     * unsupported codec (its name is kept for the error message).
+     */
+    private static void readAudioEntry(ByteBuffer b, Box stsd, Track t) {
         int entry = stsd.start + 8;                      // version/flags + entry count
-        if (entry + 36 > stsd.end) return null;
+        if (entry + 36 > stsd.end) return;
         String codec = fourCC(b, entry + 4);
-        if (!codec.equals("mp4a")) return null;           // alac, ac-3 and others are not supported
+        t.codecName = codec;
+        if (!codec.equals("mp4a") && !codec.equals("alac")) return; // ac-3, ... are not supported
         int body = entry + 8;
         int version = b.getShort(body + 8) & 0xFFFF;      // QuickTime sound description version
         int fixed = 28 + (version == 1 ? 16 : version == 2 ? 36 : 0);
         int entryEnd = (int) Math.min(stsd.end, entry + (b.getInt(entry) & 0xFFFFFFFFL));
         for (Box child : children(b, body + fixed, entryEnd)) {
-            if (!child.type.equals("esds")) continue;
-            return parseDescriptors(b, child.start + 4, child.end);
+            if (codec.equals("mp4a") && child.type.equals("esds")) {
+                byte[] info = parseDescriptors(b, child.start + 4, child.end);
+                if (info != null) {
+                    t.codec = Codec.AAC;
+                    t.specificInfo = info;
+                }
+                return;
+            }
+            if (codec.equals("alac") && child.type.equals("alac") && child.end - child.start >= 28) {
+                byte[] cfg = new byte[24];                // after the 4 bytes of version and flags
+                for (int i = 0; i < 24; i++) cfg[i] = b.get(child.start + 4 + i);
+                t.codec = Codec.ALAC;
+                t.specificInfo = cfg;
+                return;
+            }
         }
-        return null;
     }
 
     // ES_Descriptor (0x03) > DecoderConfigDescriptor (0x04) > DecoderSpecificInfo (0x05)
