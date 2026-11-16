@@ -31,5 +31,8 @@
   "message.icraft.ipod.unlinked": "iPod vom Lautsprecher getrennt",
   "screen.icraft.ipod.audiobooks": "Hörbücher",
   "screen.icraft.ipod.books": "Hörbücher",
-  "screen.icraft.ipod.no_books": "Keine Hörbücher gefunden. Lege pro Buch einen Ordner in ipod/audiobooks (mp3, ogg, flac, wav, m4a oder m4b)."
+  "screen.icraft.ipod.no_books": "Keine Hörbücher gefunden. Lege pro Buch einen Ordner in ipod/audiobooks (mp3, ogg, flac, wav, m4a oder m4b).",
+  "screen.icraft.ipod.podcasts": "Podcasts",
+  "screen.icraft.ipod.podcast_list": "Podcasts",
+  "screen.icraft.ipod.no_podcasts": "Keine Podcasts gefunden. Lege pro Sendung einen Ordner in ipod/podcasts (mp3, ogg, flac, wav, m4a oder m4b)."
 }

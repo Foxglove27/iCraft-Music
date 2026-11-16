@@ -16,6 +16,7 @@ public class ClientHooks {
                 IpodItem.getDiscs(ipod),
                 LocalMusic.albums(),
                 LocalMusic.books(),
+                LocalMusic.podcasts(),
                 ipod.has(ModDataComponents.LINKED_SPEAKER.get()),
                 color.guiTexture(),
                 ipod.get(ModDataComponents.IPOD_ID.get())));

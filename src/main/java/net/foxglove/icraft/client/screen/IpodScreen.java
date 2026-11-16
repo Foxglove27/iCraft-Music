@@ -94,10 +94,11 @@ public class IpodScreen extends Screen {
 
     private static final int MENU_MUSIC = 0;
     private static final int MENU_BOOKS = 1;
-    private static final int MENU_SETTINGS = 2;
+    private static final int MENU_PODCASTS = 2;
+    private static final int MENU_SETTINGS = 3;
     private static final int SETTING_SHUFFLE = 0;
     private static final int SETTING_REPEAT = 1;
-    private static final int MENU_ROWS = 3;
+    private static final int MENU_ROWS = 4;
     private static final int SETTING_ROWS = 2;
 
     private Page page = Page.MENU;
@@ -105,6 +106,15 @@ public class IpodScreen extends Screen {
     private final ResourceLocation skin; // the GUI texture for this iPod's colour
     private final List<AlbumView> albums = new ArrayList<>();
     private final List<AlbumView> books = new ArrayList<>();
+    private final List<AlbumView> podcasts = new ArrayList<>();
+
+    // The BOOKS and CHAPTERS pages show either the audiobooks or the podcasts
+    private enum BookSection { AUDIOBOOKS, PODCASTS }
+    private BookSection bookSection = BookSection.AUDIOBOOKS;
+
+    private List<AlbumView> shownBooks() {
+        return bookSection == BookSection.PODCASTS ? podcasts : books;
+    }
     @Nullable
     private AlbumView open;   // the album shown on the TRACKS page, or the book on the CHAPTERS page
     private int openedIndex;  // which album we opened, so Menu can jump back to it
@@ -133,8 +143,8 @@ public class IpodScreen extends Screen {
     private boolean closing;
     private float closeFrom;
 
-    public IpodScreen(List<ItemStack> discs, List<LocalMusic.Album> library, List<LocalMusic.Book> library2,
-                      boolean linked, ResourceLocation skin, @Nullable UUID ipod) {
+    public IpodScreen(List<ItemStack> discs, List<LocalMusic.Album> library, List<LocalMusic.Book> audiobookLibrary,
+                      List<LocalMusic.Book> podcastLibrary, boolean linked, ResourceLocation skin, @Nullable UUID ipod) {
         super(Component.translatable("screen.icraft.ipod"));
         this.skin = skin;
 
@@ -159,7 +169,15 @@ public class IpodScreen extends Screen {
             albums.add(new AlbumView(album.name(), album.cover(), null, tracks));
         }
 
-        for (LocalMusic.Book book : library2) {
+        buildBooks(audiobookLibrary, books, ipod);
+        buildBooks(podcastLibrary, podcasts, ipod);
+
+        animStart = Util.getMillis();
+    }
+
+    // Turns books (or podcast shows) into list entries whose rows play a chapter (or episode)
+    private static void buildBooks(List<LocalMusic.Book> library, List<AlbumView> into, @Nullable UUID ipod) {
+        for (LocalMusic.Book book : library) {
             List<Track> chapters = new ArrayList<>();
             List<LocalMusic.Chapter> list = book.chapters();
             String last = AudiobookProgress.lastChapter(book.key());
@@ -173,10 +191,8 @@ public class IpodScreen extends Screen {
                         saved >= 1 ? formatTime(saved) : null));
                 if (chapter.key().equals(last)) startRow = i;
             }
-            books.add(new AlbumView(book.name(), book.cover(), null, chapters, startRow));
+            into.add(new AlbumView(book.name(), book.cover(), null, chapters, startRow));
         }
-
-        animStart = Util.getMillis();
     }
 
     private static String formatTime(double seconds) {
@@ -308,7 +324,8 @@ public class IpodScreen extends Screen {
         Component title = switch (page) {
             case MENU -> Component.translatable("screen.icraft.ipod.menu");
             case ALBUMS -> Component.translatable("screen.icraft.ipod.albums");
-            case BOOKS -> Component.translatable("screen.icraft.ipod.books");
+            case BOOKS -> Component.translatable(bookSection == BookSection.PODCASTS
+                    ? "screen.icraft.ipod.podcast_list" : "screen.icraft.ipod.books");
             case SETTINGS -> Component.translatable("screen.icraft.ipod.settings");
             case TRACKS, CHAPTERS -> open.name();
         };
@@ -318,8 +335,9 @@ public class IpodScreen extends Screen {
 
         // Nothing to show (only the album and book lists can be empty)
         if (count == 0) {
-            g.drawWordWrap(this.font, Component.translatable(page == Page.BOOKS
-                            ? "screen.icraft.ipod.no_books" : "screen.icraft.ipod.empty"),
+            g.drawWordWrap(this.font, Component.translatable(page != Page.BOOKS ? "screen.icraft.ipod.empty"
+                            : bookSection == BookSection.PODCASTS ? "screen.icraft.ipod.no_podcasts"
+                            : "screen.icraft.ipod.no_books"),
                     left, LIST_Y + 3, right - left, 0xFFFFFFFF);
         }
 
@@ -339,7 +357,7 @@ public class IpodScreen extends Screen {
             Component name;
             switch (page) {
                 case ALBUMS, BOOKS -> {
-                    AlbumView album = (page == Page.ALBUMS ? albums : books).get(index);
+                    AlbumView album = (page == Page.ALBUMS ? albums : shownBooks()).get(index);
                     drawCover(g, album, left, rowY + 1, THUMB);
                     textX = left + THUMB + 3;
                     name = album.name();
@@ -421,7 +439,7 @@ public class IpodScreen extends Screen {
             case MENU -> MENU_ROWS;
             case SETTINGS -> SETTING_ROWS;
             case ALBUMS -> albums.size();
-            case BOOKS -> books.size();
+            case BOOKS -> shownBooks().size();
             case TRACKS, CHAPTERS -> open.tracks().size();
         };
     }
@@ -430,6 +448,7 @@ public class IpodScreen extends Screen {
         return Component.translatable(switch (index) {
             case MENU_MUSIC -> "screen.icraft.ipod.music";
             case MENU_BOOKS -> "screen.icraft.ipod.audiobooks";
+            case MENU_PODCASTS -> "screen.icraft.ipod.podcasts";
             default -> "screen.icraft.ipod.settings";
         });
     }
@@ -471,7 +490,10 @@ public class IpodScreen extends Screen {
         switch (page) {
             case MENU -> goTo(switch (selected) {
                 case MENU_MUSIC -> Page.ALBUMS;
-                case MENU_BOOKS -> Page.BOOKS;
+                case MENU_BOOKS, MENU_PODCASTS -> {
+                    bookSection = selected == MENU_PODCASTS ? BookSection.PODCASTS : BookSection.AUDIOBOOKS;
+                    yield Page.BOOKS;
+                }
                 default -> Page.SETTINGS;
             }, 0);
             case ALBUMS -> {
@@ -481,7 +503,7 @@ public class IpodScreen extends Screen {
             }
             case BOOKS -> {
                 openedIndex = selected;
-                open = books.get(selected);
+                open = shownBooks().get(selected);
                 goTo(Page.CHAPTERS, open.startRow());
             }
             case TRACKS, CHAPTERS -> {
@@ -507,7 +529,7 @@ public class IpodScreen extends Screen {
             case TRACKS -> goTo(Page.ALBUMS, openedIndex);
             case CHAPTERS -> goTo(Page.BOOKS, openedIndex);
             case ALBUMS -> goTo(Page.MENU, MENU_MUSIC);
-            case BOOKS -> goTo(Page.MENU, MENU_BOOKS);
+            case BOOKS -> goTo(Page.MENU, bookSection == BookSection.PODCASTS ? MENU_PODCASTS : MENU_BOOKS);
             case SETTINGS -> goTo(Page.MENU, MENU_SETTINGS);
             case MENU -> { }
         }

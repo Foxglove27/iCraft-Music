@@ -31,5 +31,8 @@
   "message.icraft.ipod.unlinked": "iPod unlinked from speaker",
   "screen.icraft.ipod.audiobooks": "Audiobooks",
   "screen.icraft.ipod.books": "Audiobooks",
-  "screen.icraft.ipod.no_books": "No audiobooks found. Put one folder per book in ipod/audiobooks (mp3, ogg, flac, wav, m4a or m4b)."
+  "screen.icraft.ipod.no_books": "No audiobooks found. Put one folder per book in ipod/audiobooks (mp3, ogg, flac, wav, m4a or m4b).",
+  "screen.icraft.ipod.podcasts": "Podcasts",
+  "screen.icraft.ipod.podcast_list": "Podcasts",
+  "screen.icraft.ipod.no_podcasts": "No podcasts found. Put one folder per show in ipod/podcasts (mp3, ogg, flac, wav, m4a or m4b)."
 }

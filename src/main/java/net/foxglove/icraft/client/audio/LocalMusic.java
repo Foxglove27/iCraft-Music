@@ -58,6 +58,10 @@ public class LocalMusic {
         return libraryRoot().resolve("music");
     }
 
+    public static Path podcastRoot() {
+        return libraryRoot().resolve("podcasts");
+    }
+
     public static Path audiobookRoot() {
         return libraryRoot().resolve("audiobooks");
     }
@@ -91,6 +95,7 @@ public class LocalMusic {
         try {
             Files.createDirectories(musicRoot());
             Files.createDirectories(audiobookRoot());
+            Files.createDirectories(podcastRoot());
         } catch (IOException e) {
             LOGGER.warn("Could not create the library folders under {}", libraryRoot(), e);
         }
@@ -113,8 +118,18 @@ public class LocalMusic {
     // ---- audiobooks ----
 
     public static List<Book> books() {
+        return scanBooks(audiobookRoot());
+    }
+
+    // ---- podcasts: shows are folders and episodes are files, exactly like books and chapters ----
+
+    public static List<Book> podcasts() {
+        return scanBooks(podcastRoot());
+    }
+
+    private static List<Book> scanBooks(Path root) {
         List<Book> books = new ArrayList<>();
-        for (Path dir : listFolders(audiobookRoot())) {
+        for (Path dir : listFolders(root)) {
             List<Chapter> chapters = new ArrayList<>();
             for (Path file : listAudio(dir)) {
                 chapters.addAll(chaptersOf(file));

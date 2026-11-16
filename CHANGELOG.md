@@ -7,6 +7,10 @@ All notable changes to iCraft are listed here, newest first. The format follows
 ## [Unreleased]
 
 ### Added
+- **Podcasts.** A Podcasts entry in the menu, working like audiobooks: put one folder per show in `ipod/podcasts`
+  and the episodes inside it. Shows can have a cover, episodes play in order and stop after the last one, and the
+  iPod remembers where you stopped in every episode. Opening a show highlights the next episode you have not
+  finished.
 - **Hold Next or Previous** to skip within the song: after a moment it jumps 10 seconds ahead (or back) about
   every 0.4 seconds until you let go. A quick click still changes the track. Works for songs and audiobook
   chapters, not for music discs. Nothing happens while paused.
