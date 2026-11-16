@@ -13,12 +13,14 @@ public class ClientEvents {
     @SubscribeEvent
     public static void onLoggingOut(ClientPlayerNetworkEvent.LoggingOut event) {
         IpodPlayer.stop();
+        DockClientPlayer.stopAll();
     }
 
     // Once per client tick: notices when a track has finished so the next one can start
     @SubscribeEvent
     public static void onClientTick(ClientTickEvent.Post event) {
         IpodPlayer.clientTick();
+        DockControl.tick();
         ModKeyMappings.tick(net.minecraft.client.Minecraft.getInstance().screen != null);
     }
 }

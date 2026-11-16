@@ -39,18 +39,12 @@ import org.lwjgl.openal.AL11;
 import org.slf4j.Logger;
 
 public class IpodPlayer {
-    // Range of a single speaker = max(volume, 1) x 16 blocks, so 2.0 = 32 blocks. A multiblock uses twice
-    // this value (64 blocks). Loudness itself is capped at full volume by Minecraft.
-    private static final float SPEAKER_VOLUME = 2.0F;
 
     private static SoundInstance current;
     private static ItemStack currentDisc = ItemStack.EMPTY; // empty while a file is playing
 
-    // One place the sound comes from: a single speaker or a multiblock of the dock. 'pos' is where the sound
-    // is, 'top' where the music notes rise, 'volume' decides how far it carries (range = volume x 16 blocks).
-    private record Output(BlockPos anchor, boolean multiblock, Vec3 pos, Vec3 top, float volume) {}
     // The speakers the current track plays through; empty = straight into the player's ears
-    private static List<Output> currentOutputs = List.of();
+    private static List<DockOutputs.Output> currentOutputs = List.of();
     // The sounds of the speakers after the first. 'current' is the first one and drives everything; these
     // are started, paused, resumed and stopped together with it.
     private static List<SoundInstance> extras = List.of();
@@ -58,9 +52,7 @@ public class IpodPlayer {
     @Nullable
     private static GlobalPos queueDock;
     private static int ticksSinceOutputCheck = 0;
-    private static int ticksSinceNote = 0;
     private static final int OUTPUT_CHECK_TICKS = 10; // look for changed speakers twice a second
-    private static final int NOTE_TICKS = 8;          // a music note per speaker every 8 ticks
 
     private static boolean paused = false;
     // true when we paused it because the iPod left your inventory (so we can resume it on return)
@@ -110,20 +102,20 @@ public class IpodPlayer {
     private static int consecutiveFailures = 0;
 
     public static Component getNowPlaying() {
-        return currentName;
+        return DockControl.isActive() ? DockControl.currentName() : currentName;
     }
 
     public static Component getNowPlayingSubtitle() {
-        return currentSubtitle;
+        return DockControl.isActive() ? Component.translatable("screen.icraft.ipod.discs") : currentSubtitle;
     }
 
     @Nullable
     public static Path getNowPlayingCover() {
-        return currentCover;
+        return DockControl.isActive() ? null : currentCover;
     }
 
     public static ItemStack getNowPlayingDisc() {
-        return currentDisc;
+        return DockControl.isActive() ? DockControl.currentDiscStack() : currentDisc;
     }
 
     // What is playing right now, for the on-screen display
@@ -177,7 +169,6 @@ public class IpodPlayer {
                 ticksSinceSave = 0;
                 saveProgress();
             }
-            spawnNotes(mc);
             return; // still playing
         }
 
@@ -277,6 +268,7 @@ public class IpodPlayer {
 
     // Called when shuffle is switched on or off: the current track stays current, what follows changes
     public static void shuffleChanged() {
+        DockControl.modesChanged(); // a dock that plays its discs gets the new setting too
         if (queueIsBook || queue.isEmpty() || queueIndex < 0 || queueIndex >= order.length) return;
         queueIndex = buildOrder(order[queueIndex]);
     }
@@ -293,15 +285,15 @@ public class IpodPlayer {
         Minecraft mc = Minecraft.getInstance();
         if (mc.level == null) return;
 
-        List<Output> outputs = outputsFor(mc, ipod, List.of());
+        List<DockOutputs.Output> outputs = outputsFor(mc, ipod, List.of());
 
         JukeboxSong.fromStack(mc.level.registryAccess(), disc).ifPresent(song -> {
             SoundEvent sound = song.value().soundEvent().value();
             List<SoundInstance> sounds = new ArrayList<>();
             if (outputs.isEmpty()) {
-                sounds.add(IpodSoundInstance.forDisc(sound, null, SPEAKER_VOLUME));
+                sounds.add(IpodSoundInstance.forDisc(sound, null, DockOutputs.SPEAKER_VOLUME));
             } else {
-                for (Output o : outputs) sounds.add(IpodSoundInstance.forDisc(sound, o.pos(), o.volume()));
+                for (DockOutputs.Output o : outputs) sounds.add(IpodSoundInstance.forDisc(sound, o.pos(), o.volume()));
             }
             start(sounds, disc.copy(), outputs,
                     song.value().description(),
@@ -332,7 +324,7 @@ public class IpodPlayer {
         Minecraft mc = Minecraft.getInstance();
         if (mc.level == null) return;
 
-        List<Output> outputs = outputsFor(mc, ipod, List.of());
+        List<DockOutputs.Output> outputs = outputsFor(mc, ipod, List.of());
 
         // Progress is kept for audiobook chapters, and for songs while they play through a dock's speakers
         ProgressTarget target = null;
@@ -357,9 +349,9 @@ public class IpodPlayer {
 
         List<SoundInstance> sounds = new ArrayList<>();
         if (outputs.isEmpty()) {
-            sounds.add(IpodSoundInstance.forFile(file, null, SPEAKER_VOLUME, startSeconds, endSeconds));
+            sounds.add(IpodSoundInstance.forFile(file, null, DockOutputs.SPEAKER_VOLUME, startSeconds, endSeconds));
         } else {
-            for (Output o : outputs) {
+            for (DockOutputs.Output o : outputs) {
                 sounds.add(IpodSoundInstance.forFile(file, o.pos(), o.volume(), startSeconds, endSeconds));
             }
         }
@@ -399,6 +391,7 @@ public class IpodPlayer {
 
     /** True while a file (music or audiobook chapter) is playing, so holding Next/Previous can skip within it. */
     public static boolean canSkipSeconds() {
+        if (DockControl.isActive()) return true;
         return current instanceof IpodSoundInstance sound && sound.isFile() && started;
     }
 
@@ -408,6 +401,10 @@ public class IpodPlayer {
      * the new position, like a relink.
      */
     public static void skipSeconds(double delta) {
+        if (DockControl.isActive()) {
+            if (!DockControl.isPaused()) DockControl.skipSeconds(delta);
+            return;
+        }
         if (!canSkipSeconds() || paused || queue.isEmpty() || queueIndex < 0 || queueIndex >= order.length) return;
         IpodSoundInstance sound = (IpodSoundInstance) current;
 
@@ -441,9 +438,10 @@ public class IpodPlayer {
         AudiobookProgress.finish(target.bookKey(), target.itemKey(), target.nextKey());
     }
 
-    private static void start(List<SoundInstance> instances, ItemStack disc, List<Output> outputs,
+    private static void start(List<SoundInstance> instances, ItemStack disc, List<DockOutputs.Output> outputs,
                               Component name, Component subtitle, @Nullable Path cover, @Nullable UUID ipod) {
         Minecraft mc = Minecraft.getInstance();
+        DockControl.stop(); // a disc the dock plays makes way for what the player starts now
         endCurrent(); // ends any current sound, but keeps the track list
         mc.getMusicManager().stopPlaying();
         current = instances.get(0);
@@ -455,10 +453,30 @@ public class IpodPlayer {
         currentCover = cover;
         currentIpod = ipod;
         for (SoundInstance instance : instances) mc.getSoundManager().play(instance);
+        setExternal(true);
+    }
+
+    // The dock this player's own file is playing at, as far as the server was told (so everybody sees the notes)
+    @Nullable
+    private static GlobalPos externalDock;
+
+    // Tells the dock the list was started from that its owner is (or is no longer) playing a file there
+    private static void setExternal(boolean playing) {
+        if (playing && queueDock != null && current != null && !paused) {
+            if (!queueDock.equals(externalDock)) {
+                if (externalDock != null) DockControl.setExternal(externalDock, false);
+                DockControl.setExternal(queueDock, true);
+                externalDock = queueDock;
+            }
+        } else if (externalDock != null) {
+            DockControl.setExternal(externalDock, false);
+            externalDock = null;
+        }
     }
 
     // Ends the current sound but keeps the track list (used when switching tracks)
     private static void endCurrent() {
+        setExternal(false);
         refreshPosition();
         saveProgress(); // an audiobook chapter remembers where it was left
         currentProgress = null;
@@ -483,51 +501,49 @@ public class IpodPlayer {
     }
 
     /**
-     * The speakers of the dock the list was started from, as outputs. Empty when the music is not from a dock
-     * (or the dock is not there, holds another iPod, or has no usable speaker): then it plays in the player's ears.
-     * A speaker in a chunk that is not loaded cannot be checked: it keeps its entry from {@code previous}.
+     * The speakers of the dock the list was started from. Empty when the music is not from a dock (or the dock
+     * is not there, holds another iPod, or has no usable speaker): then it plays in the player's ears.
      */
-    private static List<Output> outputsFor(Minecraft mc, @Nullable UUID ipod, List<Output> previous) {
+    private static List<DockOutputs.Output> outputsFor(Minecraft mc, @Nullable UUID ipod, List<DockOutputs.Output> previous) {
         GlobalPos dockPos = queueDock;
         if (dockPos == null || mc.level == null || !dockPos.dimension().equals(mc.level.dimension())) return List.of();
         if (!(mc.level.getBlockEntity(dockPos.pos()) instanceof DockBlockEntity dock) || !dock.hasIpod()) return List.of();
         if (ipod != null && !ipod.equals(dock.getIpod().get(ModDataComponents.IPOD_ID.get()))) return List.of();
-
-        List<Output> outputs = new ArrayList<>();
-        for (DockBlockEntity.Slot slot : dock.getSpeakers()) {
-            BlockPos anchor = slot.anchor();
-            if (!mc.level.hasChunkAt(anchor)) {
-                previous.stream().filter(o -> o.anchor().equals(anchor)).findFirst().ifPresent(outputs::add);
-                continue;
-            }
-            if (slot.multiblock()) {
-                // a broken multiblock is not a single speaker: it is skipped until the dock drops it
-                Multiblock.Result big = Multiblock.find(mc.level, anchor);
-                if (big != null && big.anchor().equals(anchor)) {
-                    outputs.add(new Output(anchor, true, big.center(), big.top(), SPEAKER_VOLUME * 2)); // twice the range
-                }
-            } else if (mc.level.getBlockState(anchor).is(ModBlocks.SPEAKER.get())) {
-                Vec3 center = Vec3.atCenterOf(anchor);
-                outputs.add(new Output(anchor, false, center, center.add(0, 0.5, 0), SPEAKER_VOLUME));
-            }
-        }
-        return outputs;
+        return DockOutputs.of(mc.level, dock, previous);
     }
 
     /** Which dock the next list is started from (null for an iPod the player holds). Set by the iPod screen. */
     public static void setQueueDock(@Nullable GlobalPos dock) {
         queueDock = dock;
+        queueDockSince = Minecraft.getInstance().level != null ? Minecraft.getInstance().level.getGameTime() : 0;
     }
 
-    // Little music notes rise from every speaker that is playing
-    private static void spawnNotes(Minecraft mc) {
-        if (paused || currentOutputs.isEmpty() || mc.level == null || ++ticksSinceNote < NOTE_TICKS) return;
-        ticksSinceNote = 0;
-        for (Output o : currentOutputs) {
-            double x = o.top().x + (mc.level.random.nextDouble() - 0.5) * (o.multiblock() ? 1.2 : 0.5);
-            double z = o.top().z + (mc.level.random.nextDouble() - 0.5) * (o.multiblock() ? 1.2 : 0.5);
-            mc.level.addParticle(ParticleTypes.NOTE, x, o.top().y + 0.1, z, mc.level.random.nextInt(25) / 24.0, 0, 0);
+    // When the list was tied to its dock (game time). The dock needs a moment to tell the client that the iPod is in it.
+    private static long queueDockSince = 0;
+    private static final long DOCK_GRACE_TICKS = 60;
+
+    /**
+     * The iPod this player was playing from has just been put into a dock. A file or chapter carries on, now
+     * through the dock's speakers (the outputs check restarts it at the same second once the dock reports its
+     * speakers); a music disc is handed to the dock, which plays it for everybody from the start.
+     */
+    public static void handOverToDock(GlobalPos dock, @Nullable UUID ipod, ItemStack ipodStack) {
+        if (current == null || ipod == null || !ipod.equals(currentIpod)) return;
+        if (currentDisc.isEmpty()) {
+            setQueueDock(dock);
+            setExternal(true);
+            return;
         }
+        List<ItemStack> discs = IpodItem.getDiscs(ipodStack);
+        int index = -1;
+        for (int i = 0; i < discs.size(); i++) {
+            if (ItemStack.isSameItemSameComponents(discs.get(i), currentDisc)) {
+                index = i;
+                break;
+            }
+        }
+        stop();
+        if (index >= 0) DockControl.playWhenDocked(dock, index);
     }
 
     // The iPod with this ID in the inventory (or on the cursor), or null
@@ -575,6 +591,7 @@ public class IpodPlayer {
         paused = true;
         autoPaused = false;
         setChannelPaused(true);
+        setExternal(false);
     }
 
     // Carries on from exactly where it was frozen
@@ -582,9 +599,14 @@ public class IpodPlayer {
         paused = false;
         autoPaused = false;
         setChannelPaused(false);
+        setExternal(true);
     }
 
     public static void togglePause() {
+        if (DockControl.isActive()) {
+            DockControl.togglePause();
+            return;
+        }
         if (!canTogglePause()) return;
         if (paused) {
             resume();
@@ -608,10 +630,18 @@ public class IpodPlayer {
     }
 
     public static void next() {
+        if (DockControl.isActive()) {
+            DockControl.next();
+            return;
+        }
         skip(1);
     }
 
     public static void previous() {
+        if (DockControl.isActive()) {
+            DockControl.previous();
+            return;
+        }
         skip(-1);
     }
 
@@ -624,11 +654,11 @@ public class IpodPlayer {
 
     // Pause/Play only works while a song is loaded
     public static boolean canTogglePause() {
-        return isPlaying();
+        return DockControl.isActive() || isPlaying();
     }
 
     public static boolean isPaused() {
-        return paused;
+        return DockControl.isActive() ? DockControl.isPaused() : paused;
     }
 
     public static void stopIfPlaying(ItemStack removed) {
@@ -638,13 +668,14 @@ public class IpodPlayer {
     }
 
     public static boolean isPlaying() {
+        if (DockControl.isActive()) return true; // (paused or not: see isPaused)
         return current != null && Minecraft.getInstance().getSoundManager().isActive(current);
     }
 
     // True while any track is loaded (even paused or still loading), so the HUD can stay on
     // through Next/Previous transitions. Becomes false only once we stop completely.
     public static boolean hasTrack() {
-        return !currentName.getString().isEmpty();
+        return DockControl.isActive() || !currentName.getString().isEmpty();
     }
 
     // True if this is the sound the player is currently tracking.
@@ -715,6 +746,7 @@ public class IpodPlayer {
             if (!queueDock.dimension().equals(mc.level.dimension())) {
                 stop();
             } else if (mc.level.hasChunkAt(queueDock.pos())
+                    && mc.level.getGameTime() - queueDockSince > DOCK_GRACE_TICKS
                     && !(mc.level.getBlockEntity(queueDock.pos()) instanceof DockBlockEntity dock
                     && dock.hasIpod()
                     && (currentIpod == null || currentIpod.equals(dock.getIpod().get(ModDataComponents.IPOD_ID.get()))))) {

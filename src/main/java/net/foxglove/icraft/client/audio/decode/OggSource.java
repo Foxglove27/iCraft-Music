@@ -20,6 +20,7 @@ import java.nio.file.StandardOpenOption;
  */
 public final class OggSource implements PcmSource {
     private ByteBuffer mapped;
+    private final boolean isMapped; // a mapped file is released when closed; a buffer from memory is left to the GC
     private final long handle;
     private final int sampleRate;
     private final int channels;
@@ -28,19 +29,33 @@ public final class OggSource implements PcmSource {
     private boolean closed;
 
     public OggSource(Path path) throws IOException {
+        this(mapFile(path), true, path.getFileName().toString());
+    }
+
+    /** Decodes an Ogg Vorbis file that is already in memory ({@code data} must be a direct buffer). */
+    public OggSource(ByteBuffer data, String name) throws IOException {
+        this(data, false, name);
+    }
+
+    private static ByteBuffer mapFile(Path path) throws IOException {
         try (FileChannel ch = FileChannel.open(path, StandardOpenOption.READ)) {
             long size = ch.size();
             if (size == 0) throw new IOException("File is empty");
             if (size > Integer.MAX_VALUE) throw new IOException("File is larger than 2 GiB");
-            mapped = ch.map(FileChannel.MapMode.READ_ONLY, 0, size); // stays valid after the channel closes
+            return ch.map(FileChannel.MapMode.READ_ONLY, 0, size); // stays valid after the channel closes
         }
+    }
+
+    private OggSource(ByteBuffer data, boolean isMapped, String name) throws IOException {
+        mapped = data;
+        this.isMapped = isMapped;
 
         try (MemoryStack stack = MemoryStack.stackPush()) {
             IntBuffer error = stack.mallocInt(1);
             handle = STBVorbis.stb_vorbis_open_memory(mapped, error, null);
             if (handle == 0L) {
-                unmap(mapped);
-                throw new IOException("Could not read " + path.getFileName()
+                if (isMapped) unmap(mapped);
+                throw new IOException("Could not read " + name
                         + " as Ogg Vorbis (error " + error.get(0) + ")");
             }
             STBVorbisInfo info = STBVorbisInfo.malloc(stack);
@@ -49,7 +64,7 @@ public final class OggSource implements PcmSource {
             sampleRate = info.sample_rate();
             if (channels < 1 || channels > 2) {
                 STBVorbis.stb_vorbis_close(handle);
-                unmap(mapped);
+                if (isMapped) unmap(mapped);
                 throw new IOException("Only mono or stereo files are supported");
             }
         }
@@ -112,7 +127,7 @@ public final class OggSource implements PcmSource {
         if (closed) return;
         closed = true;
         STBVorbis.stb_vorbis_close(handle);
-        unmap(mapped); // releases the file right away (matters on Windows)
+        if (isMapped) unmap(mapped); // releases the file right away (matters on Windows)
         mapped = null;
     }
 

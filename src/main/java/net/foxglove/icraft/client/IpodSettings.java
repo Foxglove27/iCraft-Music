@@ -39,6 +39,7 @@ public class IpodSettings {
         load();
         repeat = repeat.next();
         changed = true;
+        DockControl.modesChanged();
     }
 
     /** Writes the settings to the config file (called when the iPod screen closes). */

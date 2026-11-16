@@ -51,5 +51,6 @@
   "message.icraft.dock.too_far": "That speaker is too far from the dock (at most %s blocks).",
   "message.icraft.dock.speaker_added": "Speaker added to the dock (%s/%s)",
   "message.icraft.dock.speaker_removed": "Speaker removed from the dock (%s/%s)",
-  "message.icraft.dock.speaker_lost": "A speaker was removed from the dock (%s/%s)"
+  "message.icraft.dock.speaker_lost": "A speaker was removed from the dock (%s/%s)",
+  "message.icraft.dock.not_yours": "This iPod belongs to %s."
 }

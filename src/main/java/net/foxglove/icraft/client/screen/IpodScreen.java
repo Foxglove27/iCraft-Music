@@ -1,6 +1,7 @@
 package net.foxglove.icraft.client.screen;
 
 import com.mojang.math.Axis;
+import net.foxglove.icraft.client.DockControl;
 import net.foxglove.icraft.client.IpodPlayer;
 import net.foxglove.icraft.client.IpodSettings;
 import net.foxglove.icraft.client.IpodVolume;
@@ -106,6 +107,7 @@ public class IpodScreen extends Screen {
 
     @Nullable
     private final GlobalPos dock; // the dock this iPod sits in, or null when the player holds it
+    private final boolean dockOwner; // only the player who docked the iPod controls the dock
     private final ResourceLocation skin; // the GUI texture for this iPod's colour
     private final List<AlbumView> albums = new ArrayList<>();
     private final List<AlbumView> books = new ArrayList<>();
@@ -147,11 +149,12 @@ public class IpodScreen extends Screen {
     private float closeFrom;
 
     public IpodScreen(List<ItemStack> discs, List<LocalMusic.Album> library, List<LocalMusic.Book> audiobookLibrary,
-                      List<LocalMusic.Book> podcastLibrary, boolean linked, @Nullable GlobalPos dock,
+                      List<LocalMusic.Book> podcastLibrary, boolean linked, @Nullable GlobalPos dock, boolean dockOwner,
                       ResourceLocation skin, @Nullable UUID ipod) {
         super(Component.translatable("screen.icraft.ipod"));
         this.skin = skin;
         this.dock = dock;
+        this.dockOwner = dockOwner;
 
         if (!discs.isEmpty()) {
             List<Track> tracks = new ArrayList<>();
@@ -258,7 +261,14 @@ public class IpodScreen extends Screen {
         }
 
         // The song changed by itself or through Next/Previous: move the highlight to it
-        if ((page == Page.TRACKS || page == Page.CHAPTERS) && open == playedAlbum && playedActions != null
+        // the dock plays the discs: the highlight follows the disc it is on
+        if (page == Page.TRACKS && dock != null && open != null && open.icon() != null && DockControl.isActive()) {
+            int disc = DockControl.currentDisc();
+            if (disc >= 0 && disc != lastPlayingSeen) {
+                lastPlayingSeen = disc;
+                selected = disc;
+            }
+        } else if ((page == Page.TRACKS || page == Page.CHAPTERS) && open == playedAlbum && playedActions != null
                 && IpodPlayer.isQueue(playedActions)) {
             int playing = IpodPlayer.playingQueueIndex();
             if (playing >= 0 && playing != lastPlayingSeen) {
@@ -512,11 +522,17 @@ public class IpodScreen extends Screen {
                 goTo(Page.CHAPTERS, open.startRow());
             }
             case TRACKS, CHAPTERS -> {
+                if (page == Page.TRACKS && dock != null && open.icon() != null) {
+                    // the discs of a docked iPod: the dock (the server) plays them for everybody near it
+                    lastPlayingSeen = selected;
+                    DockControl.play(dock, selected);
+                    return;
+                }
                 List<Runnable> actions = open.tracks().stream().map(Track::play).toList();
                 playedAlbum = open;
                 playedActions = actions;
                 lastPlayingSeen = selected;
-                IpodPlayer.setQueueDock(dock);
+                IpodPlayer.setQueueDock(dockOwner ? dock : null); // only the owner's files play through the dock
                 IpodPlayer.playQueue(actions, selected, page == Page.CHAPTERS);
             }
             case SETTINGS -> {
@@ -612,6 +628,7 @@ public class IpodScreen extends Screen {
             // A click was already waiting, so this is the second one: a double-click
             pendingActivateAt = -1;
             if (IpodPlayer.isPlaying()) {
+                DockControl.stop(); // a dock that plays discs stops too
                 IpodPlayer.stop();
             } else {
                 activate(); // nothing to stop, so treat it as a normal click

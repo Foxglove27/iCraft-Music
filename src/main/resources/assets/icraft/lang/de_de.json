@@ -51,5 +51,6 @@
   "message.icraft.dock.too_far": "Dieser Lautsprecher ist zu weit von der Dockingstation entfernt (höchstens %s Blöcke).",
   "message.icraft.dock.speaker_added": "Lautsprecher zur Dockingstation hinzugefügt (%s/%s)",
   "message.icraft.dock.speaker_removed": "Lautsprecher von der Dockingstation entfernt (%s/%s)",
-  "message.icraft.dock.speaker_lost": "Ein Lautsprecher wurde von der Dockingstation entfernt (%s/%s)"
+  "message.icraft.dock.speaker_lost": "Ein Lautsprecher wurde von der Dockingstation entfernt (%s/%s)",
+  "message.icraft.dock.not_yours": "Dieser iPod gehört %s."
 }

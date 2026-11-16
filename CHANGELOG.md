@@ -4,6 +4,30 @@ All notable changes to iCraft, newest version first, following
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The top section is the version in `gradle.properties`;
 new changes go there until the next version bump.
 
+## [0.0.8]
+
+### Added
+- **Other players hear a dock's speakers.** Music discs that play in a dock are now heard by everybody near its
+  speakers, and everybody sees the music notes. Someone who walks up while a song is playing hears it from the
+  current position.
+- **The dock keeps playing by itself.** It plays through the disc list of the docked iPod (with shuffle and repeat)
+  on the server, so the music goes on when the player who docked the iPod walks away or logs out.
+- **Only the player who docked the iPod controls it** (play, pause, next, previous, skip, stop, shuffle and repeat,
+  also with the keys). Others get a message who it belongs to. Only that player (or an operator) can take the iPod
+  out. When the owner plays one of their own files at a dock, only they hear it, but everybody sees the notes.
+- Music discs played from a dock can be skipped through by holding Next or Previous.
+
+### Fixed
+- A dock that already held an iPod before this version had no owner, so nobody could control it (and no notes or
+  sound followed). It now belongs to the first player who uses it.
+- Putting an iPod that is playing into a dock no longer leaves the music stuck and impossible to resume. A song or
+  chapter carries on through the dock's speakers; a music disc is handed to the dock and plays from its start.
+- A dock without any speaker now plays its discs in its owner's own ears (it was silent).
+
+### Changed
+- Music discs in a dock are played by the mod itself instead of the game's own disc player, so they can start in
+  the middle. Discs played from an iPod you hold are unchanged.
+
 ## [0.0.7]
 
 ### Added

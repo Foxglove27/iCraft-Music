@@ -1,6 +1,8 @@
 package net.foxglove.icraft.block;
 
+import net.foxglove.icraft.RepeatMode;
 import net.foxglove.icraft.item.IpodItem;
+import net.foxglove.icraft.net.DockControlPayload;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
@@ -14,21 +16,27 @@ import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.game.ClientGamePacketListener;
 import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.JukeboxSong;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
+import java.util.UUID;
 
 /**
  * What a docking station holds: the iPod that sits in it and the speakers it plays through.
  * Both are sent to the clients (the client that plays the music needs them).
  */
 public class DockBlockEntity extends BlockEntity {
+    private static final org.slf4j.Logger LOGGER = com.mojang.logging.LogUtils.getLogger();
     public static final int MAX_SPEAKERS = 4;
     /** A speaker has to be this close to the dock (in blocks) to be added. */
     public static final double MAX_SPEAKER_DISTANCE = 32;
+    /** The owner can control the dock from this far away (in blocks). */
+    public static final double CONTROL_DISTANCE = 64;
 
     private ItemStack ipod = ItemStack.EMPTY;
     /**
@@ -38,6 +46,19 @@ public class DockBlockEntity extends BlockEntity {
     public record Slot(BlockPos anchor, boolean multiblock) {}
 
     private final List<Slot> speakers = new ArrayList<>();
+
+    // The player who docked the iPod: only they control it. Cleared when the iPod is taken out.
+    @Nullable
+    private UUID owner;
+    private String ownerName = "";
+    // What the dock plays from its disc list (null = nothing). Run by the server, copied to every client.
+    @Nullable
+    private DockPlayback playback;
+    // The owner plays one of their own files at this dock: only they hear it, but everybody sees the notes
+    private boolean externalPlaying;
+    // For the client's own bookkeeping (what it is playing for this dock); never saved or sent
+    @Nullable
+    public Object clientData;
 
     public DockBlockEntity(BlockPos pos, BlockState state) {
         super(ModBlockEntities.DOCK.get(), pos, state);
@@ -53,17 +74,132 @@ public class DockBlockEntity extends BlockEntity {
         return ipod;
     }
 
-    public void setIpod(ItemStack stack) {
+    /** Docks an iPod. {@code owner} is the player who docked it. */
+    public void setIpod(ItemStack stack, Player owner) {
         ipod = stack;
+        this.owner = owner.getUUID();
+        this.ownerName = owner.getGameProfile().getName();
+        playback = null;
+        externalPlaying = false;
         changed();
     }
 
-    /** Removes and returns the docked iPod. */
+    /** Removes and returns the docked iPod. The music stops and the dock has no owner any more. */
     public ItemStack takeIpod() {
         ItemStack out = ipod;
         ipod = ItemStack.EMPTY;
+        owner = null;
+        ownerName = "";
+        playback = null;
+        externalPlaying = false;
         changed();
         return out;
+    }
+
+    // ---- owner and playback ----
+
+    @Nullable
+    public UUID getOwner() {
+        return owner;
+    }
+
+    public String getOwnerName() {
+        return ownerName;
+    }
+
+    public boolean isOwner(Player player) {
+        return owner != null && owner.equals(player.getUUID());
+    }
+
+    /** True for the owner, and for anybody while the dock has no owner yet (a dock filled before owners existed). */
+    public boolean canControl(Player player) {
+        return owner == null || isOwner(player);
+    }
+
+    /**
+     * A dock that holds an iPod but has no owner (it was docked by an older version) belongs to the first
+     * player who uses it. Server side.
+     */
+    public void claimIfUnowned(Player player) {
+        if (owner == null && hasIpod() && level != null && !level.isClientSide()) {
+            owner = player.getUUID();
+            ownerName = player.getGameProfile().getName();
+            changed();
+        }
+    }
+
+    @Nullable
+    public DockPlayback getPlayback() {
+        return playback;
+    }
+
+    public boolean isExternalPlaying() {
+        return externalPlaying;
+    }
+
+    /** True while the dock makes music that people should see notes for. */
+    public boolean isMakingMusic() {
+        return externalPlaying || (playback != null && playback.isPlaying() && !playback.isPaused());
+    }
+
+    private int discCount() {
+        return IpodItem.getDiscs(ipod).size();
+    }
+
+    /** How long a disc of the docked iPod lasts, in ticks (0 if unknown). Server side. */
+    private long discTicks(Level level, int index) {
+        List<ItemStack> discs = IpodItem.getDiscs(ipod);
+        if (index < 0 || index >= discs.size()) return 0;
+        return JukeboxSong.fromStack(level.registryAccess(), discs.get(index)).map(h -> (long) h.value().lengthInTicks()).orElse(0L);
+    }
+
+    /**
+     * Applies a control message from a player (server side). Only the owner may control the dock, from within 64
+     * blocks. Anything else gets a message and changes nothing.
+     */
+    public void control(Player player, DockControlPayload message) {
+        if (level == null || level.isClientSide() || !hasIpod()) return;
+        claimIfUnowned(player);
+        LOGGER.info("Dock at {}: {} sent action {} (arg {}); owner is {}", worldPosition.toShortString(),
+                player.getGameProfile().getName(), message.action(), message.arg(), ownerName);
+        if (!isOwner(player)) {
+            player.displayClientMessage(Component.translatable("message.icraft.dock.not_yours", ownerName), true);
+            return;
+        }
+        if (player.level() != level || player.distanceToSqr(Vec3.atCenterOf(worldPosition)) > CONTROL_DISTANCE * CONTROL_DISTANCE) return;
+
+        long now = level.getGameTime();
+        int discs = discCount();
+        switch (message.action()) {
+            case DockControlPayload.PLAY -> {
+                if (message.arg() < 0 || message.arg() >= discs) return;
+                playback = DockPlayback.start(discs, message.arg(), message.shuffle(), repeatOf(message.repeat()), now, new Random());
+                externalPlaying = false;
+            }
+            case DockControlPayload.EXTERNAL -> {
+                externalPlaying = message.arg() != 0;
+                if (externalPlaying && playback != null) playback.stop();
+            }
+            default -> {
+                if (playback == null) return;
+                switch (message.action()) {
+                    case DockControlPayload.PAUSE -> playback.pause(now);
+                    case DockControlPayload.RESUME -> playback.resume(now);
+                    case DockControlPayload.NEXT -> playback.next(now);
+                    case DockControlPayload.PREVIOUS -> playback.previous(now);
+                    case DockControlPayload.SEEK -> playback.seekBy(message.arg(), now, i -> discTicks(level, i));
+                    case DockControlPayload.STOP -> playback.stop();
+                    case DockControlPayload.MODES -> playback.setModes(message.shuffle(), repeatOf(message.repeat()), discs);
+                    default -> { return; }
+                }
+            }
+        }
+        changed();
+    }
+
+    private static RepeatMode repeatOf(int ordinal) {
+        RepeatMode[] modes = RepeatMode.values();
+        return modes[Math.max(0, Math.min(ordinal, modes.length - 1))];
     }
 
     // ---- the speakers ----
@@ -98,9 +234,20 @@ public class DockBlockEntity extends BlockEntity {
 
     // ---- keeping the list true (server only) ----
 
-    /** Every half second: forget speakers that were broken, and tell the people nearby. */
+    /** Every tick: moves a playing dock on to its next disc. Every half second: forgets speakers that were broken. */
     public static void serverTick(Level level, BlockPos pos, BlockState state, DockBlockEntity dock) {
-        if (level.getGameTime() % 10 != 0 || dock.speakers.isEmpty()) return;
+        long now = level.getGameTime();
+
+        if (dock.playback != null && dock.playback.isPlaying() && dock.playback.tick(now, i -> dock.discTicks(level, i))) {
+            dock.changed();
+        }
+        // the owner left or logged out while playing one of their own files: nobody is making that music any more
+        if (dock.externalPlaying && now % 20 == 0 && (dock.owner == null || level.getPlayerByUUID(dock.owner) == null)) {
+            dock.externalPlaying = false;
+            dock.changed();
+        }
+
+        if (now % 10 != 0 || dock.speakers.isEmpty()) return;
 
         int before = dock.speakers.size();
         dock.speakers.removeIf(slot -> level.hasChunkAt(slot.anchor()) && !dock.isValid(level, slot));
@@ -121,6 +268,14 @@ public class DockBlockEntity extends BlockEntity {
         if (!slot.multiblock()) return level.getBlockState(slot.anchor()).is(ModBlocks.SPEAKER.get());
         Multiblock.Result big = Multiblock.find(level, slot.anchor());
         return big != null && big.anchor().equals(slot.anchor());
+    }
+
+    @Override
+    public void setRemoved() {
+        super.setRemoved();
+        if (level != null && level.isClientSide()) {
+            net.foxglove.icraft.client.ClientHooks.dockRemoved(this); // stop the sounds this dock was playing
+        }
     }
 
     private void changed() {
@@ -144,12 +299,45 @@ public class DockBlockEntity extends BlockEntity {
             list.add(entry);
         }
         tag.put("speakers", list);
+
+        if (owner != null) {
+            tag.putUUID("owner", owner);
+            tag.putString("ownerName", ownerName);
+        }
+        tag.putBoolean("external", externalPlaying);
+        if (playback != null) {
+            DockPlayback.Snapshot s = playback.snapshot();
+            CompoundTag p = new CompoundTag();
+            p.putIntArray("order", s.order());
+            p.putInt("index", s.index());
+            p.putBoolean("shuffle", s.shuffle());
+            p.putInt("repeat", s.repeat());
+            p.putLong("base", s.positionBase());
+            p.putLong("changedAt", s.changedAt());
+            p.putBoolean("paused", s.paused());
+            p.putBoolean("stopped", s.stopped());
+            p.putInt("sequence", s.sequence());
+            tag.put("playback", p);
+        }
     }
 
     @Override
     protected void loadAdditional(CompoundTag tag, HolderLookup.Provider registries) {
         super.loadAdditional(tag, registries);
         ipod = tag.contains("ipod") ? ItemStack.parse(registries, tag.getCompound("ipod")).orElse(ItemStack.EMPTY) : ItemStack.EMPTY;
+        owner = tag.hasUUID("owner") ? tag.getUUID("owner") : null;
+        ownerName = tag.getString("ownerName");
+        externalPlaying = tag.getBoolean("external");
+        playback = null;
+        if (tag.contains("playback", Tag.TAG_COMPOUND)) {
+            CompoundTag p = tag.getCompound("playback");
+            int[] order = p.getIntArray("order");
+            if (order.length > 0) {
+                playback = DockPlayback.restore(new DockPlayback.Snapshot(order, p.getInt("index"), p.getBoolean("shuffle"),
+                        p.getInt("repeat"), p.getLong("base"), p.getLong("changedAt"), p.getBoolean("paused"),
+                        p.getBoolean("stopped"), p.getInt("sequence")), new Random());
+            }
+        }
         speakers.clear();
         if (tag.contains("speakers", Tag.TAG_LIST)) {
             for (Tag raw : tag.getList("speakers", Tag.TAG_COMPOUND)) {
@@ -168,6 +356,27 @@ public class DockBlockEntity extends BlockEntity {
     @Override
     public CompoundTag getUpdateTag(HolderLookup.Provider registries) {
         return saveWithoutMetadata(registries);
+    }
+
+    // What the client got from the server, in the log (so a dock that looks empty can be explained)
+    private void logReceived(String how) {
+        LOGGER.info("Dock at {} ({}): iPod {}, owner {}, speakers {}, playback {}", worldPosition.toShortString(), how,
+                hasIpod() ? "docked" : "none", ownerName.isEmpty() ? "none" : ownerName, speakers.size(),
+                playback == null ? "none" : (playback.isPlaying() ? (playback.isPaused() ? "paused" : "playing") : "stopped")
+                        + " disc " + playback.currentDisc() + " sequence " + playback.sequence());
+    }
+
+    @Override
+    public void onDataPacket(net.minecraft.network.Connection net, ClientboundBlockEntityDataPacket packet,
+                             HolderLookup.Provider registries) {
+        super.onDataPacket(net, packet, registries);
+        logReceived("update");
+    }
+
+    @Override
+    public void handleUpdateTag(CompoundTag tag, HolderLookup.Provider registries) {
+        super.handleUpdateTag(tag, registries);
+        logReceived("chunk");
     }
 
     @Nullable
