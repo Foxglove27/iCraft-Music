@@ -2,6 +2,7 @@ package net.foxglove.icraft.client.screen;
 
 import com.mojang.math.Axis;
 import net.foxglove.icraft.client.IpodPlayer;
+import net.foxglove.icraft.client.IpodSettings;
 import net.foxglove.icraft.client.IpodVolume;
 import net.foxglove.icraft.client.audio.CoverArt;
 import net.foxglove.icraft.client.audio.LocalMusic;
@@ -75,10 +76,22 @@ public class IpodScreen extends Screen {
     private record Track(Component name, Runnable play) {}
     private record AlbumView(Component name, @Nullable Path cover, @Nullable ItemStack icon, List<Track> tracks) {}
 
+    // Which list the display is showing. Menu goes up one level: TRACKS -> ALBUMS -> MENU, SETTINGS -> MENU.
+    private enum Page { MENU, ALBUMS, TRACKS, SETTINGS }
+
+    private static final int MENU_MUSIC = 0;
+    private static final int MENU_SETTINGS = 1;
+    private static final int SETTING_SHUFFLE = 0;
+    private static final int SETTING_REPEAT = 1;
+    private static final int MENU_ROWS = 2;
+    private static final int SETTING_ROWS = 2;
+
+    private Page page = Page.MENU;
+
     private final ResourceLocation skin; // the GUI texture for this iPod's colour
     private final List<AlbumView> albums = new ArrayList<>();
     @Nullable
-    private AlbumView open;   // null = showing the album list
+    private AlbumView open;   // the album shown on the TRACKS page
     private int openedIndex;  // which album we opened, so Menu can jump back to it
     private int selected;     // the highlighted row in the current list
     private int scroll;       // index of the first row that is visible
@@ -213,12 +226,17 @@ public class IpodScreen extends Screen {
         keepSelectionVisible();
 
         // Header: dark text on the light blue strip, plus a play/pause symbol
-        Component title = open == null ? Component.translatable("screen.icraft.ipod.albums") : open.name();
+        Component title = switch (page) {
+            case MENU -> Component.translatable("screen.icraft.ipod.menu");
+            case ALBUMS -> Component.translatable("screen.icraft.ipod.albums");
+            case SETTINGS -> Component.translatable("screen.icraft.ipod.settings");
+            case TRACKS -> open.name();
+        };
         g.drawString(this.font, fit(title.getString(), right - left - 10), left,
                 DISPLAY_Y + (HEADER_H - 8) / 2, 0xFF0A2A66, false);
         drawStatusIcon(g, right - 5, DISPLAY_Y + (HEADER_H - 5) / 2);
 
-        // Nothing to show
+        // Nothing to show (only the album list can be empty)
         if (count == 0) {
             g.drawWordWrap(this.font, Component.translatable("screen.icraft.ipod.empty"),
                     left, LIST_Y + 3, right - left, 0xFFFFFFFF);
@@ -237,13 +255,16 @@ public class IpodScreen extends Screen {
 
             int textX = left;
             Component name;
-            if (open == null) {
-                AlbumView album = albums.get(index);
-                drawCover(g, album, left, rowY + 1, THUMB);
-                textX = left + THUMB + 3;
-                name = album.name();
-            } else {
-                name = open.tracks().get(index).name();
+            switch (page) {
+                case ALBUMS -> {
+                    AlbumView album = albums.get(index);
+                    drawCover(g, album, left, rowY + 1, THUMB);
+                    textX = left + THUMB + 3;
+                    name = album.name();
+                }
+                case TRACKS -> name = open.tracks().get(index).name();
+                case SETTINGS -> name = settingRow(index);
+                default -> name = menuRow(index);
             }
 
             int color = isSelected ? 0xFF0A3A8C : 0xFFFFFFFF;
@@ -305,7 +326,34 @@ public class IpodScreen extends Screen {
     // =====================================================================
 
     private int listSize() {
-        return open != null ? open.tracks().size() : albums.size();
+        return switch (page) {
+            case MENU -> MENU_ROWS;
+            case SETTINGS -> SETTING_ROWS;
+            case ALBUMS -> albums.size();
+            case TRACKS -> open.tracks().size();
+        };
+    }
+
+    private static Component menuRow(int index) {
+        return Component.translatable(index == MENU_MUSIC ? "screen.icraft.ipod.music" : "screen.icraft.ipod.settings");
+    }
+
+    // "Shuffle: Off", "Repeat: List"...
+    private static Component settingRow(int index) {
+        if (index == SETTING_SHUFFLE) {
+            return Component.translatable("screen.icraft.ipod.setting",
+                    Component.translatable("screen.icraft.ipod.shuffle"),
+                    Component.translatable(IpodSettings.shuffle() ? "screen.icraft.ipod.on" : "screen.icraft.ipod.off"));
+        }
+        return Component.translatable("screen.icraft.ipod.setting",
+                Component.translatable("screen.icraft.ipod.repeat"),
+                Component.translatable("screen.icraft.ipod.repeat." + IpodSettings.repeat().name().toLowerCase(Locale.ROOT)));
+    }
+
+    private void goTo(Page next, int row) {
+        page = next;
+        selected = row;
+        scroll = 0;
     }
 
     // Keeps the highlighted row inside the 4 visible rows
@@ -321,25 +369,37 @@ public class IpodScreen extends Screen {
         selected = Mth.clamp(selected + step, 0, Math.max(0, listSize() - 1));
     }
 
-    // The middle button (or Enter, or clicking a row): open the album / play the track
+    // The middle button (or Enter, or clicking a row): open the page / album, play the track, change the setting
     private void activate() {
         if (listSize() == 0) return;
-        if (open == null) {
-            openedIndex = selected;
-            open = albums.get(selected);
-            selected = 0;
-            scroll = 0;
-        } else {
-            List<Runnable> actions = open.tracks().stream().map(Track::play).toList();
-            IpodPlayer.playQueue(actions, selected);
+        switch (page) {
+            case MENU -> goTo(selected == MENU_MUSIC ? Page.ALBUMS : Page.SETTINGS, 0);
+            case ALBUMS -> {
+                openedIndex = selected;
+                open = albums.get(selected);
+                goTo(Page.TRACKS, 0);
+            }
+            case TRACKS -> {
+                List<Runnable> actions = open.tracks().stream().map(Track::play).toList();
+                IpodPlayer.playQueue(actions, selected);
+            }
+            case SETTINGS -> {
+                if (selected == SETTING_SHUFFLE) {
+                    IpodSettings.toggleShuffle();
+                } else {
+                    IpodSettings.cycleRepeat();
+                }
+            }
         }
     }
 
-    // The Menu button: back from the tracks to the album list
+    // The Menu button: one level up. The row we came from stays highlighted.
     private void menu() {
-        if (open != null) {
-            open = null;
-            selected = openedIndex;
+        switch (page) {
+            case TRACKS -> goTo(Page.ALBUMS, openedIndex);
+            case ALBUMS -> goTo(Page.MENU, MENU_MUSIC);
+            case SETTINGS -> goTo(Page.MENU, MENU_SETTINGS);
+            case MENU -> { }
         }
     }
 
@@ -468,7 +528,8 @@ public class IpodScreen extends Screen {
 
     @Override
     public void removed() {
-        IpodVolume.save(); // write the volume to the config file when the screen closes
+        IpodVolume.save(); // write the volume and the settings to the config file when the screen closes
+        IpodSettings.save();
     }
 
     @Override

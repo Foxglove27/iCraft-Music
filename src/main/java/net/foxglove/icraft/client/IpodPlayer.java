@@ -2,6 +2,7 @@ package net.foxglove.icraft.client;
 
 import com.mojang.blaze3d.audio.Channel;
 import com.mojang.logging.LogUtils;
+import net.foxglove.icraft.RepeatMode;
 import net.foxglove.icraft.block.ModBlocks;
 import net.foxglove.icraft.client.audio.IpodSoundInstance;
 import net.foxglove.icraft.client.audio.LocalMusic;
@@ -23,6 +24,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Random;
 import java.util.UUID;
 import org.slf4j.Logger;
 
@@ -45,7 +47,11 @@ public class IpodPlayer {
 
     // The list of tracks the current song came from, and our position in it
     private static List<Runnable> queue = List.of();
+    // The order the tracks are played in: indices into 'queue'. 0..n-1 normally, shuffled with shuffle on.
+    private static int[] order = new int[0];
+    // Our position in 'order' (not in 'queue')
     private static int queueIndex = -1;
+    private static final Random RANDOM = new Random();
 
     // True once the current sound has really started playing (it is only ticked then).
     // Until then "not active" just means "still loading".
@@ -109,17 +115,78 @@ public class IpodPlayer {
         }
     }
 
-    // The track is over (finished or failed): go to the next one in the list, or stop after the last.
-    // Unlike Next, this does not wrap around (repeat comes later).
+    // The track is over (finished or failed): decide what plays next.
+    // Repeat One plays the same track again; otherwise the next one in the play order. After the last
+    // one, Repeat Off stops and the other modes start over. A failed track is never repeated.
     private static void advanceAfterEnd(boolean failed) {
         consecutiveFailures = failed ? consecutiveFailures + 1 : 0;
-        int next = queueIndex + 1;
-        if (queue.isEmpty() || next >= queue.size() || consecutiveFailures >= queue.size()) {
+        if (queue.isEmpty() || consecutiveFailures >= queue.size()) {
             stop(); // clears the track, so the HUD disappears too
             return;
         }
+
+        RepeatMode repeat = IpodSettings.repeat();
+        if (!failed && repeat == RepeatMode.ONE) {
+            queue.get(order[queueIndex]).run();
+            return;
+        }
+
+        int next = queueIndex + 1;
+        if (next >= order.length) {
+            if (repeat == RepeatMode.OFF) {
+                stop();
+                return;
+            }
+            // start over; with shuffle on, a fresh random order that does not begin with the track just played
+            if (IpodSettings.shuffle()) order = shuffledOrder(-1, order[queueIndex]);
+            next = 0;
+        }
         queueIndex = next;
-        queue.get(next).run();
+        queue.get(order[next]).run();
+    }
+
+    // The play order for 'size' tracks. 'first' (or -1) is played first; the rest is shuffled.
+    // 'notFirst' (or -1) is a track that must not come first (the one that just played).
+    private static int[] shuffledOrder(int first, int notFirst) {
+        int n = queue.size();
+        int[] result = new int[n];
+        for (int i = 0; i < n; i++) result[i] = i;
+
+        int from = 0;
+        if (first >= 0) { // put the chosen track in front and only shuffle the rest
+            result[first] = 0;
+            result[0] = first;
+            from = 1;
+        }
+        for (int i = n - 1; i > from; i--) { // Fisher-Yates
+            int j = from + RANDOM.nextInt(i - from + 1);
+            int tmp = result[i];
+            result[i] = result[j];
+            result[j] = tmp;
+        }
+        if (first < 0 && n > 1 && result[0] == notFirst) {
+            int j = 1 + RANDOM.nextInt(n - 1);
+            result[0] = result[j];
+            result[j] = notFirst;
+        }
+        return result;
+    }
+
+    // Builds 'order' for the list, starting at track 'index'. Returns our position in it.
+    private static int buildOrder(int index) {
+        if (IpodSettings.shuffle()) {
+            order = shuffledOrder(index, -1);
+            return 0;
+        }
+        order = new int[queue.size()];
+        for (int i = 0; i < order.length; i++) order[i] = i;
+        return index;
+    }
+
+    // Called when shuffle is switched on or off: the current track stays current, what follows changes
+    public static void shuffleChanged() {
+        if (queue.isEmpty() || queueIndex < 0 || queueIndex >= order.length) return;
+        queueIndex = buildOrder(order[queueIndex]);
     }
 
     private static void showLoadFailed() {
@@ -202,6 +269,7 @@ public class IpodPlayer {
     public static void stop() {
         endCurrent();
         queue = List.of();
+        order = new int[0];
         queueIndex = -1;
     }
 
@@ -232,8 +300,8 @@ public class IpodPlayer {
     // Starts a track and remembers the list it came from, so Next/Previous know where to go
     public static void playQueue(List<Runnable> tracks, int index) {
         queue = tracks;
-        queueIndex = index;
         consecutiveFailures = 0;
+        queueIndex = buildOrder(index);
         tracks.get(index).run();
     }
 
@@ -248,8 +316,8 @@ public class IpodPlayer {
     private static void skip(int step) {
         if (queue.isEmpty()) return;
         // floorMod keeps the position inside the list and wraps around at both ends
-        queueIndex = Math.floorMod(queueIndex + step, queue.size());
-        queue.get(queueIndex).run();
+        queueIndex = Math.floorMod(queueIndex + step, order.length);
+        queue.get(order[queueIndex]).run();
     }
 
     // Pause/Play only works while a song is loaded

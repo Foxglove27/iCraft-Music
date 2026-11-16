@@ -16,5 +16,16 @@
   "screen.icraft.ipod.empty": "No music found. Add discs, or put files in the ipod_music folder.",
   "message.icraft.ipod.linked": "iPod linked to speaker",
   "screen.icraft.ipod.singles": "Singles",
-  "message.icraft.ipod.load_failed": "Could not play %s"
+  "message.icraft.ipod.load_failed": "Could not play %s",
+  "screen.icraft.ipod.menu": "iPod",
+  "screen.icraft.ipod.music": "Music",
+  "screen.icraft.ipod.settings": "Settings",
+  "screen.icraft.ipod.setting": "%s: %s",
+  "screen.icraft.ipod.shuffle": "Shuffle",
+  "screen.icraft.ipod.repeat": "Repeat",
+  "screen.icraft.ipod.on": "On",
+  "screen.icraft.ipod.off": "Off",
+  "screen.icraft.ipod.repeat.off": "Off",
+  "screen.icraft.ipod.repeat.list": "List",
+  "screen.icraft.ipod.repeat.one": "One"
 }

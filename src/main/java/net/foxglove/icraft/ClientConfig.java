@@ -16,6 +16,14 @@ public class ClientConfig {
             .comment("iPod volume, from 0.0 (silent) to 1.0 (full)")
             .defineInRange("volume", 1.0, 0.0, 1.0);
 
+    public static final ModConfigSpec.BooleanValue SHUFFLE = BUILDER
+            .comment("Play the tracks of a list in random order")
+            .define("shuffle", false);
+
+    public static final ModConfigSpec.EnumValue<RepeatMode> REPEAT = BUILDER
+            .comment("What happens when a track ends: OFF (stop after the last), LIST (start over) or ONE (same track again)")
+            .defineEnum("repeat", RepeatMode.OFF);
+
     // The full spec, handed to {@code ModContainer.registerConfig(...)} in the mod constructor.
     public static final ModConfigSpec SPEC = BUILDER.build();
 }
