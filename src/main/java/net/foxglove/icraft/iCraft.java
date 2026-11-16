@@ -1,5 +1,6 @@
 package net.foxglove.icraft;
 
+import net.foxglove.icraft.block.ModBlockEntities;
 import net.foxglove.icraft.block.ModBlocks;
 import net.foxglove.icraft.item.ModCreativeModeTabs;
 import net.foxglove.icraft.item.ModDataComponents;
@@ -25,6 +26,7 @@ public class iCraft {
         ModCreativeModeTabs.register(modEventBus);
         ModItems.register(modEventBus);
         ModBlocks.register(modEventBus);
+        ModBlockEntities.register(modEventBus);
         ModDataComponents.register(modEventBus);
         ModRecipes.register(modEventBus);
 
@@ -45,6 +47,7 @@ public class iCraft {
 
         if (event.getTabKey() == CreativeModeTabs.FUNCTIONAL_BLOCKS) {
             event.accept(ModBlocks.SPEAKER);
+            event.accept(ModBlocks.DOCK);
         }
     }
 }

@@ -9,6 +9,7 @@ import net.foxglove.icraft.client.audio.CoverArt;
 import net.foxglove.icraft.client.audio.LocalMusic;
 import net.minecraft.Util;
 import net.minecraft.client.Minecraft;
+import net.minecraft.core.GlobalPos;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
@@ -103,6 +104,8 @@ public class IpodScreen extends Screen {
 
     private Page page = Page.MENU;
 
+    @Nullable
+    private final GlobalPos dock; // the dock this iPod sits in, or null when the player holds it
     private final ResourceLocation skin; // the GUI texture for this iPod's colour
     private final List<AlbumView> albums = new ArrayList<>();
     private final List<AlbumView> books = new ArrayList<>();
@@ -144,9 +147,11 @@ public class IpodScreen extends Screen {
     private float closeFrom;
 
     public IpodScreen(List<ItemStack> discs, List<LocalMusic.Album> library, List<LocalMusic.Book> audiobookLibrary,
-                      List<LocalMusic.Book> podcastLibrary, boolean linked, ResourceLocation skin, @Nullable UUID ipod) {
+                      List<LocalMusic.Book> podcastLibrary, boolean linked, @Nullable GlobalPos dock,
+                      ResourceLocation skin, @Nullable UUID ipod) {
         super(Component.translatable("screen.icraft.ipod"));
         this.skin = skin;
+        this.dock = dock;
 
         if (!discs.isEmpty()) {
             List<Track> tracks = new ArrayList<>();
@@ -511,6 +516,7 @@ public class IpodScreen extends Screen {
                 playedAlbum = open;
                 playedActions = actions;
                 lastPlayingSeen = selected;
+                IpodPlayer.setQueueDock(dock);
                 IpodPlayer.playQueue(actions, selected, page == Page.CHAPTERS);
             }
             case SETTINGS -> {

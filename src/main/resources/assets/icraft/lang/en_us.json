@@ -34,5 +34,22 @@
   "screen.icraft.ipod.no_books": "No audiobooks found. Put one folder per book in ipod/audiobooks (mp3, ogg, flac, wav, m4a or m4b).",
   "screen.icraft.ipod.podcasts": "Podcasts",
   "screen.icraft.ipod.podcast_list": "Podcasts",
-  "screen.icraft.ipod.no_podcasts": "No podcasts found. Put one folder per show in ipod/podcasts (mp3, ogg, flac, wav, m4a or m4b)."
+  "screen.icraft.ipod.no_podcasts": "No podcasts found. Put one folder per show in ipod/podcasts (mp3, ogg, flac, wav, m4a or m4b).",
+  "key.categories.icraft": "iCraft",
+  "key.icraft.play_pause": "iPod: Play / Pause",
+  "key.icraft.next": "iPod: Next track",
+  "key.icraft.previous": "iPod: Previous track",
+  "block.icraft.dock": "Docking Station",
+  "message.icraft.dock.docked": "iPod docked",
+  "message.icraft.dock.taken": "iPod taken out of the dock",
+  "message.icraft.dock.full": "The dock already holds an iPod",
+  "message.icraft.dock.empty": "The dock is empty. Right-click it with an iPod.",
+  "message.icraft.dock.linked": "iPod linked to the dock. Right-click speakers to add or remove them (up to 4).",
+  "message.icraft.dock.link_first": "Link this iPod to a dock first: sneak + right-click the dock.",
+  "message.icraft.dock.missing": "The linked dock is not here any more.",
+  "message.icraft.dock.speakers_full": "A dock can use at most %s speakers.",
+  "message.icraft.dock.too_far": "That speaker is too far from the dock (at most %s blocks).",
+  "message.icraft.dock.speaker_added": "Speaker added to the dock (%s/%s)",
+  "message.icraft.dock.speaker_removed": "Speaker removed from the dock (%s/%s)",
+  "message.icraft.dock.speaker_lost": "A speaker was removed from the dock (%s/%s)"
 }

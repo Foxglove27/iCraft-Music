@@ -19,5 +19,6 @@ public class ClientEvents {
     @SubscribeEvent
     public static void onClientTick(ClientTickEvent.Post event) {
         IpodPlayer.clientTick();
+        ModKeyMappings.tick(net.minecraft.client.Minecraft.getInstance().screen != null);
     }
 }

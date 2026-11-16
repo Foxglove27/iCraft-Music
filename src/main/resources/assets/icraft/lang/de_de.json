@@ -34,5 +34,22 @@
   "screen.icraft.ipod.no_books": "Keine Hörbücher gefunden. Lege pro Buch einen Ordner in ipod/audiobooks (mp3, ogg, flac, wav, m4a oder m4b).",
   "screen.icraft.ipod.podcasts": "Podcasts",
   "screen.icraft.ipod.podcast_list": "Podcasts",
-  "screen.icraft.ipod.no_podcasts": "Keine Podcasts gefunden. Lege pro Sendung einen Ordner in ipod/podcasts (mp3, ogg, flac, wav, m4a oder m4b)."
+  "screen.icraft.ipod.no_podcasts": "Keine Podcasts gefunden. Lege pro Sendung einen Ordner in ipod/podcasts (mp3, ogg, flac, wav, m4a oder m4b).",
+  "key.categories.icraft": "iCraft",
+  "key.icraft.play_pause": "iPod: Wiedergabe / Pause",
+  "key.icraft.next": "iPod: Nächster Titel",
+  "key.icraft.previous": "iPod: Vorheriger Titel",
+  "block.icraft.dock": "Dockingstation",
+  "message.icraft.dock.docked": "iPod eingedockt",
+  "message.icraft.dock.taken": "iPod aus der Dockingstation genommen",
+  "message.icraft.dock.full": "In der Dockingstation steckt schon ein iPod",
+  "message.icraft.dock.empty": "Die Dockingstation ist leer. Klicke mit einem iPod rechts darauf.",
+  "message.icraft.dock.linked": "iPod mit der Dockingstation verbunden. Klicke Lautsprecher rechts an, um sie hinzuzufügen oder zu entfernen (bis zu 4).",
+  "message.icraft.dock.link_first": "Verbinde diesen iPod zuerst mit einer Dockingstation: Schleichen + Rechtsklick auf die Dockingstation.",
+  "message.icraft.dock.missing": "Die verbundene Dockingstation ist nicht mehr da.",
+  "message.icraft.dock.speakers_full": "Eine Dockingstation kann höchstens %s Lautsprecher nutzen.",
+  "message.icraft.dock.too_far": "Dieser Lautsprecher ist zu weit von der Dockingstation entfernt (höchstens %s Blöcke).",
+  "message.icraft.dock.speaker_added": "Lautsprecher zur Dockingstation hinzugefügt (%s/%s)",
+  "message.icraft.dock.speaker_removed": "Lautsprecher von der Dockingstation entfernt (%s/%s)",
+  "message.icraft.dock.speaker_lost": "Ein Lautsprecher wurde von der Dockingstation entfernt (%s/%s)"
 }

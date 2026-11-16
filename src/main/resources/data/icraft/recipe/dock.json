@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "key": {
+    "I": { "item": "minecraft:iron_ingot" },
+    "R": { "item": "minecraft:redstone" },
+    "S": { "item": "minecraft:smooth_stone_slab" }
+  },
+  "pattern": [
+    "III",
+    "IRI",
+    "SSS"
+  ],
+  "result": {
+    "id": "icraft:dock"
+  }
+}

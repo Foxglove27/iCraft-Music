@@ -21,6 +21,10 @@ public class ModBlocks {
             () -> new SpeakerBlock(BlockBehaviour.Properties.of()
                     .strength(4f).requiresCorrectToolForDrops().sound(SoundType.METAL)));
 
+    public static final DeferredBlock<Block> DOCK = registerBlock("dock",
+            () -> new DockBlock(BlockBehaviour.Properties.of()
+                    .strength(3f).requiresCorrectToolForDrops().sound(SoundType.METAL).noOcclusion()));
+
     private static <T extends Block> DeferredBlock<T> registerBlock(String name, Supplier<T> block) {
         DeferredBlock<T> toReturn =BLOCKS.register(name, block);
         registerBlockItem(name, toReturn);

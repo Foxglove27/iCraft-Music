@@ -23,6 +23,14 @@ public class ModDataComponents {
                     .networkSynchronized(GlobalPos.STREAM_CODEC)
                     .build());
 
+    // The docking station an iPod is linked to (set by sneak + right-clicking a dock); right-clicking
+    // speakers with such an iPod adds them to that dock. Replaces LINKED_SPEAKER.
+    public static final Supplier<DataComponentType<GlobalPos>> LINKED_DOCK =
+            COMPONENTS.register("linked_dock", () -> DataComponentType.<GlobalPos>builder()
+                    .persistent(GlobalPos.CODEC)
+                    .networkSynchronized(GlobalPos.STREAM_CODEC)
+                    .build());
+
     // The discs loaded into an iPod (our own component, so other mods don't mistake it for a container)
     public static final Supplier<DataComponentType<IpodDiscs>> DISCS =
             COMPONENTS.register("discs", () -> DataComponentType.<IpodDiscs>builder()

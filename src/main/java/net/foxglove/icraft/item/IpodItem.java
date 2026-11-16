@@ -1,8 +1,11 @@
 package net.foxglove.icraft.item;
 
+import net.foxglove.icraft.block.DockBlockEntity;
 import net.foxglove.icraft.block.ModBlocks;
+import net.foxglove.icraft.block.Multiblock;
 import net.foxglove.icraft.client.ClientHooks;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.GlobalPos;
 import net.minecraft.core.GlobalPos;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.network.chat.Component;
@@ -18,6 +21,7 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.phys.Vec3;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -69,6 +73,9 @@ public class IpodItem extends Item {
     public void inventoryTick(ItemStack stack, Level level, Entity entity, int slotId, boolean isSelected) {
         if (!level.isClientSide() && !stack.has(ModDataComponents.IPOD_ID.get())) {
             stack.set(ModDataComponents.IPOD_ID.get(), UUID.randomUUID());
+        }
+        if (!level.isClientSide() && stack.has(ModDataComponents.LINKED_SPEAKER.get())) {
+            stack.remove(ModDataComponents.LINKED_SPEAKER.get()); // the direct speaker link was replaced by docks
         }
     }
 
@@ -125,29 +132,62 @@ public class IpodItem extends Item {
         return false;
     }
 
+    // Using the iPod on a block: sneak + dock = link the iPod to that dock; a speaker = add it to / remove it
+    // from the linked dock (the whole multiblock counts as one speaker). Everything else opens the GUI.
     @Override
     public InteractionResult useOn(UseOnContext context) {
         Level level = context.getLevel();
         BlockPos pos = context.getClickedPos();
+        Player player = context.getPlayer();
+        ItemStack ipod = context.getItemInHand();
+
+        if (level.getBlockState(pos).is(ModBlocks.DOCK.get()) && player != null && player.isShiftKeyDown()) {
+            if (!level.isClientSide()) {
+                ipod.set(ModDataComponents.LINKED_DOCK.get(), GlobalPos.of(level.dimension(), pos));
+                player.displayClientMessage(Component.translatable("message.icraft.dock.linked"), true);
+            }
+            return InteractionResult.sidedSuccess(level.isClientSide());
+        }
 
         if (level.getBlockState(pos).is(ModBlocks.SPEAKER.get())) {
-            if (!level.isClientSide()) {
-                ItemStack ipod = context.getItemInHand();
-                GlobalPos target = GlobalPos.of(level.dimension(), pos);
-                // clicking the speaker the iPod is already linked to unlinks it
-                boolean unlink = target.equals(ipod.get(ModDataComponents.LINKED_SPEAKER.get()));
-                if (unlink) {
-                    ipod.remove(ModDataComponents.LINKED_SPEAKER.get());
-                } else {
-                    ipod.set(ModDataComponents.LINKED_SPEAKER.get(), target);
-                }
-                if (context.getPlayer() != null) {
-                    context.getPlayer().displayClientMessage(Component.translatable(
-                            unlink ? "message.icraft.ipod.unlinked" : "message.icraft.ipod.linked"), true);
-                }
+            if (!level.isClientSide() && player != null) {
+                toggleSpeaker(level, pos, ipod, player);
             }
             return InteractionResult.sidedSuccess(level.isClientSide());
         }
         return InteractionResult.PASS; // other blocks fall through to use() and open the GUI
+    }
+
+    private static void toggleSpeaker(Level level, BlockPos clicked, ItemStack ipod, Player player) {
+        GlobalPos dockPos = ipod.get(ModDataComponents.LINKED_DOCK.get());
+        if (dockPos == null) {
+            player.displayClientMessage(Component.translatable("message.icraft.dock.link_first"), true);
+            return;
+        }
+        if (!dockPos.dimension().equals(level.dimension())
+                || !(level.getBlockEntity(dockPos.pos()) instanceof DockBlockEntity dock)) {
+            player.displayClientMessage(Component.translatable("message.icraft.dock.missing"), true);
+            return;
+        }
+
+        Multiblock.Result big = Multiblock.find(level, clicked);
+        BlockPos anchor = big != null ? big.anchor() : clicked;
+
+        if (!dock.hasSpeaker(anchor)) {
+            if (dock.isFull()) {
+                player.displayClientMessage(Component.translatable("message.icraft.dock.speakers_full",
+                        DockBlockEntity.MAX_SPEAKERS), true);
+                return;
+            }
+            if (Vec3.atCenterOf(anchor).distanceTo(Vec3.atCenterOf(dockPos.pos())) > DockBlockEntity.MAX_SPEAKER_DISTANCE) {
+                player.displayClientMessage(Component.translatable("message.icraft.dock.too_far",
+                        (int) DockBlockEntity.MAX_SPEAKER_DISTANCE), true);
+                return;
+            }
+        }
+        boolean added = dock.toggleSpeaker(anchor, big);
+        player.displayClientMessage(Component.translatable(
+                added ? "message.icraft.dock.speaker_added" : "message.icraft.dock.speaker_removed",
+                dock.getSpeakers().size(), DockBlockEntity.MAX_SPEAKERS), true);
     }
 }

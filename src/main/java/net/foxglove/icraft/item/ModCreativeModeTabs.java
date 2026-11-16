@@ -24,6 +24,7 @@ public class ModCreativeModeTabs {
                             output.accept(ipod);
                         }
                         output.accept(ModBlocks.SPEAKER);
+                        output.accept(ModBlocks.DOCK);
                     }).build());
 
     public static void register(IEventBus eventbus){
