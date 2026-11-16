@@ -4,6 +4,7 @@ import com.mojang.math.Axis;
 import net.foxglove.icraft.client.IpodPlayer;
 import net.foxglove.icraft.client.IpodSettings;
 import net.foxglove.icraft.client.IpodVolume;
+import net.foxglove.icraft.client.audio.AudiobookProgress;
 import net.foxglove.icraft.client.audio.CoverArt;
 import net.foxglove.icraft.client.audio.LocalMusic;
 import net.minecraft.Util;
@@ -72,25 +73,40 @@ public class IpodScreen extends Screen {
     // this is the time (in milliseconds) when we give up waiting. -1 means nothing is waiting.
     private long pendingActivateAt = -1;
 
-    private record Track(Component name, Runnable play) {}
-    private record AlbumView(Component name, @Nullable Path cover, @Nullable ItemStack icon, List<Track> tracks) {}
+    // 'detail' is a small grey text after the name (for example the saved time in an audiobook chapter)
+    private record Track(Component name, Runnable play, @Nullable String detail) {
+        Track(Component name, Runnable play) {
+            this(name, play, null);
+        }
+    }
 
-    // Which list the display is showing. Menu goes up one level: TRACKS -> ALBUMS -> MENU, SETTINGS -> MENU.
-    private enum Page { MENU, ALBUMS, TRACKS, SETTINGS }
+    // An album or a book. 'startRow' is the row to highlight when it is opened (a book's last chapter).
+    private record AlbumView(Component name, @Nullable Path cover, @Nullable ItemStack icon, List<Track> tracks,
+                             int startRow) {
+        AlbumView(Component name, @Nullable Path cover, @Nullable ItemStack icon, List<Track> tracks) {
+            this(name, cover, icon, tracks, 0);
+        }
+    }
+
+    // Which list the display is showing. Menu goes up one level: TRACKS -> ALBUMS -> MENU,
+    // CHAPTERS -> BOOKS -> MENU, SETTINGS -> MENU.
+    private enum Page { MENU, ALBUMS, TRACKS, BOOKS, CHAPTERS, SETTINGS }
 
     private static final int MENU_MUSIC = 0;
-    private static final int MENU_SETTINGS = 1;
+    private static final int MENU_BOOKS = 1;
+    private static final int MENU_SETTINGS = 2;
     private static final int SETTING_SHUFFLE = 0;
     private static final int SETTING_REPEAT = 1;
-    private static final int MENU_ROWS = 2;
+    private static final int MENU_ROWS = 3;
     private static final int SETTING_ROWS = 2;
 
     private Page page = Page.MENU;
 
     private final ResourceLocation skin; // the GUI texture for this iPod's colour
     private final List<AlbumView> albums = new ArrayList<>();
+    private final List<AlbumView> books = new ArrayList<>();
     @Nullable
-    private AlbumView open;   // the album shown on the TRACKS page
+    private AlbumView open;   // the album shown on the TRACKS page, or the book on the CHAPTERS page
     private int openedIndex;  // which album we opened, so Menu can jump back to it
     private int selected;     // the highlighted row in the current list
     private int scroll;       // index of the first row that is visible
@@ -103,12 +119,22 @@ public class IpodScreen extends Screen {
     private List<Runnable> playedActions;
     private int lastPlayingSeen = -1;
 
+    // Holding the left or right side of the wheel skips within the song; a quick click changes track
+    private enum Hold { NONE, PREVIOUS, NEXT }
+    private static final long HOLD_START_MS = 400;  // how long before skipping begins
+    private static final long HOLD_STEP_MS = 400;   // time between skips while held
+    private static final double HOLD_SKIP_SECONDS = 10;
+    private Hold hold = Hold.NONE;
+    private long holdStart;
+    private long holdLastStep;
+    private boolean holdSkipped;
+
     private long animStart;
     private boolean closing;
     private float closeFrom;
 
-    public IpodScreen(List<ItemStack> discs, List<LocalMusic.Album> library,
-                      ResourceLocation skin, @Nullable UUID ipod) {
+    public IpodScreen(List<ItemStack> discs, List<LocalMusic.Album> library, List<LocalMusic.Book> library2,
+                      boolean linked, ResourceLocation skin, @Nullable UUID ipod) {
         super(Component.translatable("screen.icraft.ipod"));
         this.skin = skin;
 
@@ -124,13 +150,39 @@ public class IpodScreen extends Screen {
         for (LocalMusic.Album album : library) {
             List<Track> tracks = new ArrayList<>();
             for (Path file : album.files()) {
+                // while a speaker is linked, songs resume where they were left: show that time
+                double saved = linked ? AudiobookProgress.get(AudiobookProgress.MUSIC, LocalMusic.key(file)) : 0;
                 tracks.add(new Track(Component.literal(LocalMusic.displayName(file)),
-                        () -> IpodPlayer.playFile(file, ipod)));
+                        () -> IpodPlayer.playFile(file, ipod),
+                        saved >= 1 ? formatTime(saved) : null));
             }
             albums.add(new AlbumView(album.name(), album.cover(), null, tracks));
         }
 
+        for (LocalMusic.Book book : library2) {
+            List<Track> chapters = new ArrayList<>();
+            List<LocalMusic.Chapter> list = book.chapters();
+            String last = AudiobookProgress.lastChapter(book.key());
+            int startRow = 0;
+            for (int i = 0; i < list.size(); i++) {
+                LocalMusic.Chapter chapter = list.get(i);
+                String nextKey = i + 1 < list.size() ? list.get(i + 1).key() : null;
+                double saved = AudiobookProgress.get(book.key(), chapter.key());
+                chapters.add(new Track(chapter.title(),
+                        () -> IpodPlayer.playChapter(chapter, book.key(), nextKey, ipod),
+                        saved >= 1 ? formatTime(saved) : null));
+                if (chapter.key().equals(last)) startRow = i;
+            }
+            books.add(new AlbumView(book.name(), book.cover(), null, chapters, startRow));
+        }
+
         animStart = Util.getMillis();
+    }
+
+    private static String formatTime(double seconds) {
+        int total = (int) seconds;
+        int h = total / 3600, m = (total / 60) % 60, sec = total % 60;
+        return h > 0 ? String.format(Locale.ROOT, "%d:%02d:%02d", h, m, sec) : String.format(Locale.ROOT, "%d:%02d", m, sec);
     }
 
     private static Component discName(ItemStack disc) {
@@ -185,12 +237,22 @@ public class IpodScreen extends Screen {
         }
 
         // The song changed by itself or through Next/Previous: move the highlight to it
-        if (page == Page.TRACKS && open == playedAlbum && playedActions != null
+        if ((page == Page.TRACKS || page == Page.CHAPTERS) && open == playedAlbum && playedActions != null
                 && IpodPlayer.isQueue(playedActions)) {
             int playing = IpodPlayer.playingQueueIndex();
             if (playing >= 0 && playing != lastPlayingSeen) {
                 lastPlayingSeen = playing;
                 selected = playing; // keepSelectionVisible scrolls it into view when drawing
+            }
+        }
+
+        // Left or right held down: skip ahead or back within the song
+        if (hold != Hold.NONE && IpodPlayer.canSkipSeconds()) {
+            long now = Util.getMillis();
+            if (now - holdStart >= HOLD_START_MS && now - holdLastStep >= HOLD_STEP_MS) {
+                holdLastStep = now;
+                holdSkipped = true; // also when paused: a hold never changes track
+                IpodPlayer.skipSeconds(hold == Hold.NEXT ? HOLD_SKIP_SECONDS : -HOLD_SKIP_SECONDS);
             }
         }
 
@@ -246,16 +308,18 @@ public class IpodScreen extends Screen {
         Component title = switch (page) {
             case MENU -> Component.translatable("screen.icraft.ipod.menu");
             case ALBUMS -> Component.translatable("screen.icraft.ipod.albums");
+            case BOOKS -> Component.translatable("screen.icraft.ipod.books");
             case SETTINGS -> Component.translatable("screen.icraft.ipod.settings");
-            case TRACKS -> open.name();
+            case TRACKS, CHAPTERS -> open.name();
         };
         g.drawString(this.font, fit(title.getString(), right - left - 10), left,
                 DISPLAY_Y + (HEADER_H - 8) / 2, 0xFF0A2A66, false);
         drawStatusIcon(g, right - 5, DISPLAY_Y + (HEADER_H - 5) / 2);
 
-        // Nothing to show (only the album list can be empty)
+        // Nothing to show (only the album and book lists can be empty)
         if (count == 0) {
-            g.drawWordWrap(this.font, Component.translatable("screen.icraft.ipod.empty"),
+            g.drawWordWrap(this.font, Component.translatable(page == Page.BOOKS
+                            ? "screen.icraft.ipod.no_books" : "screen.icraft.ipod.empty"),
                     left, LIST_Y + 3, right - left, 0xFFFFFFFF);
         }
 
@@ -271,21 +335,31 @@ public class IpodScreen extends Screen {
             }
 
             int textX = left;
+            int right2 = right; // where the name has to end
             Component name;
             switch (page) {
-                case ALBUMS -> {
-                    AlbumView album = albums.get(index);
+                case ALBUMS, BOOKS -> {
+                    AlbumView album = (page == Page.ALBUMS ? albums : books).get(index);
                     drawCover(g, album, left, rowY + 1, THUMB);
                     textX = left + THUMB + 3;
                     name = album.name();
                 }
-                case TRACKS -> name = open.tracks().get(index).name();
+                case TRACKS, CHAPTERS -> {
+                    Track track = open.tracks().get(index);
+                    name = track.name();
+                    if (track.detail() != null) { // the saved time, right-aligned in grey
+                        int detailW = this.font.width(track.detail());
+                        g.drawString(this.font, track.detail(), right - detailW, rowY + 2,
+                                isSelected ? 0xFF5A7AB0 : 0xFFAAAAAA, false);
+                        right2 = right - detailW - 3;
+                    }
+                }
                 case SETTINGS -> name = settingRow(index);
                 default -> name = menuRow(index);
             }
 
             int color = isSelected ? 0xFF0A3A8C : 0xFFFFFFFF;
-            g.drawString(this.font, fit(name.getString(), right - textX), textX, rowY + 2, color, !isSelected);
+            g.drawString(this.font, fit(name.getString(), right2 - textX), textX, rowY + 2, color, !isSelected);
         }
 
         // Volume bar along the bottom of the display
@@ -347,12 +421,17 @@ public class IpodScreen extends Screen {
             case MENU -> MENU_ROWS;
             case SETTINGS -> SETTING_ROWS;
             case ALBUMS -> albums.size();
-            case TRACKS -> open.tracks().size();
+            case BOOKS -> books.size();
+            case TRACKS, CHAPTERS -> open.tracks().size();
         };
     }
 
     private static Component menuRow(int index) {
-        return Component.translatable(index == MENU_MUSIC ? "screen.icraft.ipod.music" : "screen.icraft.ipod.settings");
+        return Component.translatable(switch (index) {
+            case MENU_MUSIC -> "screen.icraft.ipod.music";
+            case MENU_BOOKS -> "screen.icraft.ipod.audiobooks";
+            default -> "screen.icraft.ipod.settings";
+        });
     }
 
     // "Shuffle: Off", "Repeat: List"...
@@ -390,18 +469,27 @@ public class IpodScreen extends Screen {
     private void activate() {
         if (listSize() == 0) return;
         switch (page) {
-            case MENU -> goTo(selected == MENU_MUSIC ? Page.ALBUMS : Page.SETTINGS, 0);
+            case MENU -> goTo(switch (selected) {
+                case MENU_MUSIC -> Page.ALBUMS;
+                case MENU_BOOKS -> Page.BOOKS;
+                default -> Page.SETTINGS;
+            }, 0);
             case ALBUMS -> {
                 openedIndex = selected;
                 open = albums.get(selected);
                 goTo(Page.TRACKS, 0);
             }
-            case TRACKS -> {
+            case BOOKS -> {
+                openedIndex = selected;
+                open = books.get(selected);
+                goTo(Page.CHAPTERS, open.startRow());
+            }
+            case TRACKS, CHAPTERS -> {
                 List<Runnable> actions = open.tracks().stream().map(Track::play).toList();
                 playedAlbum = open;
                 playedActions = actions;
                 lastPlayingSeen = selected;
-                IpodPlayer.playQueue(actions, selected);
+                IpodPlayer.playQueue(actions, selected, page == Page.CHAPTERS);
             }
             case SETTINGS -> {
                 if (selected == SETTING_SHUFFLE) {
@@ -417,7 +505,9 @@ public class IpodScreen extends Screen {
     private void menu() {
         switch (page) {
             case TRACKS -> goTo(Page.ALBUMS, openedIndex);
+            case CHAPTERS -> goTo(Page.BOOKS, openedIndex);
             case ALBUMS -> goTo(Page.MENU, MENU_MUSIC);
+            case BOOKS -> goTo(Page.MENU, MENU_BOOKS);
             case SETTINGS -> goTo(Page.MENU, MENU_SETTINGS);
             case MENU -> { }
         }
@@ -471,11 +561,11 @@ public class IpodScreen extends Screen {
             if (onMiddle) {
                 onMiddleClick();
             } else if (Math.abs(dx) > Math.abs(dy)) {
-                if (dx < 0) {
-                    IpodPlayer.previous();          // left
-                } else {
-                    IpodPlayer.next();              // right
-                }
+                // left / right: what happens is decided when the button is released (see mouseReleased)
+                hold = dx < 0 ? Hold.PREVIOUS : Hold.NEXT;
+                holdStart = Util.getMillis();
+                holdLastStep = holdStart;
+                holdSkipped = false;
             } else {
                 if (dy < 0) {
                     menu();                         // top
@@ -547,7 +637,25 @@ public class IpodScreen extends Screen {
     }
 
     @Override
+    public boolean mouseReleased(double mouseX, double mouseY, int button) {
+        if (button == 0 && hold != Hold.NONE) {
+            Hold released = hold;
+            hold = Hold.NONE;
+            if (!holdSkipped) { // a quick click: change track
+                if (released == Hold.PREVIOUS) {
+                    IpodPlayer.previous();
+                } else {
+                    IpodPlayer.next();
+                }
+            }
+            return true;
+        }
+        return super.mouseReleased(mouseX, mouseY, button);
+    }
+
+    @Override
     public void removed() {
+        hold = Hold.NONE;
         IpodVolume.save(); // write the volume and the settings to the config file when the screen closes
         IpodSettings.save();
     }

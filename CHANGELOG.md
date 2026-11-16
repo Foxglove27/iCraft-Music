@@ -7,6 +7,22 @@ All notable changes to iCraft are listed here, newest first. The format follows
 ## [Unreleased]
 
 ### Added
+- **Hold Next or Previous** to skip within the song: after a moment it jumps 10 seconds ahead (or back) about
+  every 0.4 seconds until you let go. A quick click still changes the track. Works for songs and audiobook
+  chapters, not for music discs. Nothing happens while paused.
+- **Songs remember where you stopped while the iPod is linked to a speaker**, like audiobook chapters: pausing,
+  stopping, switching songs or quitting the game saves the position, and playing that song again carries on a
+  couple of seconds earlier (the list shows the saved time). Without a linked speaker songs still start from the
+  beginning. A song that played to the end starts over next time.
+- **Audiobooks.** A new Audiobooks entry in the menu lists the books in `ipod/audiobooks`: one folder per
+  book, with the chapters as files (or one `.m4b` file). The iPod remembers where you stopped in every chapter
+  (also after quitting the game) and carries on from there, a couple of seconds earlier. Chapters play in order
+  and stop after the last one; shuffle and repeat do not apply. The book list shows the saved time.
+- **M4A and M4B files** can be played (AAC audio). Chapter markers inside an `.m4b` show up as chapters in the list,
+  and Next/Previous jump between them. Known limit: AAC files that use "noise substitution" (for example files
+  made with ffmpeg's built-in encoder at default settings) play with silent gaps.
+- **One library folder**: put music in `ipod/music/<album>` and audiobooks in `ipod/audiobooks/<book>` (inside the
+  game folder). The old `ipod_music` folder is still read for music.
 - **Unlink a speaker**: right-click the speaker an iPod is linked to once more. Linking another speaker switches the link.
 - Changing the link (link, unlink or switch) while a song plays restarts that song from its beginning on the new
   output (the speaker or your own ears). If the iPod is paused, this happens when it plays again.
@@ -21,18 +37,20 @@ All notable changes to iCraft are listed here, newest first. The format follows
   (not used by the player yet). ffmpeg is **no longer needed**.
 - The iPod holds up to 32 discs (was 8). A dyed iPod keeps its discs, speaker link and name. A white iPod recipe was added.
 - `Singles` / `Einzeltitel` name for loose files in `ipod_music`.
-- `THIRD_PARTY.md` (licence notice for the bundled JLayer, LGPL) is included in the jar.
+- `THIRD_PARTY.md` (licence notices for the bundled JLayer, LGPL, and JAAD, public domain) is included in the jar.
 - Log warnings for cover images that fail to load, for decoding errors during playback, and for file
   names the game cannot read (a launcher without a UTF-8 locale breaks symbols like `Ī`; set
   `LC_ALL=C.UTF-8` for the launcher).
 
 ### Changed
+- Relinking a speaker while a file plays now carries on at the same second instead of restarting the song.
+- Tracks and chapters are sorted naturally (`Track 2` before `Track 10`).
 - The speaker link now remembers its dimension. **Existing links must be set again** (right-click the speaker).
 - Discs are stored in the mod's own component and every iPod has an ID, so a playing song belongs to one specific iPod.
 - Ogg files are memory-mapped instead of loaded whole; the 256 MiB file size limit is gone (2 GiB per file).
-- `.m4a` is no longer listed in the library (it was only playable through ffmpeg).
 
 ### Fixed
+- Songs whose file names contain numbers now play in the right order (`Track 10` no longer comes before `Track 2`).
 - The highlighted row in the track list now follows the song when you press Next/Previous, and when the next
   song starts by itself.
 - A speaker at the same coordinates in another dimension no longer counts as the linked speaker.

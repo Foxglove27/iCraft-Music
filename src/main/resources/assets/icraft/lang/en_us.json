@@ -13,7 +13,7 @@
   "screen.icraft.ipod": "iPod",
   "screen.icraft.ipod.albums": "Albums",
   "screen.icraft.ipod.discs": "Music Discs",
-  "screen.icraft.ipod.empty": "No music found. Add discs, or put files in the ipod_music folder.",
+  "screen.icraft.ipod.empty": "No music found. Add discs, or put albums in ipod/music.",
   "message.icraft.ipod.linked": "iPod linked to speaker",
   "screen.icraft.ipod.singles": "Singles",
   "message.icraft.ipod.load_failed": "Could not play %s",
@@ -28,5 +28,8 @@
   "screen.icraft.ipod.repeat.off": "Off",
   "screen.icraft.ipod.repeat.list": "List",
   "screen.icraft.ipod.repeat.one": "One",
-  "message.icraft.ipod.unlinked": "iPod unlinked from speaker"
+  "message.icraft.ipod.unlinked": "iPod unlinked from speaker",
+  "screen.icraft.ipod.audiobooks": "Audiobooks",
+  "screen.icraft.ipod.books": "Audiobooks",
+  "screen.icraft.ipod.no_books": "No audiobooks found. Put one folder per book in ipod/audiobooks (mp3, ogg, flac, wav, m4a or m4b)."
 }

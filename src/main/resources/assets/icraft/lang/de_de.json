@@ -13,7 +13,7 @@
   "screen.icraft.ipod": "iPod",
   "screen.icraft.ipod.albums": "Alben",
   "screen.icraft.ipod.discs": "Schallplatten",
-  "screen.icraft.ipod.empty": "Keine Musik gefunden. Füge Schallplatten hinzu oder lege Dateien im ipod_music-Ordner ab.",
+  "screen.icraft.ipod.empty": "Keine Musik gefunden. Füge Schallplatten hinzu oder lege Alben in ipod/music.",
   "message.icraft.ipod.linked": "iPod mit Lautsprecher verbunden",
   "screen.icraft.ipod.singles": "Einzeltitel",
   "message.icraft.ipod.load_failed": "%s konnte nicht abgespielt werden",
@@ -28,5 +28,8 @@
   "screen.icraft.ipod.repeat.off": "Aus",
   "screen.icraft.ipod.repeat.list": "Liste",
   "screen.icraft.ipod.repeat.one": "Titel",
-  "message.icraft.ipod.unlinked": "iPod vom Lautsprecher getrennt"
+  "message.icraft.ipod.unlinked": "iPod vom Lautsprecher getrennt",
+  "screen.icraft.ipod.audiobooks": "Hörbücher",
+  "screen.icraft.ipod.books": "Hörbücher",
+  "screen.icraft.ipod.no_books": "Keine Hörbücher gefunden. Lege pro Buch einen Ordner in ipod/audiobooks (mp3, ogg, flac, wav, m4a oder m4b)."
 }

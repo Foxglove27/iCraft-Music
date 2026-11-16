@@ -120,6 +120,13 @@ dependencies {
         version { strictly '[1.0.1,1.1)'; prefer '1.0.1' }
     }
 
+    // AAC / MP4 decoding for .m4a and .m4b (public domain, bundled through jar-in-jar; see THIRD_PARTY.md)
+    implementation 'de.sfuhrm:jaad:0.8.7'
+    additionalRuntimeClasspath 'de.sfuhrm:jaad:0.8.7'
+    jarJar(implementation('de.sfuhrm:jaad')) {
+        version { strictly '[0.8.7,0.9)'; prefer '0.8.7' }
+    }
+
     // Example optional mod dependency with JEI
     // The JEI API is declared for compile time use, while the full JEI artifact is used at runtime
     // compileOnly "mezz.jei:jei-${mc_version}-common-api:${jei_version}"

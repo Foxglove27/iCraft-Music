@@ -1,5 +1,6 @@
 package net.foxglove.icraft.client.audio;
 
+import com.mojang.logging.LogUtils;
 import net.foxglove.icraft.client.IpodVolume;
 import net.minecraft.Util;
 import net.minecraft.client.Minecraft;
@@ -13,6 +14,7 @@ import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.Nullable;
+import org.slf4j.Logger;
 import net.foxglove.icraft.client.IpodPlayer;
 
 import java.io.IOException;
@@ -21,29 +23,37 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 
 public class IpodSoundInstance extends AbstractTickableSoundInstance {
+    private static final Logger LOGGER = LogUtils.getLogger();
+
     @Nullable
     private final Path file;      // null means "a normal sound event" (a music disc)
     private final boolean positional;
+    private final double startSeconds; // where in the file to begin (0 = the start)
+    private final double endSeconds;   // where to stop (-1 = the end of the file)
     @Nullable
     private volatile PcmAudioStream stream; // set once a file has been opened; null for discs
 
     // A vanilla music disc sound
     public static IpodSoundInstance forDisc(SoundEvent sound, @Nullable Vec3 pos, float volume) {
-        return new IpodSoundInstance(sound, null, pos, volume);
+        return new IpodSoundInstance(sound, null, pos, volume, 0, -1);
     }
 
     // A file from the ipod_music folder
-    public static IpodSoundInstance forFile(Path file, @Nullable Vec3 pos, float volume) {
+    public static IpodSoundInstance forFile(Path file, @Nullable Vec3 pos, float volume,
+                                            double startSeconds, double endSeconds) {
         // borrow a vanilla streamed sound so the engine takes its streaming path;
         // getStream() below swaps in our own audio data
         SoundEvent borrowed = SoundEvent.createVariableRangeEvent(
                 ResourceLocation.withDefaultNamespace("music_disc.cat"));
-        return new IpodSoundInstance(borrowed, file, pos, volume);
+        return new IpodSoundInstance(borrowed, file, pos, volume, startSeconds, endSeconds);
     }
 
-    private IpodSoundInstance(SoundEvent sound, @Nullable Path file, @Nullable Vec3 pos, float volume) {
+    private IpodSoundInstance(SoundEvent sound, @Nullable Path file, @Nullable Vec3 pos, float volume,
+                              double startSeconds, double endSeconds) {
         super(sound, SoundSource.RECORDS, SoundInstance.createUnseededRandom());
         this.file = file;
+        this.startSeconds = startSeconds;
+        this.endSeconds = endSeconds;
         this.positional = pos != null;
 
         if (pos != null) {
@@ -62,7 +72,13 @@ public class IpodSoundInstance extends AbstractTickableSoundInstance {
         }
     }
 
-    /** True for a file from the ipod_music folder, false for a vanilla disc. */
+    /** The decoder stream of a file track once it is open, or null. */
+    @Nullable
+    public PcmAudioStream stream() {
+        return stream;
+    }
+
+    /** True for a file from the library folder, false for a vanilla disc. */
     public boolean isFile() {
         return file != null;
     }
@@ -113,6 +129,17 @@ public class IpodSoundInstance extends AbstractTickableSoundInstance {
             future = CompletableFuture.supplyAsync(() -> {
                 try {
                     PcmAudioStream opened = AudioDecoders.open(file, positional);
+                    if (startSeconds > 0) {
+                        try {
+                            opened.seekToFrame(Math.round(startSeconds * opened.sampleRate()));
+                        } catch (IOException e) {
+                            // the position is unusable after a failed seek: start again from the beginning
+                            LOGGER.warn("Could not seek to {} s in {}; playing from the start", startSeconds, file, e);
+                            opened.close();
+                            opened = AudioDecoders.open(file, positional);
+                        }
+                    }
+                    if (endSeconds >= 0) opened.limitToFrame(Math.round(endSeconds * opened.sampleRate()));
                     stream = opened;
                     return opened;
                 } catch (IOException e) {

@@ -1,5 +1,6 @@
 package net.foxglove.icraft.client.audio;
 
+import net.foxglove.icraft.client.audio.decode.AacSource;
 import net.foxglove.icraft.client.audio.decode.FlacSource;
 import net.foxglove.icraft.client.audio.decode.Mp3Source;
 import net.foxglove.icraft.client.audio.decode.OggSource;
@@ -22,6 +23,7 @@ public final class AudioDecoders {
             case "mp3" -> new Mp3Source(file);
             case "flac" -> new FlacSource(file);
             case "wav" -> new WavSource(file);
+            case "m4a", "m4b" -> new AacSource(file);
             default -> throw new IOException("Unsupported audio format: " + file.getFileName());
         };
         return new PcmAudioStream(source, downmixToMono);

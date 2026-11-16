@@ -16,6 +16,9 @@ public class PcmAudioStream implements AudioStream {
     private static final Logger LOGGER = LogUtils.getLogger();
 
     private boolean errorLogged;
+    private volatile long startFrame;  // where in the file this stream began (after a seek)
+    private volatile long framesRead;  // frames handed to the engine since then
+    private volatile long endFrame = -1; // stop here (a chapter inside a longer file), -1 = end of file
     private volatile boolean reachedEnd; // the decoder has no more samples (the last buffers may still be playing)
     private volatile boolean failed;     // reading failed part-way through
     private final PcmSource source;
@@ -39,6 +42,14 @@ public class PcmAudioStream implements AudioStream {
     @Override
     public ByteBuffer read(int size) throws IOException {
         int frames = Math.max(1, size / (2 * outChannels));
+        if (endFrame >= 0) {
+            long left = endFrame - (startFrame + framesRead);
+            if (left <= 0) {
+                reachedEnd = true;
+                return BufferUtils.createByteBuffer(0);
+            }
+            frames = (int) Math.min(frames, left);
+        }
         if (scratch.length < frames * channels) scratch = new short[frames * channels];
         int got;
         try {
@@ -60,6 +71,7 @@ public class PcmAudioStream implements AudioStream {
             for (int i = 0; i < got; i++) out.putShort((short) ((scratch[2 * i] + scratch[2 * i + 1]) / 2));
         }
         out.flip();
+        framesRead += got;
         if (got == 0) reachedEnd = true;
         return out; // empty buffer = end of stream
     }
@@ -74,9 +86,37 @@ public class PcmAudioStream implements AudioStream {
         return failed;
     }
 
-    /** Jumps to a sample frame. Not used by the player yet (planned for relinking and audiobooks). */
+    /** Jumps to a sample frame of the file. Call before the first read (or when restarting). */
     public void seekToFrame(long frame) throws IOException {
         source.seek(frame);
+        startFrame = frame;
+        framesRead = 0;
+    }
+
+    /** Ends the stream at this frame of the file (used for a chapter inside a longer file). */
+    public void limitToFrame(long frame) {
+        endFrame = frame;
+    }
+
+    /** Sample frames per second of what the engine plays (the file's rate). */
+    public int sampleRate() {
+        return source.sampleRate();
+    }
+
+    /**
+     * Where in the file playback is, in frames. {@code queuedBuffers} is how many of our buffers are in
+     * the OpenAL queue and {@code sampleOffset} how far into that queue the source has played. The sound
+     * engine fills its buffers with one second of audio each.
+     */
+    public long playedFrames(int queuedBuffers, int sampleOffset) {
+        long queuedFrames = (long) queuedBuffers * sampleRate();
+        long position = startFrame + framesRead - queuedFrames + sampleOffset;
+        return Math.max(startFrame, position);
+    }
+
+    /** The frame the stream started at (position before anything has played). */
+    public long startFrame() {
+        return startFrame;
     }
 
     /** Length in sample frames, or -1 if unknown. */
