@@ -271,17 +271,29 @@ public final class DockClientPlayer {
             mc.getSoundManager().play(sound);
             return;
         }
+        List<IpodSoundInstance> speakers = new ArrayList<>();
         for (DockOutputs.Output o : s.outputs) {
             IpodSoundInstance sound = IpodSoundInstance.forDock(downmix -> DiscAudio.open(path, downmix),
                     path.toString(), o.pos(), o.volume(), start);
             s.sounds.add(sound);
-            mc.getSoundManager().play(sound);
+            speakers.add(sound);
         }
+        // all speakers that can be heard start at the same moment (a far one that the engine skips is not waited for)
+        net.minecraft.world.phys.Vec3 listener = mc.player != null ? mc.player.position() : net.minecraft.world.phys.Vec3.ZERO;
+        List<IpodSoundInstance> heard = new ArrayList<>();
+        for (int i = 0; i < speakers.size(); i++) {
+            if (DockOutputs.inRange(s.outputs.get(i), listener)) heard.add(speakers.get(i));
+        }
+        IpodSoundInstance.startTogether(heard);
+        for (IpodSoundInstance sound : speakers) mc.getSoundManager().play(sound);
     }
 
     private static void stopSounds(State s) {
         if (s.sounds.isEmpty()) return;
-        for (SoundInstance sound : s.sounds) Minecraft.getInstance().getSoundManager().stop(sound);
+        for (SoundInstance sound : s.sounds) {
+            Minecraft.getInstance().getSoundManager().stop(sound);
+            if (sound instanceof IpodSoundInstance ours) ours.release();
+        }
         s.sounds.clear();
         s.sequence = -1;
     }

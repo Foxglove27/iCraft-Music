@@ -15,7 +15,8 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.file.Path;
-import java.util.HashMap;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Queue;
@@ -35,7 +36,10 @@ public class CoverArt {
 
     private record Ready(Path path, @Nullable NativeImage image) {}
 
-    private static final Map<Path, ResourceLocation> LOADED = new HashMap<>();
+    /** At most this many cover textures stay registered; the least recently shown ones are released (video memory). */
+    private static final int MAX_TEXTURES = 128;
+    // access order: get() moves a cover to the end, so the eldest entry is the one shown longest ago
+    private static final Map<Path, ResourceLocation> LOADED = new LinkedHashMap<>(256, 0.75F, true);
     private static final Set<Path> FAILED = new HashSet<>();
     private static final Set<Path> LOADING = ConcurrentHashMap.newKeySet();
     private static final Queue<Ready> READY = new ConcurrentLinkedQueue<>();
@@ -97,5 +101,16 @@ public class CoverArt {
         ResourceLocation id = ResourceLocation.fromNamespaceAndPath(iCraft.MOD_ID, "cover/" + nextId++);
         Minecraft.getInstance().getTextureManager().register(id, texture);
         LOADED.put(ready.path(), id);
+        // Release the covers shown longest ago. One that is asked for again is simply decoded again.
+        for (Iterator<ResourceLocation> eldest = LOADED.values().iterator(); LOADED.size() > MAX_TEXTURES && eldest.hasNext(); ) {
+            Minecraft.getInstance().getTextureManager().release(eldest.next());
+            eldest.remove();
+        }
+    }
+
+    /** Releases every cover texture (leaving a world). Render thread. */
+    public static void clear() {
+        for (ResourceLocation id : LOADED.values()) Minecraft.getInstance().getTextureManager().release(id);
+        LOADED.clear();
     }
 }

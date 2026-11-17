@@ -26,6 +26,15 @@ public final class DockOutputs {
         }
     }
 
+    /**
+     * True if a listener at {@code listener} is within the speaker's range. A sound the engine would skip for being
+     * too far away never asks for its stream, so it must not be waited for when speakers start together.
+     */
+    public static boolean inRange(Output output, Vec3 listener) {
+        double range = output.range();
+        return listener.distanceToSqr(output.pos()) <= range * range;
+    }
+
     private DockOutputs() {}
 
     /**

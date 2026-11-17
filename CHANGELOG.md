@@ -25,6 +25,10 @@ new changes go there until the next version bump.
 - Breaking an extra speaker on a finished wall no longer plays the "wall broken" cue while a complete wall is still standing.
 - Shuffle and repeat are saved the moment you change them, not only when the iPod screen closes.
 - Speakers and docks keep facing the right way when a structure is rotated or mirrored.
+- Album covers are released again when you scroll past them, so a huge library no longer fills up video memory.
+- A big network library is no longer read again every time you open the iPod (at most every 30 seconds).
+- The speakers of a dock now start a track at the same moment (less echo at the start).
+- A song that is skipped while it is still loading no longer leaves its file open.
 
 ## [0.0.8]
 

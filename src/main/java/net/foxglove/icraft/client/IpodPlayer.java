@@ -468,6 +468,14 @@ public class IpodPlayer {
                 sounds.add(IpodSoundInstance.forFile(file, o.pos(), o.volume(), startSeconds, endSeconds));
             }
         }
+        // the speakers in earshot start together (a far one that the engine skips is not waited for)
+        if (mc.player != null && !outputs.isEmpty()) {
+            List<SoundInstance> heard = new ArrayList<>();
+            for (int i = 0; i < outputs.size(); i++) {
+                if (DockOutputs.inRange(outputs.get(i), mc.player.position())) heard.add(sounds.get(i));
+            }
+            IpodSoundInstance.startTogether(heard);
+        }
         start(sounds, ItemStack.EMPTY, outputs, name, subtitle, cover, ipod);
         currentProgress = target; // after start(), which clears the previous one
         currentItemStart = itemStart;
@@ -604,9 +612,13 @@ public class IpodPlayer {
         chapterFinished = false;
         if (current != null) {
             Minecraft.getInstance().getSoundManager().stop(current);
+            if (current instanceof IpodSoundInstance ours) ours.release();
             current = null;
         }
-        for (SoundInstance extra : extras) Minecraft.getInstance().getSoundManager().stop(extra);
+        for (SoundInstance extra : extras) {
+            Minecraft.getInstance().getSoundManager().stop(extra);
+            if (extra instanceof IpodSoundInstance ours) ours.release();
+        }
         extras = List.of();
         currentOutputs = List.of();
         currentDisc = ItemStack.EMPTY;

@@ -47,12 +47,27 @@ public final class LibraryCache {
     private static volatile Snapshot current = new Snapshot(List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), 0, false);
     private static final AtomicBoolean RUNNING = new AtomicBoolean();
     private static final AtomicBoolean AGAIN = new AtomicBoolean();
+    /** A scan that took at least this long (a network share) is not repeated within {@link #STALE_MS}. */
+    private static final long SLOW_MS = 1000;
+    private static final long STALE_MS = 30_000;
+    private static volatile long lastFinishedAt = 0;
+    private static volatile long lastDurationMs = 0;
 
     private LibraryCache() {}
 
     /** The latest scan (never null, empty before the first scan has finished). */
     public static Snapshot get() {
         return current;
+    }
+
+    /**
+     * For opening the iPod: scans again unless a scan is running, or the last one was slow (a big share) and
+     * finished less than 30 seconds ago. A small local library is cheap, so it is scanned on every open.
+     */
+    public static void refreshIfStale() {
+        if (RUNNING.get()) return;
+        if (lastDurationMs >= SLOW_MS && System.currentTimeMillis() - lastFinishedAt < STALE_MS) return;
+        refreshAsync();
     }
 
     /** Starts a scan in the background; if one is running already, it runs once more when it is done. */
@@ -80,6 +95,8 @@ public final class LibraryCache {
                     List<LocalMusic.Book> nasBooks = LocalMusic.nasBooks();
                     List<LocalMusic.Book> nasPodcasts = LocalMusic.nasPodcasts();
                     current = new Snapshot(albums, nas, books, podcasts, nasBooks, nasPodcasts, current.generation() + 1, true);
+                    lastDurationMs = System.currentTimeMillis() - start;
+                    lastFinishedAt = System.currentTimeMillis();
                     LOGGER.info("Library scanned in {} ms: {} albums, {} NAS albums, {} audiobooks, {} podcasts, {} NAS audiobooks, {} NAS podcasts",
                             System.currentTimeMillis() - start, albums.size(), nas.size(), books.size(), podcasts.size(),
                             nasBooks.size(), nasPodcasts.size());

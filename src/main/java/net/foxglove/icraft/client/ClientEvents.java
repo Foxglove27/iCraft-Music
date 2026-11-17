@@ -24,6 +24,7 @@ public class ClientEvents {
     public static void onLoggingOut(ClientPlayerNetworkEvent.LoggingOut event) {
         IpodPlayer.stop();
         DockClientPlayer.stopAll();
+        net.foxglove.icraft.client.audio.CoverArt.clear();
     }
 
     // While iCraft music plays for the player, the game's own background music (source MUSIC) is not started.

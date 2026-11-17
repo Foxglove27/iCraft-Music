@@ -124,8 +124,11 @@ public class PcmAudioStream implements AudioStream {
         return source.lengthFrames();
     }
 
+    private final java.util.concurrent.atomic.AtomicBoolean closed = new java.util.concurrent.atomic.AtomicBoolean();
+
+    /** Closes the decoder. Safe to call more than once (the engine and our own clean-up may both do it). */
     @Override
     public void close() throws IOException {
-        source.close();
+        if (closed.compareAndSet(false, true)) source.close();
     }
 }
