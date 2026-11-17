@@ -20,6 +20,20 @@ public class ClientHooks {
         openScreen(ipod, null, false, true);
     }
 
+    /**
+     * Ctrl + right-click with an iPod in hand: takes its last disc out (the server does it, told by a message;
+     * a disc that is playing stops here). Returns false when Ctrl is not held or there is no disc.
+     */
+    public static boolean ejectDiscWithCtrl(ItemStack ipod, net.minecraft.world.InteractionHand hand) {
+        if (!net.minecraft.client.gui.screens.Screen.hasControlDown()) return false;
+        java.util.List<ItemStack> discs = IpodItem.getDiscs(ipod);
+        if (discs.isEmpty()) return true; // Ctrl was held: nothing to open either
+        discRemoved(discs.get(discs.size() - 1));
+        net.neoforged.neoforge.network.PacketDistributor.sendToServer(
+                new net.foxglove.icraft.net.EjectDiscPayload(hand == net.minecraft.world.InteractionHand.OFF_HAND));
+        return true;
+    }
+
     /** Opens the screen of the iPod that sits in a dock. It plays through the dock's speakers. */
     public static void openDockScreen(DockBlockEntity dock) {
         Level level = dock.getLevel();

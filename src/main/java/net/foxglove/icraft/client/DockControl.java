@@ -25,14 +25,16 @@ public final class DockControl {
     @Nullable
     private static GlobalPos pendingDock;
     private static int pendingDisc;
+    private static double pendingSeconds;
     private static int pendingTicks;
 
     private DockControl() {}
 
     /** Starts disc {@code index} on the dock once it has reported that it holds the iPod (a few ticks). */
-    public static void playWhenDocked(GlobalPos dock, int index) {
+    public static void playWhenDocked(GlobalPos dock, int index, double seconds) {
         pendingDock = dock;
         pendingDisc = index;
+        pendingSeconds = seconds;
         pendingTicks = 60;
     }
 
@@ -45,7 +47,7 @@ public final class DockControl {
                 && dock.hasIpod() && dock.isOwner(mc.player)) {
             GlobalPos target = pendingDock;
             pendingDock = null;
-            play(target, pendingDisc);
+            play(target, pendingDisc, pendingSeconds);
         } else if (--pendingTicks <= 0) {
             pendingDock = null;
         }
@@ -99,14 +101,20 @@ public final class DockControl {
 
     private static void send(GlobalPos dock, int action, int arg) {
         PacketDistributor.sendToServer(new DockControlPayload(dock.pos(), action, arg,
-                IpodSettings.shuffle(), IpodSettings.repeat().ordinal()));
+                IpodSettings.shuffle(), IpodSettings.repeat().ordinal(), 0));
     }
 
     /** Starts the docked iPod's disc list at disc {@code index}. Stops anything this player plays locally. */
     public static void play(GlobalPos dock, int index) {
+        play(dock, index, 0);
+    }
+
+    /** Same, beginning {@code seconds} into the disc (a disc that was playing on a held iPod and was docked). */
+    public static void play(GlobalPos dock, int index, double seconds) {
         IpodPlayer.stop(); // a file or disc playing in the player's ears makes way
         lastDock = dock;
-        send(dock, DockControlPayload.PLAY, index);
+        PacketDistributor.sendToServer(new DockControlPayload(dock.pos(), DockControlPayload.PLAY, index,
+                IpodSettings.shuffle(), IpodSettings.repeat().ordinal(), (int) Math.round(seconds * 20)));
     }
 
     public static void togglePause() {
@@ -147,6 +155,6 @@ public final class DockControl {
     /** Tells a dock that the owner plays one of their own files there (so everybody sees the notes). */
     public static void setExternal(GlobalPos dock, boolean playing) {
         PacketDistributor.sendToServer(new DockControlPayload(dock.pos(), DockControlPayload.EXTERNAL,
-                playing ? 1 : 0, false, 0));
+                playing ? 1 : 0, false, 0, 0));
     }
 }

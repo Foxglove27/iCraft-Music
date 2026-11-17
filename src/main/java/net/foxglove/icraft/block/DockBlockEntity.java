@@ -173,7 +173,11 @@ public class DockBlockEntity extends BlockEntity {
         switch (message.action()) {
             case DockControlPayload.PLAY -> {
                 if (message.arg() < 0 || message.arg() >= discs) return;
-                playback = DockPlayback.start(discs, message.arg(), message.shuffle(), repeatOf(message.repeat()), now, new Random());
+                // a disc carried over from a held iPod starts where it was; kept clear of the end so it cannot end at once
+                long length = discTicks(level, message.arg());
+                long startAt = length > 40 ? Math.max(0, Math.min(message.startTicks(), length - 40)) : 0;
+                playback = DockPlayback.start(discs, message.arg(), message.shuffle(), repeatOf(message.repeat()), now,
+                        new Random(), startAt);
                 externalPlaying = false;
             }
             case DockControlPayload.EXTERNAL -> {

@@ -6,6 +6,12 @@ new changes go there until the next version bump.
 
 ## [0.0.9]
 
+### Changed
+- Take the last disc out of an iPod in your hand with Ctrl + right-click (it was Shift + right-click, which clashed with
+  sneaking). Shift + right-click now simply opens the iPod. Taking a disc out in the inventory is unchanged.
+- A music disc that plays from your iPod carries on from the same second when you put the iPod into a dock (it used to
+  start again from the beginning).
+
 ### Fixed
 - The game's own background music no longer starts over the iPod or a dock's music while it plays for you (it comes back
   afterwards). Switch: `silenceBackgroundMusic` in `icraft-client.toml`.
@@ -17,6 +23,8 @@ new changes go there until the next version bump.
 - Skipping tracks with several speakers at a dock no longer leaves the new track silent until the second press: the new
   sounds now wait until the old speakers have given up their audio channels.
 - Breaking an extra speaker on a finished wall no longer plays the "wall broken" cue while a complete wall is still standing.
+- Shuffle and repeat are saved the moment you change them, not only when the iPod screen closes.
+- Speakers and docks keep facing the right way when a structure is rotated or mirrored.
 
 ## [0.0.8]
 

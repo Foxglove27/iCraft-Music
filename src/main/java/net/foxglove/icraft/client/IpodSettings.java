@@ -32,6 +32,7 @@ public class IpodSettings {
         load();
         shuffle = !shuffle;
         changed = true;
+        save(); // saved at once, not only when the screen closes
         IpodPlayer.shuffleChanged();
     }
 
@@ -39,10 +40,11 @@ public class IpodSettings {
         load();
         repeat = repeat.next();
         changed = true;
+        save();
         DockControl.modesChanged();
     }
 
-    /** Writes the settings to the config file (called when the iPod screen closes). */
+    /** Writes the settings to the config file (at every change, and when the iPod screen closes). */
     public static void save() {
         if (!changed) return;
         ClientConfig.SHUFFLE.set(shuffle);

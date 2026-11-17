@@ -330,6 +330,22 @@ public class IpodPlayer {
     public static void play(ItemStack disc, @Nullable UUID ipod) {
         Minecraft mc = Minecraft.getInstance();
         if (mc.level == null) return;
+        // In the player's own ears a disc is decoded by us, so its position is known (it can carry on in a dock);
+        // other discs, or ones we cannot find the file of, use the game's own stream.
+        if (queueDock == null && outputsFor(mc, ipod, List.of()).isEmpty()) {
+            ResourceLocation path = JukeboxSong.fromStack(mc.level.registryAccess(), disc)
+                    .map(s -> DiscAudio.resolve(s.value().soundEvent().value())).orElse(null);
+            if (path != null) {
+                play(disc, ipod, 0);
+                return;
+            }
+        }
+        playVanillaDisc(disc, ipod);
+    }
+
+    private static void playVanillaDisc(ItemStack disc, @Nullable UUID ipod) {
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.level == null) return;
 
         List<DockOutputs.Output> outputs = outputsFor(mc, ipod, List.of());
 
@@ -355,7 +371,7 @@ public class IpodPlayer {
         Optional<Holder<JukeboxSong>> song = JukeboxSong.fromStack(mc.level.registryAccess(), disc);
         ResourceLocation path = song.map(s -> DiscAudio.resolve(s.value().soundEvent().value())).orElse(null);
         if (song.isEmpty() || path == null) {
-            play(disc, ipod); // cannot start in the middle: from the start
+            playVanillaDisc(disc, ipod); // cannot start in the middle: from the start
             return;
         }
         queueDock = null;
@@ -669,8 +685,10 @@ public class IpodPlayer {
                 break;
             }
         }
+        refreshPosition(); // where the disc is, so it carries on at the same second on the dock
+        double seconds = positionSeconds();
         stop();
-        if (index >= 0) DockControl.playWhenDocked(dock, index);
+        if (index >= 0) DockControl.playWhenDocked(dock, index, seconds);
     }
 
     // The iPod with this ID in the inventory (or on the cursor), or null

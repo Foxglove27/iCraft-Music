@@ -83,24 +83,20 @@ public class IpodItem extends Item {
     public InteractionResultHolder<ItemStack> use(Level level, Player player, InteractionHand hand) {
         ItemStack stack = player.getItemInHand(hand);
 
-        if (player.isShiftKeyDown()) {
-            List<ItemStack> discs = getDiscs(stack);
-            if (!discs.isEmpty()) {
-                ItemStack removed = discs.remove(discs.size() - 1);
-                if (level.isClientSide()) {
-                    ClientHooks.discRemoved(removed);
-                } else {
-                    player.getInventory().placeItemBackInInventory(removed);
-                    setDiscs(stack, discs);
-                }
-            }
-            return InteractionResultHolder.sidedSuccess(stack, level.isClientSide());
-        }
-
         if (level.isClientSide()) {
-            ClientHooks.openIpodScreen(stack);
+            // Ctrl + right-click takes the last disc out (only the client knows about Ctrl, so the server is told)
+            if (!ClientHooks.ejectDiscWithCtrl(stack, hand)) ClientHooks.openIpodScreen(stack);
         }
         return InteractionResultHolder.sidedSuccess(stack, level.isClientSide());
+    }
+
+    /** Server side: takes the last disc out of {@code ipod} and gives it to the player. */
+    public static void ejectLastDisc(Player player, ItemStack ipod) {
+        List<ItemStack> discs = getDiscs(ipod);
+        if (discs.isEmpty()) return;
+        ItemStack removed = discs.remove(discs.size() - 1);
+        player.getInventory().placeItemBackInInventory(removed);
+        setDiscs(ipod, discs);
     }
     // Called when the cursor stack (other) is right-clicked onto this iPod in an inventory slot
     @Override
