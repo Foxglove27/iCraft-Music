@@ -51,6 +51,13 @@ public final class Multiblock {
         return find(p -> p.equals(pos) ? removed : level.getBlockState(p), pos);
     }
 
+    /** Like {@link #find}, but reads {@code ignored} as air: was there a complete wall at {@code pos} without that block? */
+    @Nullable
+    public static Result findWithout(BlockGetter level, BlockPos pos, BlockPos ignored) {
+        BlockState air = net.minecraft.world.level.block.Blocks.AIR.defaultBlockState();
+        return find(p -> p.equals(ignored) ? air : level.getBlockState(p), pos);
+    }
+
     @Nullable
     private static Result find(Function<BlockPos, BlockState> level, BlockPos pos) {
         BlockState state = level.apply(pos);

@@ -9,6 +9,14 @@ new changes go there until the next version bump.
 ### Fixed
 - The game's own background music no longer starts over the iPod or a dock's music while it plays for you (it comes back
   afterwards). Switch: `silenceBackgroundMusic` in `icraft-client.toml`.
+- Music recovers by itself when the game drops the sound: after the volume was set to 0 and back, after switching the
+  audio device, and after walking away from a dock and back (the song carries on at the right second).
+- Previous now keeps going back when it lands on a track that cannot be played (it used to jump forward again).
+- Holding Backspace in the iPod no longer jumps back through several menus; a held key only goes back one level.
+- Stacking speakers on a finished 2x4 wall no longer plays the "wall formed" chime and animation again.
+- Skipping tracks with several speakers at a dock no longer leaves the new track silent until the second press: the new
+  sounds now wait until the old speakers have given up their audio channels.
+- Breaking an extra speaker on a finished wall no longer plays the "wall broken" cue while a complete wall is still standing.
 
 ## [0.0.8]
 

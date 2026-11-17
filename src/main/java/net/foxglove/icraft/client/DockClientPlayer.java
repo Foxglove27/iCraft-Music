@@ -7,6 +7,7 @@ import net.foxglove.icraft.client.audio.DiscAudio;
 import net.foxglove.icraft.client.audio.IpodSoundInstance;
 import net.foxglove.icraft.item.IpodItem;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.sounds.SoundManager;
 import net.minecraft.client.resources.sounds.SoundInstance;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
@@ -56,6 +57,9 @@ public final class DockClientPlayer {
         boolean locallyStopped; // this player stopped the dock's music for themselves
         String lastReason = ""; // what the dock last told the log, so it is logged only when it changes
         long checkAt = Long.MAX_VALUE; // when to log whether the started sounds are really playing
+        long startedAt;        // game time of the last start of the sounds
+        long nextRevive;       // earliest game time to restart sounds the engine dropped
+        int revives;           // restarts since the sounds were last all alive
 
         boolean isPlaying() {
             return !sounds.isEmpty();
@@ -138,12 +142,43 @@ public final class DockClientPlayer {
             startSounds(level, dock, s, pb);
             s.checkAt = now + 40;
         }
+        reviveDeadSounds(level, dock, s, pb, pos, now);
         if (now >= s.checkAt && s.isPlaying()) { // two seconds later: did the sound engine really start them?
             s.checkAt = Long.MAX_VALUE;
             StringBuilder active = new StringBuilder();
             for (SoundInstance sound : s.sounds) active.append(mc.getSoundManager().isActive(sound) ? "active " : "NOT ACTIVE ");
             LOGGER.info("Dock at {}: two seconds after the start the sounds are: {}", pos.toShortString(), active.toString().trim());
         }
+    }
+
+    /**
+     * The sound engine can drop a sound without telling us (a volume set to 0 and back, an audio device switch,
+     * walking away and back). If a sound of this dock is no longer active although its file has not ended, start
+     * again at the position the server says. Retries get further apart (1 s, 2 s, ... 5 s) so a file that
+     * cannot play does not loop.
+     */
+    private static void reviveDeadSounds(Level level, DockBlockEntity dock, State s, DockPlayback pb, BlockPos pos, long now) {
+        if (!s.isPlaying() || now - s.startedAt < 40) return;
+        SoundManager sounds = Minecraft.getInstance().getSoundManager();
+        boolean dead = false;
+        for (SoundInstance sound : s.sounds) {
+            if (sounds.isActive(sound)) continue;
+            if (sound instanceof IpodSoundInstance ipod && (ipod.streamEnded() || ipod.streamFailed())) continue; // really over
+            dead = true;
+        }
+        if (!dead) {
+            s.revives = 0;
+            return;
+        }
+        if (now < s.nextRevive) return;
+        s.nextRevive = now + 20L * (1 + Math.min(s.revives, 4));
+        s.revives++;
+        LOGGER.info("Dock at {}: a sound stopped before the disc ended, restarting at {} s (try {})",
+                pos.toShortString(), pb.positionTicks(now) / 20, s.revives);
+        int tries = s.revives;
+        startSounds(level, dock, s, pb);
+        s.revives = tries; // startSounds does not reset it; it is reset when everything is alive again
+        s.startedAt = now;
     }
 
     // One line in the log whenever the reason why this dock is silent (or not) changes
@@ -204,6 +239,7 @@ public final class DockClientPlayer {
         Minecraft.getInstance().getMusicManager().stopPlaying(); // the game's own music makes way for the dock's
         s.sequence = pb.sequence();
         s.playingOutputs = s.outputs;
+        s.startedAt = level.getGameTime();
 
         List<ItemStack> discs = IpodItem.getDiscs(dock.getIpod());
         int index = pb.currentDisc();

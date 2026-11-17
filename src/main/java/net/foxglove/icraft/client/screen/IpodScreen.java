@@ -996,16 +996,26 @@ public class IpodScreen extends Screen {
                 return true;
             }
             if (keyCode == GLFW.GLFW_KEY_BACKSPACE) {
+                boolean fresh = !backspaceDown; // a held key repeats; only a new press may go back a level
+                backspaceDown = true;
                 if (page == Page.SEARCH && !searchQuery.isEmpty()) { // delete a letter; with nothing typed it goes back
                     searchQuery = searchQuery.substring(0, searchQuery.length() - 1);
                     searchChanged();
-                } else {
+                } else if (fresh) {
                     menu();
                 }
                 return true;
             }
         }
         return super.keyPressed(keyCode, scanCode, modifiers);
+    }
+
+    private boolean backspaceDown;
+
+    @Override
+    public boolean keyReleased(int keyCode, int scanCode, int modifiers) {
+        if (keyCode == GLFW.GLFW_KEY_BACKSPACE) backspaceDown = false;
+        return super.keyReleased(keyCode, scanCode, modifiers);
     }
 
     // Typing on the search page

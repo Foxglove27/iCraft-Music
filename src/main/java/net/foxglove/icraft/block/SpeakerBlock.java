@@ -44,6 +44,15 @@ public class SpeakerBlock extends HorizontalDirectionalBlock {
         if (level.isClientSide() || oldState.is(this)) return;
         Multiblock.Result big = Multiblock.find(level, pos);
         if (big == null) return;
+        // A speaker added to a wall that was already complete forms another 2x4 rectangle with some of its blocks:
+        // that is no new wall, so no chime
+        for (int x = 0; x < Multiblock.WIDTH; x++) {
+            for (int y = 0; y < Multiblock.HEIGHT; y++) {
+                BlockPos p = big.anchor().above(y);
+                p = big.axis() == Direction.Axis.X ? p.east(x) : p.south(x);
+                if (!p.equals(pos) && Multiblock.findWithout(level, p, pos) != null) return;
+            }
+        }
 
         for (int x = 0; x < Multiblock.WIDTH; x++) {
             for (int y = 0; y < Multiblock.HEIGHT; y++) {
@@ -84,7 +93,7 @@ public class SpeakerBlock extends HorizontalDirectionalBlock {
     protected void onRemove(BlockState state, Level level, BlockPos pos, BlockState newState, boolean movedByPiston) {
         if (!level.isClientSide() && !state.is(newState.getBlock()) && level instanceof ServerLevel server) {
             Multiblock.Result big = Multiblock.findAssuming(level, pos, state);
-            if (big != null) {
+            if (big != null && !wallRemains(level, big, pos)) {
                 Direction facing = state.getValue(FACING);
                 for (int x = 0; x < Multiblock.WIDTH; x++) {
                     for (int y = 0; y < Multiblock.HEIGHT; y++) {
@@ -103,6 +112,19 @@ public class SpeakerBlock extends HorizontalDirectionalBlock {
             }
         }
         super.onRemove(state, level, pos, newState, movedByPiston);
+    }
+
+    // True if the other blocks of this wall still form a complete wall without the removed block (a wall with
+    // extra speakers on it): then nothing broke.
+    private static boolean wallRemains(Level level, Multiblock.Result big, BlockPos removed) {
+        for (int x = 0; x < Multiblock.WIDTH; x++) {
+            for (int y = 0; y < Multiblock.HEIGHT; y++) {
+                BlockPos p = big.anchor().above(y);
+                p = big.axis() == Direction.Axis.X ? p.east(x) : p.south(x);
+                if (!p.equals(removed) && Multiblock.findWithout(level, p, removed) != null) return true;
+            }
+        }
+        return false;
     }
 
     @Override
