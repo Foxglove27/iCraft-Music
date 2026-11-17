@@ -1,6 +1,9 @@
 package net.foxglove.icraft.net;
 
 import net.foxglove.icraft.block.DockBlockEntity;
+import net.foxglove.icraft.client.ClientHooks;
+import net.foxglove.icraft.net.share.ShareServer;
+import net.minecraft.server.level.ServerPlayer;
 import net.foxglove.icraft.iCraft;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
@@ -11,12 +14,35 @@ import net.neoforged.neoforge.network.registration.PayloadRegistrar;
 /** The messages iCraft sends. Registered on the mod event bus on both sides. */
 @EventBusSubscriber(modid = iCraft.MOD_ID)
 public class ModNetwork {
-    private static final String VERSION = "1";
+    private static final String VERSION = "2";
 
     @SubscribeEvent
     public static void register(RegisterPayloadHandlersEvent event) {
         PayloadRegistrar registrar = event.registrar(VERSION);
         registrar.playToServer(DockControlPayload.TYPE, DockControlPayload.STREAM_CODEC, ModNetwork::onDockControl);
+
+        // file sharing
+        registrar.playToServer(FileOfferPayload.TYPE, FileOfferPayload.STREAM_CODEC,
+                (m, c) -> c.enqueueWork(() -> ShareServer.onOffer((ServerPlayer) c.player(), m)));
+        registrar.playToServer(FileChunkPayload.TYPE, FileChunkPayload.STREAM_CODEC,
+                (m, c) -> c.enqueueWork(() -> ShareServer.onChunk((ServerPlayer) c.player(), m)));
+        registrar.playToServer(FileRequestPayload.TYPE, FileRequestPayload.STREAM_CODEC,
+                (m, c) -> c.enqueueWork(() -> ShareServer.onRequest((ServerPlayer) c.player(), m)));
+        registrar.playToServer(DockQueuePayload.TYPE, DockQueuePayload.STREAM_CODEC, ModNetwork::onDockQueue);
+        registrar.playToClient(FileStatusPayload.TYPE, FileStatusPayload.STREAM_CODEC,
+                (m, c) -> c.enqueueWork(() -> ClientHooks.fileStatus(m)));
+        registrar.playToClient(FileDataPayload.TYPE, FileDataPayload.STREAM_CODEC,
+                (m, c) -> c.enqueueWork(() -> ClientHooks.fileData(m)));
+    }
+
+    private static void onDockQueue(DockQueuePayload message, IPayloadContext context) {
+        context.enqueueWork(() -> {
+            var player = context.player();
+            if (player.level().isLoaded(message.pos())
+                    && player.level().getBlockEntity(message.pos()) instanceof DockBlockEntity dock) {
+                dock.queue(player, message);
+            }
+        });
     }
 
     private static void onDockControl(DockControlPayload message, IPayloadContext context) {

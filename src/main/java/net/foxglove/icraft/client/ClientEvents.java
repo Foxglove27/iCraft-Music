@@ -21,6 +21,7 @@ public class ClientEvents {
     public static void onClientTick(ClientTickEvent.Post event) {
         IpodPlayer.clientTick();
         DockControl.tick();
+        net.foxglove.icraft.client.share.SharedFiles.tick();
         ModKeyMappings.tick(net.minecraft.client.Minecraft.getInstance().screen != null);
     }
 }

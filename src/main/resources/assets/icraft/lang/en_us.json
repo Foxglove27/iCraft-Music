@@ -52,5 +52,22 @@
   "message.icraft.dock.speaker_added": "Speaker added to the dock (%s/%s)",
   "message.icraft.dock.speaker_removed": "Speaker removed from the dock (%s/%s)",
   "message.icraft.dock.speaker_lost": "A speaker was removed from the dock (%s/%s)",
-  "message.icraft.dock.not_yours": "This iPod belongs to %s."
+  "message.icraft.dock.not_yours": "This iPod belongs to %s.",
+  "message.icraft.share.notice": "Your files are copied to this server and to the players near your dock.",
+  "message.icraft.share.preparing": "Preparing your files...",
+  "message.icraft.share.unreadable": "A file of this list cannot be read.",
+  "message.icraft.share.sharing": "Sharing %s: %s%%",
+  "message.icraft.share.downloading": "Downloading %s: %s%%",
+  "message.icraft.share.refused.off": "File sharing is switched off on this server. Only you hear your files.",
+  "message.icraft.share.refused.not_private": "File sharing only works on a private network. Only you hear your files.",
+  "message.icraft.share.refused.bad_file": "This file cannot be shared: %s",
+  "message.icraft.share.refused.too_large": "This file is too large to share: %s",
+  "message.icraft.share.refused.quota": "You have shared too much already: %s",
+  "message.icraft.share.refused.cache_full": "The server has no room to share this: %s",
+  "message.icraft.share.refused.bad_data": "The file transfer failed: %s",
+  "message.icraft.share.refused.bad_hash": "The file was damaged in transfer: %s",
+  "message.icraft.share.refused.not_here": "You are not near a dock playing this file.",
+  "message.icraft.share.refused.error": "The server could not handle this file: %s",
+  "key.icraft.stop_for_me": "iPod: Stop a dock's music for me",
+  "message.icraft.dock.stopped_for_you": "Stopped for you. Walk away and come back to listen again."
 }

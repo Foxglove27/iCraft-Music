@@ -54,6 +54,18 @@ public class ClientHooks {
         IpodPlayer.handOverToDock(dock, ipod.get(ModDataComponents.IPOD_ID.get()), ipod);
     }
 
+    /** The server answered about a file (an upload of ours, or a download we asked for). */
+    public static void fileStatus(net.foxglove.icraft.net.FileStatusPayload status) {
+        if (!net.foxglove.icraft.client.share.FileUploader.onStatus(status)) {
+            net.foxglove.icraft.client.share.SharedFiles.onStatus(status);
+        }
+    }
+
+    /** A piece of a shared file arrived. */
+    public static void fileData(net.foxglove.icraft.net.FileDataPayload data) {
+        net.foxglove.icraft.client.share.SharedFiles.onData(data);
+    }
+
     /** A dock block entity went away on the client: stop what it was playing. */
     public static void dockRemoved(DockBlockEntity dock) {
         DockClientPlayer.cleanup(dock);

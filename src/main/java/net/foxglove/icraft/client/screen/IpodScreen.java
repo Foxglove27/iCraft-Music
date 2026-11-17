@@ -1,6 +1,7 @@
 package net.foxglove.icraft.client.screen;
 
 import com.mojang.math.Axis;
+import net.foxglove.icraft.client.DockClientPlayer;
 import net.foxglove.icraft.client.DockControl;
 import net.foxglove.icraft.client.IpodPlayer;
 import net.foxglove.icraft.client.IpodSettings;
@@ -76,9 +77,10 @@ public class IpodScreen extends Screen {
     private long pendingActivateAt = -1;
 
     // 'detail' is a small grey text after the name (for example the saved time in an audiobook chapter)
-    private record Track(Component name, Runnable play, @Nullable String detail) {
+    // 'item' describes the file when the track can be shared through a dock (file sharing)
+    private record Track(Component name, Runnable play, @Nullable String detail, @Nullable DockControl.FileItem item) {
         Track(Component name, Runnable play) {
-            this(name, play, null);
+            this(name, play, null, null);
         }
     }
 
@@ -172,7 +174,9 @@ public class IpodScreen extends Screen {
                 double saved = linked ? AudiobookProgress.get(AudiobookProgress.MUSIC, LocalMusic.key(file)) : 0;
                 tracks.add(new Track(Component.literal(LocalMusic.displayName(file)),
                         () -> IpodPlayer.playFile(file, ipod),
-                        saved >= 1 ? formatTime(saved) : null));
+                        saved >= 1 ? formatTime(saved) : null,
+                        new DockControl.FileItem(file, Component.literal(LocalMusic.displayName(file)), album.name(),
+                                album.cover(), 0, -1, AudiobookProgress.MUSIC, LocalMusic.key(file), null)));
             }
             albums.add(new AlbumView(album.name(), album.cover(), null, tracks));
         }
@@ -196,7 +200,9 @@ public class IpodScreen extends Screen {
                 double saved = AudiobookProgress.get(book.key(), chapter.key());
                 chapters.add(new Track(chapter.title(),
                         () -> IpodPlayer.playChapter(chapter, book.key(), nextKey, ipod),
-                        saved >= 1 ? formatTime(saved) : null));
+                        saved >= 1 ? formatTime(saved) : null,
+                        new DockControl.FileItem(chapter.file(), chapter.title(), book.name(), book.cover(),
+                                chapter.startSeconds(), chapter.endSeconds(), book.key(), chapter.key(), nextKey)));
                 if (chapter.key().equals(last)) startRow = i;
             }
             into.add(new AlbumView(book.name(), book.cover(), null, chapters, startRow));
@@ -267,6 +273,12 @@ public class IpodScreen extends Screen {
             if (disc >= 0 && disc != lastPlayingSeen) {
                 lastPlayingSeen = disc;
                 selected = disc;
+            }
+        } else if ((page == Page.TRACKS || page == Page.CHAPTERS) && open == playedAlbum && DockControl.isFilesActive()) {
+            int shown = DockControl.currentIndexInAlbum(); // the dock plays the shared list: follow it
+            if (shown >= 0 && shown != lastPlayingSeen) {
+                lastPlayingSeen = shown;
+                selected = shown;
             }
         } else if ((page == Page.TRACKS || page == Page.CHAPTERS) && open == playedAlbum && playedActions != null
                 && IpodPlayer.isQueue(playedActions)) {
@@ -528,6 +540,15 @@ public class IpodScreen extends Screen {
                     DockControl.play(dock, selected);
                     return;
                 }
+                if (dock != null && dockOwner && DockControl.canShareFiles()
+                        && open.tracks().stream().allMatch(t -> t.item() != null)) {
+                    // file sharing is on: the dock plays the list for everybody near it, the files go to the server
+                    playedAlbum = open;
+                    playedActions = null;
+                    lastPlayingSeen = selected;
+                    DockControl.playFiles(dock, open.tracks().stream().map(Track::item).toList(), selected, page == Page.CHAPTERS);
+                    return;
+                }
                 List<Runnable> actions = open.tracks().stream().map(Track::play).toList();
                 playedAlbum = open;
                 playedActions = actions;
@@ -627,6 +648,9 @@ public class IpodScreen extends Screen {
         if (pendingActivateAt >= 0) {
             // A click was already waiting, so this is the second one: a double-click
             pendingActivateAt = -1;
+            if (dock != null && !dockOwner && DockClientPlayer.stopForMe(dock.pos())) {
+                return; // not their dock: the double-click stops the music for them only
+            }
             if (IpodPlayer.isPlaying()) {
                 DockControl.stop(); // a dock that plays discs stops too
                 IpodPlayer.stop();

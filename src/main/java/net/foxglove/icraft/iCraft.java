@@ -35,6 +35,7 @@ public class iCraft {
 
         // Let FML create and load the client-side config file (config/icraft-client.toml) from our spec
         modContainer.registerConfig(ModConfig.Type.CLIENT, ClientConfig.SPEC);
+        modContainer.registerConfig(ModConfig.Type.SERVER, ServerConfig.SPEC);
 
     }
 

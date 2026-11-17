@@ -52,7 +52,13 @@ public class IpodSoundInstance extends AbstractTickableSoundInstance {
      * {@code startSeconds} is asked when the stream opens, so the time spent loading is not lost.
      */
     public static IpodSoundInstance forDock(Opener opener, String label, @Nullable Vec3 pos, float volume, DoubleSupplier startSeconds) {
-        return new IpodSoundInstance(borrowedEvent(), opener, label, false, pos, volume, startSeconds, -1);
+        return forDock(opener, label, pos, volume, startSeconds, -1);
+    }
+
+    /** Like above, ending at {@code endSeconds} of the file (a chapter inside a longer file); -1 = the end of the file. */
+    public static IpodSoundInstance forDock(Opener opener, String label, @Nullable Vec3 pos, float volume,
+                                            DoubleSupplier startSeconds, double endSeconds) {
+        return new IpodSoundInstance(borrowedEvent(), opener, label, false, pos, volume, startSeconds, endSeconds);
     }
 
     // A file from the ipod_music folder

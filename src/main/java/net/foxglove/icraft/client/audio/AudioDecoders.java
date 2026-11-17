@@ -31,6 +31,17 @@ public final class AudioDecoders {
         return new PcmAudioStream(source, downmixToMono);
     }
 
+    /** How long a file plays, in seconds; 0 if the format does not tell. Opens the file briefly. */
+    public static double durationSeconds(Path file) throws IOException {
+        PcmAudioStream stream = open(file, false);
+        try {
+            long frames = stream.lengthFrames();
+            return frames > 0 ? (double) frames / stream.sampleRate() : 0;
+        } finally {
+            stream.close();
+        }
+    }
+
     // .m4a and .m4b hold AAC or Apple Lossless: read the index once and pick the decoder by the codec
     private static PcmSource openMp4(Path file) throws IOException {
         Mp4File mp4 = Mp4File.open(file);

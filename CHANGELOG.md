@@ -7,6 +7,16 @@ new changes go there until the next version bump.
 ## [0.0.8]
 
 ### Added
+- Other players can stop a dock's music for themselves with a double-click on the middle wheel button of the dock's iPod screen, or with their own key (default `\`, "iPod: Stop a dock's music for me"). Nothing
+  else changes for anybody; it stays stopped through the next songs and ends when they walk away and come back, or when the dock stops.
+- **Private file sharing at a dock** (off by default). With `allowFileSharing=true` in the world's
+  `serverconfig/icraft-server.toml`, the player who docked the iPod can play their own music, audiobooks and
+  podcasts for everybody near the dock: the files are copied to the server, the other players download them
+  automatically (and can turn that off with `downloadSharedFiles` in `icraft-client.toml`), and late joiners hear
+  them from the current position. The dock keeps playing when the owner leaves. Resume positions stay with the
+  owner. For private use only: sharing is refused for players who are not on a private network address
+  (`privateNetworkOnly`, on by default), the cache has size, per-player and age limits, and whoever runs the server is
+  responsible for the licences of what is shared.
 - **Other players hear a dock's speakers.** Music discs that play in a dock are now heard by everybody near its
   speakers, and everybody sees the music notes. Someone who walks up while a song is playing hears it from the
   current position.
@@ -18,6 +28,8 @@ new changes go there until the next version bump.
 - Music discs played from a dock can be skipped through by holding Next or Previous.
 
 ### Fixed
+- The play/pause key only controls docks you own; a listener's stop no longer ends by itself at the edge of the speaker range.
+- Owners no longer download their own shared files.
 - A dock that already held an iPod before this version had no owner, so nobody could control it (and no notes or
   sound followed). It now belongs to the first player who uses it.
 - Putting an iPod that is playing into a dock no longer leaves the music stuck and impossible to resume. A song or

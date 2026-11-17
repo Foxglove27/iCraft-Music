@@ -3,12 +3,18 @@ package net.foxglove.icraft.client;
 import com.mojang.logging.LogUtils;
 import net.foxglove.icraft.block.DockBlockEntity;
 import net.foxglove.icraft.block.DockPlayback;
+import net.foxglove.icraft.client.audio.AudioDecoders;
 import net.foxglove.icraft.client.audio.DiscAudio;
+import net.foxglove.icraft.client.share.SharedFiles;
+import net.foxglove.icraft.net.share.QueueEntry;
+import java.nio.file.Path;
 import net.foxglove.icraft.client.audio.IpodSoundInstance;
 import net.foxglove.icraft.item.IpodItem;
 import net.minecraft.client.Minecraft;
+import net.minecraft.network.chat.Component;
 import net.minecraft.client.resources.sounds.SoundInstance;
 import net.minecraft.core.BlockPos;
+import org.jetbrains.annotations.Nullable;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.player.Player;
@@ -47,6 +53,14 @@ public final class DockClientPlayer {
         List<DockOutputs.Output> playingOutputs = List.of();
         final List<SoundInstance> sounds = new ArrayList<>();
         boolean failedLogged;
+        int lastSequence = -1; // sequence of the dock's playback at the last tick
+        DockBlockEntity dock;   // the block entity this state belongs to
+        boolean owned;          // the player owns this dock
+        boolean candidate;      // the play/pause key would act on this dock (owned and in range, or audible)
+        boolean locallyPaused; // this player paused the dock for themselves
+        int pausedSequence = -1;
+        boolean audible;       // playing and in earshot (before a local pause); double distance to the nearest speaker below
+        double distSq = Double.MAX_VALUE;
         String lastReason = ""; // what the dock last told the log, so it is logged only when it changes
         long checkAt = Long.MAX_VALUE; // when to log whether the started sounds are really playing
 
@@ -98,6 +112,54 @@ public final class DockClientPlayer {
         boolean discPlaying = dock.hasIpod() && pb != null && pb.isPlaying() && !pb.isPaused()
                 && (!s.outputs.isEmpty() || ownerEars);
         boolean heard = ownerEars || inEarshot(player, s.outputs, s.isPlaying() ? STOP_MARGIN : START_MARGIN);
+        s.dock = dock;
+        s.owned = dock.hasIpod() && dock.isOwner(player);
+        boolean playingList = dock.hasIpod() && pb != null && pb.isPlaying();
+        s.audible = discPlaying && heard;
+        s.candidate = s.owned
+                ? playingList && (ownerEars || inEarshot(player, s.outputs, STOP_MARGIN))
+                : s.audible;
+        s.lastSequence = pb != null ? pb.sequence() : -1;
+        s.distSq = nearestDistSq(player, s.outputs);
+        // a local pause ends when the player really leaves earshot (with the wide margin, so the edge cannot flip it)
+        // or the dock starts something new or stops
+        boolean stillNear = ownerEars || inEarshot(player, s.outputs, STOP_MARGIN);
+        if (s.locallyPaused && (!stillNear || !playingList)) { // track changes and the owner's pause do not bring the sound back
+            s.locallyPaused = false;
+        }
+        // shared files are fetched from twice the speaker range on, so they are usually here before the player is in earshot
+        boolean nearForDownload = dock.isFilesMode() && dock.hasIpod() && pb != null && pb.isPlaying() && !pb.isPaused()
+                && !s.outputs.isEmpty() && inEarshotFactor(player, s.outputs, 2.0);
+        if (nearForDownload && !s.owned) { // the owner's files are on their own computer: they never download them
+            List<QueueEntry> queue = dock.getQueue();
+            List<QueueEntry> wanted = new ArrayList<>();
+            int cur = pb.currentDisc(), next = pb.peekNext();
+            if (cur >= 0 && cur < queue.size()) wanted.add(queue.get(cur));
+            if (next >= 0 && next < queue.size() && next != cur) wanted.add(queue.get(next));
+            SharedFiles.want(pos.asLong(), wanted);
+        } else if (dock.isFilesMode()) {
+            SharedFiles.want(pos.asLong(), List.of());
+        }
+        if (s.locallyPaused) {
+            log(s, pos, "paused by you");
+            stopSounds(s);
+            return;
+        }
+        if (dock.isFilesMode() && discPlaying && heard) {
+            // shared files: make sure this computer has the one that plays now and the next one
+            List<QueueEntry> queue = dock.getQueue();
+            int cur = pb.currentDisc();
+            if (cur >= 0 && cur < queue.size() && SharedFiles.pathFor(queue.get(cur)) == null) {
+                if (s.owned) {
+                    log(s, pos, "your own file \"" + queue.get(cur).title() + "\" is not on this computer (a list from an earlier session): start the list again");
+                    stopSounds(s);
+                    return;
+                }
+                log(s, pos, "waiting for the shared file \"" + queue.get(cur).title() + "\" to arrive");
+                stopSounds(s);
+                return;
+            }
+        }
         if (!discPlaying || !heard) {
             log(s, pos, !dock.hasIpod() ? "the dock holds no iPod"
                     : pb == null ? "the dock plays no disc" + (dock.isExternalPlaying() ? " (the owner plays one of their own files; only they hear it)" : "")
@@ -131,6 +193,67 @@ public final class DockClientPlayer {
         LOGGER.info("Dock at {}: {}", pos.toShortString(), reason);
     }
 
+    private static boolean inEarshotFactor(Player player, List<DockOutputs.Output> outputs, double factor) {
+        for (DockOutputs.Output o : outputs) {
+            double range = o.range() * factor;
+            if (player.position().distanceToSqr(o.pos()) <= range * range) return true;
+        }
+        return false;
+    }
+
+    private static double nearestDistSq(Player player, List<DockOutputs.Output> outputs) {
+        double best = Double.MAX_VALUE;
+        for (DockOutputs.Output o : outputs) best = Math.min(best, player.position().distanceToSqr(o.pos()));
+        return best;
+    }
+
+    /**
+     * Pauses (or resumes) the music of the nearest dock that is playing for this player, for this player only.
+     * Returns false if no dock is playing in earshot. Resuming joins the song at the dock's live position.
+     */
+    /**
+     * The play/pause key for a dock the player owns: the real pause or resume (everybody hears it).
+     * Returns false if the player owns no playing dock in range (the caller then handles their own iPod).
+     */
+    public static boolean pressPlayPause() {
+        State best = null;
+        for (State s : ALL) {
+            if (s.candidate && s.owned && (best == null || s.distSq < best.distSq)) best = s;
+        }
+        if (best == null || best.dock == null) return false;
+        DockControl.togglePauseAt(best.dock);
+        return true;
+    }
+
+    /**
+     * The listener's only control: stops the music of the nearest dock they hear, for themselves. Nothing else
+     * changes. It ends when they walk out of earshot or the dock starts a new list.
+     */
+    public static void stopForMe() {
+        stopForMe(null);
+    }
+
+    /** Same, for the dock at {@code only} (the one whose iPod screen is open), or the nearest one if null. Returns true if something was stopped. */
+    public static boolean stopForMe(@Nullable BlockPos only) {
+        State best = null;
+        for (State s : ALL) {
+            if (!s.audible || s.owned || s.dock == null) continue;
+            if (only != null && !s.dock.getBlockPos().equals(only)) continue;
+            if (best == null || s.distSq < best.distSq) best = s;
+        }
+        Minecraft mc = Minecraft.getInstance();
+        if (best == null) return false;
+        best.locallyPaused = true;
+        best.pausedSequence = best.lastSequence;
+        stopSounds(best);
+        if (mc.player != null) mc.player.displayClientMessage(Component.translatable("message.icraft.dock.stopped_for_you"), true);
+        return true;
+    }
+
+    private static int pausedSequenceOf(State s) {
+        return s.lastSequence;
+    }
+
     private static boolean inEarshot(Player player, List<DockOutputs.Output> outputs, double margin) {
         for (DockOutputs.Output o : outputs) {
             double range = o.range() + margin;
@@ -144,6 +267,10 @@ public final class DockClientPlayer {
         s.sequence = pb.sequence();
         s.playingOutputs = s.outputs;
 
+        if (dock.isFilesMode()) {
+            startFileSounds(dock, s, pb);
+            return;
+        }
         List<ItemStack> discs = IpodItem.getDiscs(dock.getIpod());
         int index = pb.currentDisc();
         if (index < 0 || index >= discs.size()) {
@@ -177,6 +304,36 @@ public final class DockClientPlayer {
         for (DockOutputs.Output o : s.outputs) {
             IpodSoundInstance sound = IpodSoundInstance.forDock(downmix -> DiscAudio.open(path, downmix),
                     path.toString(), o.pos(), o.volume(), start);
+            s.sounds.add(sound);
+            mc.getSoundManager().play(sound);
+        }
+    }
+
+    // The dock plays shared files: the owner's own originals, or the copy this computer downloaded
+    private static void startFileSounds(DockBlockEntity dock, State s, DockPlayback pb) {
+        List<QueueEntry> queue = dock.getQueue();
+        int index = pb.currentDisc();
+        if (index < 0 || index >= queue.size()) return;
+        QueueEntry entry = queue.get(index);
+        Path file = SharedFiles.pathFor(entry);
+        if (file == null) {
+            s.sequence = -1; // not here yet: try again on the next tick
+            return;
+        }
+        Level level = dock.getLevel();
+        // asked when the stream opens, so the time spent loading is not lost
+        java.util.function.DoubleSupplier start = () -> entry.startTicks() / 20.0 + pb.positionTicks(level.getGameTime()) / 20.0;
+        double end = entry.endTicks() >= 0 ? entry.endTicks() / 20.0 : -1;
+        Minecraft mc = Minecraft.getInstance();
+        String label = entry.title();
+        if (s.outputs.isEmpty()) {
+            IpodSoundInstance sound = IpodSoundInstance.forDock(d -> AudioDecoders.open(file, d), label, null, 1.0F, start, end);
+            s.sounds.add(sound);
+            mc.getSoundManager().play(sound);
+            return;
+        }
+        for (DockOutputs.Output o : s.outputs) {
+            IpodSoundInstance sound = IpodSoundInstance.forDock(d -> AudioDecoders.open(file, d), label, o.pos(), o.volume(), start, end);
             s.sounds.add(sound);
             mc.getSoundManager().play(sound);
         }

@@ -106,12 +106,12 @@ public class IpodPlayer {
     }
 
     public static Component getNowPlayingSubtitle() {
-        return DockControl.isActive() ? Component.translatable("screen.icraft.ipod.discs") : currentSubtitle;
+        return DockControl.isActive() ? DockControl.currentSubtitle() : currentSubtitle;
     }
 
     @Nullable
     public static Path getNowPlayingCover() {
-        return DockControl.isActive() ? null : currentCover;
+        return DockControl.isActive() ? DockControl.currentCover() : currentCover;
     }
 
     public static ItemStack getNowPlayingDisc() {

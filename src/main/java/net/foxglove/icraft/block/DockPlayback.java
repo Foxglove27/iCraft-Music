@@ -3,6 +3,7 @@ package net.foxglove.icraft.block;
 import net.foxglove.icraft.RepeatMode;
 
 import java.util.Random;
+import java.util.function.IntPredicate;
 import java.util.function.IntToLongFunction;
 
 /**
@@ -15,6 +16,7 @@ import java.util.function.IntToLongFunction;
 public final class DockPlayback {
     /** A guard for dock catch-up after a very long gap (for example the chunk was unloaded for days). */
     private static final int MAX_ADVANCES = 10_000;
+    private static final IntPredicate ALL = i -> true;
 
     private int[] order;          // disc indices in play order
     private int index;            // position in 'order'
@@ -97,6 +99,11 @@ public final class DockPlayback {
         return order[index];
     }
 
+    /** The item that comes after the current one in the play order (wraps around), or -1 if there is none. */
+    public int peekNext() {
+        return order.length == 0 ? -1 : order[(index + 1) % order.length];
+    }
+
     /** Ticks into the current disc. */
     public long positionTicks(long now) {
         return paused || stopped ? positionBase : Math.max(0, positionBase + (now - changedAt));
@@ -105,11 +112,16 @@ public final class DockPlayback {
     // ---- changing (all return true when something changed) ----
 
     public void play(int disc, int discCount, boolean shuffle, RepeatMode repeat, long now) {
+        play(disc, discCount, shuffle, repeat, now, 0);
+    }
+
+    /** Like {@link #play(int, int, boolean, RepeatMode, long)}, starting {@code startOffsetTicks} into the first item (a resume). */
+    public void play(int disc, int discCount, boolean shuffle, RepeatMode repeat, long now, long startOffsetTicks) {
         this.shuffle = shuffle;
         this.repeat = repeat;
         order = buildOrder(discCount, disc, shuffle);
         index = shuffle ? 0 : disc;
-        restartAt(0, now);
+        restartAt(Math.max(0, startOffsetTicks), now);
         stopped = false;
         paused = false;
         sequence++;
@@ -137,7 +149,15 @@ public final class DockPlayback {
 
     /** Next disc (wraps around, like the Next button). Also starts a stopped or paused dock. */
     public void next(long now) {
-        index = (index + 1) % order.length;
+        next(now, ALL);
+    }
+
+    /** Like {@link #next(long)}, skipping items that cannot be played (for example a file not uploaded yet). */
+    public void next(long now, IntPredicate playable) {
+        for (int i = 0; i < order.length; i++) {
+            index = (index + 1) % order.length;
+            if (playable.test(currentDisc())) break;
+        }
         restartAt(0, now);
         stopped = false;
         paused = false;
@@ -145,7 +165,14 @@ public final class DockPlayback {
     }
 
     public void previous(long now) {
-        index = Math.floorMod(index - 1, order.length);
+        previous(now, ALL);
+    }
+
+    public void previous(long now, IntPredicate playable) {
+        for (int i = 0; i < order.length; i++) {
+            index = Math.floorMod(index - 1, order.length);
+            if (playable.test(currentDisc())) break;
+        }
         restartAt(0, now);
         stopped = false;
         paused = false;
@@ -154,11 +181,15 @@ public final class DockPlayback {
 
     /** Skips within the disc by {@code delta} ticks. Past the end counts as the disc ending. Ignored while paused or stopped. */
     public void seekBy(long delta, long now, IntToLongFunction lengthOf) {
+        seekBy(delta, now, lengthOf, ALL);
+    }
+
+    public void seekBy(long delta, long now, IntToLongFunction lengthOf, IntPredicate playable) {
         if (stopped || paused) return;
         long target = Math.max(0, positionTicks(now) + delta);
         long length = lengthOf.applyAsLong(currentDisc());
         if (length > 0 && target >= length) {
-            advanceOnEnd(now);
+            advanceOnEnd(now, playable);
         } else {
             restartAt(target, now);
         }
@@ -183,6 +214,11 @@ public final class DockPlayback {
      * something changed. Loops, so a long gap is caught up in one go.
      */
     public boolean tick(long now, IntToLongFunction lengthOf) {
+        return tick(now, lengthOf, ALL);
+    }
+
+    /** Like {@link #tick(long, IntToLongFunction)}; an item that is not playable is skipped when its turn comes. */
+    public boolean tick(long now, IntToLongFunction lengthOf, IntPredicate playable) {
         if (stopped || paused) return false;
         boolean changed = false;
         for (int steps = 0; steps < MAX_ADVANCES; steps++) {
@@ -192,7 +228,7 @@ public final class DockPlayback {
 
             long endTime = changedAt + (length - positionBase); // the moment the disc ended
             changed = true;
-            if (!advanceOnEnd(endTime)) {
+            if (!advanceOnEnd(endTime, playable)) {
                 sequence++;
                 return true;
             }
@@ -210,8 +246,17 @@ public final class DockPlayback {
     }
 
     /** The current disc ended at game time {@code at}. Returns false when playback stopped. */
-    private boolean advanceOnEnd(long at) {
-        if (repeat == RepeatMode.ONE) {
+    private boolean advanceOnEnd(long at, IntPredicate playable) {
+        for (int tries = 0; tries <= order.length; tries++) {
+            if (!advanceOnce(at, playable.test(currentDisc()))) return false;
+            if (playable.test(currentDisc())) return true;
+        }
+        stopped = true; // nothing in the list can be played
+        return false;
+    }
+
+    private boolean advanceOnce(long at, boolean currentPlayable) {
+        if (repeat == RepeatMode.ONE && currentPlayable) {
             restartAt(0, at);
             sequence++;
             return true;

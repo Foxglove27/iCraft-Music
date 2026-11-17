@@ -2,9 +2,17 @@ package net.foxglove.icraft.block;
 
 import net.foxglove.icraft.RepeatMode;
 import net.foxglove.icraft.item.IpodItem;
+import net.foxglove.icraft.ServerConfig;
 import net.foxglove.icraft.net.DockControlPayload;
+import net.foxglove.icraft.net.DockQueuePayload;
+import net.foxglove.icraft.net.share.DockQueues;
+import net.foxglove.icraft.net.share.QueueEntry;
+import net.foxglove.icraft.net.share.ShareServer;
+import net.foxglove.icraft.net.share.SharedFileCache;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.GlobalPos;
 import net.minecraft.core.HolderLookup;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
@@ -54,6 +62,9 @@ public class DockBlockEntity extends BlockEntity {
     // What the dock plays from its disc list (null = nothing). Run by the server, copied to every client.
     @Nullable
     private DockPlayback playback;
+    // The tracks of the list: the iPod's discs, or (file sharing) the owner's own files held on the server
+    private final List<QueueEntry> queue = new ArrayList<>();
+    private boolean filesMode;
     // The owner plays one of their own files at this dock: only they hear it, but everybody sees the notes
     private boolean externalPlaying;
     // For the client's own bookkeeping (what it is playing for this dock); never saved or sent
@@ -81,6 +92,7 @@ public class DockBlockEntity extends BlockEntity {
         this.ownerName = owner.getGameProfile().getName();
         playback = null;
         externalPlaying = false;
+        clearQueue();
         changed();
     }
 
@@ -92,6 +104,7 @@ public class DockBlockEntity extends BlockEntity {
         ownerName = "";
         playback = null;
         externalPlaying = false;
+        clearQueue();
         changed();
         return out;
     }
@@ -142,12 +155,37 @@ public class DockBlockEntity extends BlockEntity {
         return externalPlaying || (playback != null && playback.isPlaying() && !playback.isPaused());
     }
 
+    /** How many tracks the current list has: the iPod's discs, or the shared files. */
     private int discCount() {
-        return IpodItem.getDiscs(ipod).size();
+        return filesMode ? queue.size() : IpodItem.getDiscs(ipod).size();
+    }
+
+    public List<QueueEntry> getQueue() {
+        return new ArrayList<>(queue);
+    }
+
+    /** True if the list is the owner's shared files (not the iPod's discs). */
+    public boolean isFilesMode() {
+        return filesMode;
+    }
+
+    private void clearQueue() {
+        queue.clear();
+        filesMode = false;
+        if (level != null && !level.isClientSide()) DockQueues.remove(GlobalPos.of(level.dimension(), worldPosition));
+    }
+
+    // a shared file can only play once the server has it
+    private boolean playable(int index) {
+        if (!filesMode) return true;
+        if (index < 0 || index >= queue.size()) return false;
+        SharedFileCache cache = SharedFileCache.get();
+        return cache != null && cache.info(queue.get(index).hash()) != null;
     }
 
     /** How long a disc of the docked iPod lasts, in ticks (0 if unknown). Server side. */
     private long discTicks(Level level, int index) {
+        if (filesMode) return index >= 0 && index < queue.size() ? queue.get(index).playTicks() : 0;
         List<ItemStack> discs = IpodItem.getDiscs(ipod);
         if (index < 0 || index >= discs.size()) return 0;
         return JukeboxSong.fromStack(level.registryAccess(), discs.get(index)).map(h -> (long) h.value().lengthInTicks()).orElse(0L);
@@ -172,7 +210,10 @@ public class DockBlockEntity extends BlockEntity {
         int discs = discCount();
         switch (message.action()) {
             case DockControlPayload.PLAY -> {
-                if (message.arg() < 0 || message.arg() >= discs) return;
+                if (message.arg() < 0) return;
+                clearQueue(); // the iPod's own discs
+                discs = discCount();
+                if (message.arg() >= discs) return;
                 playback = DockPlayback.start(discs, message.arg(), message.shuffle(), repeatOf(message.repeat()), now, new Random());
                 externalPlaying = false;
             }
@@ -185,9 +226,9 @@ public class DockBlockEntity extends BlockEntity {
                 switch (message.action()) {
                     case DockControlPayload.PAUSE -> playback.pause(now);
                     case DockControlPayload.RESUME -> playback.resume(now);
-                    case DockControlPayload.NEXT -> playback.next(now);
-                    case DockControlPayload.PREVIOUS -> playback.previous(now);
-                    case DockControlPayload.SEEK -> playback.seekBy(message.arg(), now, i -> discTicks(level, i));
+                    case DockControlPayload.NEXT -> playback.next(now, this::playable);
+                    case DockControlPayload.PREVIOUS -> playback.previous(now, this::playable);
+                    case DockControlPayload.SEEK -> playback.seekBy(message.arg(), now, i -> discTicks(level, i), this::playable);
                     case DockControlPayload.STOP -> playback.stop();
                     case DockControlPayload.MODES -> playback.setModes(message.shuffle(), repeatOf(message.repeat()), discs);
                     default -> { return; }
@@ -195,6 +236,57 @@ public class DockBlockEntity extends BlockEntity {
             }
         }
         changed();
+    }
+
+    /**
+     * The owner starts a list of their own files (file sharing). Server side; everything is checked again:
+     * owner, distance, that sharing is allowed for this player, and every entry.
+     */
+    public void queue(Player player, DockQueuePayload message) {
+        if (level == null || level.isClientSide() || !hasIpod() || !(player instanceof ServerPlayer serverPlayer)) return;
+        claimIfUnowned(player);
+        if (!isOwner(player)) {
+            player.displayClientMessage(Component.translatable("message.icraft.dock.not_yours", ownerName), true);
+            return;
+        }
+        if (player.level() != level || player.distanceToSqr(Vec3.atCenterOf(worldPosition)) > CONTROL_DISTANCE * CONTROL_DISTANCE) return;
+        String why = ShareServer.refusal(serverPlayer);
+        if (why != null) {
+            player.displayClientMessage(Component.translatable("message.icraft.share.refused." + why), true);
+            return;
+        }
+
+        List<QueueEntry> valid = new ArrayList<>();
+        int max = ServerConfig.MAX_QUEUE_ITEMS.get();
+        for (QueueEntry e : message.entries()) {
+            QueueEntry.validated(e.hash(), e.ext(), e.title(), e.album(), e.startTicks(), e.endTicks(), e.lengthTicks())
+                    .ifPresent(valid::add);
+            if (valid.size() >= max) break;
+        }
+        if (valid.isEmpty()) return;
+
+        queue.clear();
+        queue.addAll(valid);
+        filesMode = true;
+        DockQueues.set(GlobalPos.of(level.dimension(), worldPosition), queue);
+
+        long now = level.getGameTime();
+        int start = Math.max(0, Math.min(message.startIndex(), valid.size() - 1));
+        playback = DockPlayback.start(valid.size(), start, message.shuffle(), repeatOf(message.repeat()), now, new Random());
+        playback.play(start, valid.size(), message.shuffle(), repeatOf(message.repeat()), now,
+                Math.max(0, Math.min(message.startOffsetTicks(), valid.get(start).playTicks() - 1)));
+        externalPlaying = false;
+        LOGGER.info("Dock at {}: {} started a list of {} shared files", worldPosition.toShortString(),
+                player.getGameProfile().getName(), valid.size());
+        changed();
+    }
+
+    @Override
+    public void onLoad() {
+        super.onLoad();
+        if (level != null && !level.isClientSide() && filesMode) {
+            DockQueues.set(GlobalPos.of(level.dimension(), worldPosition), queue); // the files of this queue must stay in the cache
+        }
     }
 
     private static RepeatMode repeatOf(int ordinal) {
@@ -238,7 +330,7 @@ public class DockBlockEntity extends BlockEntity {
     public static void serverTick(Level level, BlockPos pos, BlockState state, DockBlockEntity dock) {
         long now = level.getGameTime();
 
-        if (dock.playback != null && dock.playback.isPlaying() && dock.playback.tick(now, i -> dock.discTicks(level, i))) {
+        if (dock.playback != null && dock.playback.isPlaying() && dock.playback.tick(now, i -> dock.discTicks(level, i), dock::playable)) {
             dock.changed();
         }
         // the owner left or logged out while playing one of their own files: nobody is making that music any more
@@ -276,6 +368,9 @@ public class DockBlockEntity extends BlockEntity {
         if (level != null && level.isClientSide()) {
             net.foxglove.icraft.client.ClientHooks.dockRemoved(this); // stop the sounds this dock was playing
         }
+        if (level != null && !level.isClientSide()) {
+            DockQueues.remove(GlobalPos.of(level.dimension(), worldPosition));
+        }
     }
 
     private void changed() {
@@ -305,6 +400,22 @@ public class DockBlockEntity extends BlockEntity {
             tag.putString("ownerName", ownerName);
         }
         tag.putBoolean("external", externalPlaying);
+        tag.putBoolean("filesMode", filesMode);
+        if (!queue.isEmpty()) {
+            ListTag items = new ListTag();
+            for (QueueEntry e : queue) {
+                CompoundTag t = new CompoundTag();
+                t.putString("hash", e.hash());
+                t.putString("ext", e.ext());
+                t.putString("title", e.title());
+                t.putString("album", e.album());
+                t.putInt("start", e.startTicks());
+                t.putInt("end", e.endTicks());
+                t.putInt("length", e.lengthTicks());
+                items.add(t);
+            }
+            tag.put("queue", items);
+        }
         if (playback != null) {
             DockPlayback.Snapshot s = playback.snapshot();
             CompoundTag p = new CompoundTag();
@@ -328,6 +439,16 @@ public class DockBlockEntity extends BlockEntity {
         owner = tag.hasUUID("owner") ? tag.getUUID("owner") : null;
         ownerName = tag.getString("ownerName");
         externalPlaying = tag.getBoolean("external");
+        filesMode = tag.getBoolean("filesMode");
+        queue.clear();
+        if (tag.contains("queue", Tag.TAG_LIST)) {
+            for (Tag raw : tag.getList("queue", Tag.TAG_COMPOUND)) {
+                CompoundTag t = (CompoundTag) raw;
+                queue.add(new QueueEntry(t.getString("hash"), t.getString("ext"), t.getString("title"), t.getString("album"),
+                        t.getInt("start"), t.getInt("end"), t.getInt("length")));
+            }
+        }
+        if (queue.isEmpty()) filesMode = false;
         playback = null;
         if (tag.contains("playback", Tag.TAG_COMPOUND)) {
             CompoundTag p = tag.getCompound("playback");

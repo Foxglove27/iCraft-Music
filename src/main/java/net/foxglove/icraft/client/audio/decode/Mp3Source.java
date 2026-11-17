@@ -78,7 +78,25 @@ public final class Mp3Source extends BlockSource {
 
     @Override
     public long lengthFrames() {
-        return -1; // would need a full scan or a Xing header; not needed yet
+        if (scannedLength == -2) scannedLength = scanLength();
+        return scannedLength;
+    }
+
+    private long scannedLength = -2; // -2 = not counted yet, -1 = could not be counted
+
+    // MP3 has no length in its header: count the frames once (reading only their headers, which is fast)
+    private long scanLength() {
+        try (InputStream raw = new BufferedInputStream(Files.newInputStream(path), 1 << 16)) {
+            Bitstream counter = new Bitstream(raw);
+            long frames = 0;
+            while (counter.readFrame() != null) {
+                counter.closeFrame();
+                frames++;
+            }
+            return frames * samplesPerFrame;
+        } catch (IOException | JavaLayerException e) {
+            return -1;
+        }
     }
 
     @Override

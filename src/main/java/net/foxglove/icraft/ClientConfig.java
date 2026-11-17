@@ -24,6 +24,11 @@ public class ClientConfig {
             .comment("What happens when a track ends: OFF (stop after the last), LIST (start over) or ONE (same track again)")
             .defineEnum("repeat", RepeatMode.OFF);
 
+    public static final ModConfigSpec.BooleanValue DOWNLOAD_SHARED_FILES = BUILDER
+            .comment("Download the music files that other players share at a docking station on a server (private",
+                    "servers only), so you can hear them. Switch off to only see the music notes.")
+            .define("downloadSharedFiles", true);
+
     // The full spec, handed to {@code ModContainer.registerConfig(...)} in the mod constructor.
     public static final ModConfigSpec SPEC = BUILDER.build();
 }

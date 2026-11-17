@@ -52,5 +52,22 @@
   "message.icraft.dock.speaker_added": "Lautsprecher zur Dockingstation hinzugefügt (%s/%s)",
   "message.icraft.dock.speaker_removed": "Lautsprecher von der Dockingstation entfernt (%s/%s)",
   "message.icraft.dock.speaker_lost": "Ein Lautsprecher wurde von der Dockingstation entfernt (%s/%s)",
-  "message.icraft.dock.not_yours": "Dieser iPod gehört %s."
+  "message.icraft.dock.not_yours": "Dieser iPod gehört %s.",
+  "message.icraft.share.notice": "Deine Dateien werden auf diesen Server und zu den Spielern in der Nähe deiner Dockingstation kopiert.",
+  "message.icraft.share.preparing": "Deine Dateien werden vorbereitet...",
+  "message.icraft.share.unreadable": "Eine Datei dieser Liste kann nicht gelesen werden.",
+  "message.icraft.share.sharing": "Teile %s: %s%%",
+  "message.icraft.share.downloading": "Lade %s: %s%%",
+  "message.icraft.share.refused.off": "Dateien teilen ist auf diesem Server ausgeschaltet. Nur du hörst deine Dateien.",
+  "message.icraft.share.refused.not_private": "Dateien teilen funktioniert nur in einem privaten Netzwerk. Nur du hörst deine Dateien.",
+  "message.icraft.share.refused.bad_file": "Diese Datei kann nicht geteilt werden: %s",
+  "message.icraft.share.refused.too_large": "Diese Datei ist zum Teilen zu groß: %s",
+  "message.icraft.share.refused.quota": "Du hast schon zu viel geteilt: %s",
+  "message.icraft.share.refused.cache_full": "Auf dem Server ist kein Platz zum Teilen: %s",
+  "message.icraft.share.refused.bad_data": "Die Dateiübertragung ist fehlgeschlagen: %s",
+  "message.icraft.share.refused.bad_hash": "Die Datei wurde bei der Übertragung beschädigt: %s",
+  "message.icraft.share.refused.not_here": "Du bist nicht in der Nähe einer Dockingstation, die diese Datei spielt.",
+  "message.icraft.share.refused.error": "Der Server konnte diese Datei nicht verarbeiten: %s",
+  "key.icraft.stop_for_me": "iPod: Musik einer Dockingstation für mich stoppen",
+  "message.icraft.dock.stopped_for_you": "Für dich gestoppt. Geh weg und komm zurück, um wieder zuzuhören."
 }
