@@ -24,6 +24,7 @@ runs
 run-data
 CLAUDE.md
 .claude
+.internal
 
 # macOS
 .DS_Store

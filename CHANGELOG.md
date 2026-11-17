@@ -7,19 +7,6 @@ new changes go there until the next version bump.
 ## [0.0.8]
 
 ### Added
-- Long titles scroll through the row when it is selected, so names that did not fit can be read in full.
-- Taking the iPod out of a dock keeps the music going for you: your own song carries on in your ears from the same second,
-  and a music disc the dock was playing continues at about the same position.
-- **Search** in the iPod menu (between Podcasts and Settings): type on the keyboard and the list of matching albums, songs,
-  audiobooks, chapters, podcasts and episodes (including the NAS) filters live; accents and capitals do not matter
-  ("avici" finds "AVĪCI"). Backspace deletes a letter, Enter or a click plays or opens the result, and the Menu button of
-  an opened result goes back to the results.
-- **Big libraries and network shares.** `extraMusicFolders`, `extraAudiobookFolders` and `extraPodcastFolders` in
-  `icraft-client.toml` add more folders (absolute, or relative to the game folder; for example a mounted NAS share) to the
-  library. Everything from the extra folders gets its own **NAS** entry in the iPod menu (between Music and Audiobooks, shown only
-  when an extra folder is set) with a submenu of Music, Audiobooks and Podcasts; the normal Music, Audiobooks and Podcasts
-  pages only show the local folders. A network share has to be mounted first (use the mount path; `smb://` addresses do not work). A folder that directly contains audio files is an album, book or show, up to three levels deep, so
-  `Artist/Album` shows as "Artist - Album". The mod never writes into these folders.
 - **Other players hear a dock's speakers.** Music discs that play in a dock are now heard by everybody near its
   speakers, and everybody sees the music notes. Someone who walks up while a song is playing hears it from the
   current position.
@@ -29,6 +16,37 @@ new changes go there until the next version bump.
   also with the keys). Others get a message who it belongs to. Only that player (or an operator) can take the iPod
   out. When the owner plays one of their own files at a dock, only they hear it, but everybody sees the notes.
 - Music discs played from a dock can be skipped through by holding Next or Previous.
+- Other players can stop a dock's music for themselves: double-click the middle wheel button in the dock's iPod screen,
+  or use the new key (default `\`, "iPod: Stop a dock's music for me"). Nothing changes for the owner or anybody else;
+  it stays stopped through the next songs and ends when they walk away and come back, or when the dock stops.
+- **Big libraries and network shares.** `extraMusicFolders`, `extraAudiobookFolders` and `extraPodcastFolders` in
+  `icraft-client.toml` add more folders to the library (absolute, or relative to the game folder). A network share has
+  to be mounted first and its mount path used (`smb://` addresses do not work). A folder that directly contains audio
+  files is an album, book or show, up to three levels deep, so `Artist/Album` shows as "Artist - Album". The mod never
+  writes into these folders.
+- **NAS** entry in the iPod menu (between Music and Audiobooks, shown only when an extra folder is set) with a submenu
+  of Music, Audiobooks and Podcasts for the extra folders; the normal pages only show the local folders.
+- **Search** in the iPod menu (between Podcasts and Settings): type on the keyboard and the matching albums, songs,
+  audiobooks, chapters, podcasts and episodes (including the NAS) are listed live; accents and capitals do not matter
+  ("avici" finds "AVĪCI"). Enter or a click plays or opens the result, Backspace deletes a letter, and the Menu button
+  of an opened result goes back to the results.
+- Long titles scroll through the row when it is selected, so names that did not fit can be read in full.
+- Taking the iPod out of a dock keeps the music going for you: your own song carries on in your ears from the same
+  second, and a music disc the dock was playing continues at about the same position.
+
+### Changed
+- The library is scanned in the background (when you join a world and when the iPod opens), so a big library or a slow
+  share no longer freezes the game; the lists update when the scan is done ("Scanning library..."). Album covers also
+  load in the background, and animated dots after the title show that a scan is running.
+- Saved audiobook and podcast positions now live in `icraft-progress.json` in the game folder instead of inside the
+  library (an old `ipod/.icraft-progress.json` is read once as the starting point and left alone).
+- Songs no longer remember where you stopped and the song list shows no saved time: they always start from the
+  beginning. Only audiobook chapters and podcast episodes resume.
+- Ogg files up to 256 MiB are read into memory instead of memory-mapped, so a network share that disappears while a
+  song plays ends the song with a message instead of crashing the game.
+- Music discs in a dock are played by the mod itself instead of the game's own disc player, so they can start in
+  the middle. Discs played from an iPod you hold are unchanged.
+- The selected row of the iPod list is a dark grey bar with white text.
 
 ### Fixed
 - A dock that already held an iPod before this version had no owner, so nobody could control it (and no notes or
@@ -36,19 +54,6 @@ new changes go there until the next version bump.
 - Putting an iPod that is playing into a dock no longer leaves the music stuck and impossible to resume. A song or
   chapter carries on through the dock's speakers; a music disc is handed to the dock and plays from its start.
 - A dock without any speaker now plays its discs in its owner's own ears (it was silent).
-
-### Changed
-- Songs no longer remember where you stopped (and the song list shows no saved time any more): they always start from the
-  beginning. Only audiobook chapters and podcast episodes resume.
-- The library is scanned in the background (when you join a world and when the iPod opens), so a big library or a slow
-  share no longer freezes the game; the lists update when the scan is done ("Scanning library..."). Album covers also
-  load in the background; animated dots after the title show that a scan is running.
-- Saved audiobook, podcast and song positions now live in `icraft-progress.json` in the game folder instead of inside
-  the library (an old `ipod/.icraft-progress.json` is read once as the starting point and left alone).
-- Ogg files up to 256 MiB are read into memory instead of memory-mapped, so a network share that disappears while a
-  song plays ends the song with a message instead of crashing the game.
-- Music discs in a dock are played by the mod itself instead of the game's own disc player, so they can start in
-  the middle. Discs played from an iPod you hold are unchanged.
 
 ## [0.0.7]
 

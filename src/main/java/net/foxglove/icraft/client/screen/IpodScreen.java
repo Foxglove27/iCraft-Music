@@ -1,6 +1,7 @@
 package net.foxglove.icraft.client.screen;
 
 import com.mojang.math.Axis;
+import net.foxglove.icraft.client.DockClientPlayer;
 import net.foxglove.icraft.client.DockControl;
 import net.foxglove.icraft.client.IpodPlayer;
 import net.foxglove.icraft.client.IpodSettings;
@@ -945,6 +946,9 @@ public class IpodScreen extends Screen {
         if (pendingActivateAt >= 0) {
             // A click was already waiting, so this is the second one: a double-click
             pendingActivateAt = -1;
+            if (dock != null && !dockOwner && DockClientPlayer.stopForMe(dock.pos())) {
+                return; // not their dock: the double-click stops the music for them only
+            }
             if (IpodPlayer.isPlaying()) {
                 DockControl.stop(); // a dock that plays discs stops too
                 IpodPlayer.stop();

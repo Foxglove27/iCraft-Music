@@ -65,5 +65,7 @@
   "screen.icraft.ipod.result_chapter": "Chapter",
   "screen.icraft.ipod.result_show": "Show",
   "screen.icraft.ipod.result_episode": "Episode",
-  "screen.icraft.ipod.result_disc": "Disc"
+  "screen.icraft.ipod.result_disc": "Disc",
+  "key.icraft.stop_for_me": "iPod: Stop a dock's music for me",
+  "message.icraft.dock.stopped_for_you": "Stopped for you. Walk away and come back to listen again."
 }

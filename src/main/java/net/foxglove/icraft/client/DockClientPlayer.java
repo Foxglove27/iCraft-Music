@@ -9,6 +9,8 @@ import net.foxglove.icraft.item.IpodItem;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.resources.sounds.SoundInstance;
 import net.minecraft.core.BlockPos;
+import net.minecraft.network.chat.Component;
+import org.jetbrains.annotations.Nullable;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.player.Player;
@@ -47,6 +49,11 @@ public final class DockClientPlayer {
         List<DockOutputs.Output> playingOutputs = List.of();
         final List<SoundInstance> sounds = new ArrayList<>();
         boolean failedLogged;
+        DockBlockEntity dock;   // the block entity this state belongs to
+        boolean owned;          // the player owns this dock
+        boolean audible;        // playing and in earshot (before a stop by the player)
+        double distSq = Double.MAX_VALUE; // squared distance to the nearest speaker
+        boolean locallyStopped; // this player stopped the dock's music for themselves
         String lastReason = ""; // what the dock last told the log, so it is logged only when it changes
         long checkAt = Long.MAX_VALUE; // when to log whether the started sounds are really playing
 
@@ -98,6 +105,21 @@ public final class DockClientPlayer {
         boolean discPlaying = dock.hasIpod() && pb != null && pb.isPlaying() && !pb.isPaused()
                 && (!s.outputs.isEmpty() || ownerEars);
         boolean heard = ownerEars || inEarshot(player, s.outputs, s.isPlaying() ? STOP_MARGIN : START_MARGIN);
+        s.dock = dock;
+        s.owned = dock.hasIpod() && dock.isOwner(player);
+        s.audible = discPlaying && heard;
+        s.distSq = nearestDistSq(player, s.outputs);
+        // A stop by the player ends only when they really leave earshot (wide margin, so the edge cannot flip it)
+        // or the dock's list stops; track changes and the owner's pause do not bring the sound back.
+        boolean playingList = dock.hasIpod() && pb != null && pb.isPlaying();
+        if (s.locallyStopped && (!(ownerEars || inEarshot(player, s.outputs, STOP_MARGIN)) || !playingList)) {
+            s.locallyStopped = false;
+        }
+        if (s.locallyStopped) {
+            log(s, pos, "stopped by you");
+            stopSounds(s);
+            return;
+        }
         if (!discPlaying || !heard) {
             log(s, pos, !dock.hasIpod() ? "the dock holds no iPod"
                     : pb == null ? "the dock plays no disc" + (dock.isExternalPlaying() ? " (the owner plays one of their own files; only they hear it)" : "")
@@ -129,6 +151,36 @@ public final class DockClientPlayer {
         if (reason.equals(s.lastReason)) return;
         s.lastReason = reason;
         LOGGER.info("Dock at {}: {}", pos.toShortString(), reason);
+    }
+
+    private static double nearestDistSq(Player player, List<DockOutputs.Output> outputs) {
+        double best = Double.MAX_VALUE;
+        for (DockOutputs.Output o : outputs) best = Math.min(best, player.position().distanceToSqr(o.pos()));
+        return best;
+    }
+
+    /**
+     * The listener's only control: stops the music of the nearest dock they hear (and do not own), for themselves.
+     * Nothing else changes. It ends when they walk out of earshot or the dock's list stops.
+     */
+    public static void stopForMe() {
+        stopForMe(null);
+    }
+
+    /** Same for the dock at {@code only} (the one whose iPod screen is open), or the nearest if null. True if something was stopped. */
+    public static boolean stopForMe(@Nullable BlockPos only) {
+        State best = null;
+        for (State s : ALL) {
+            if (!s.audible || s.owned || s.dock == null) continue;
+            if (only != null && !s.dock.getBlockPos().equals(only)) continue;
+            if (best == null || s.distSq < best.distSq) best = s;
+        }
+        if (best == null) return false;
+        best.locallyStopped = true;
+        stopSounds(best);
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.player != null) mc.player.displayClientMessage(Component.translatable("message.icraft.dock.stopped_for_you"), true);
+        return true;
     }
 
     private static boolean inEarshot(Player player, List<DockOutputs.Output> outputs, double margin) {
