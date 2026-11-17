@@ -4,7 +4,7 @@ import net.neoforged.neoforge.common.ModConfigSpec;
 
 /**
  * Client-side configuration, registered as {@code ModConfig.Type.CLIENT} in {@link iCraft}.
- * Written to {@code config/icraft-client.toml}; loaded on physical clients only,
+ * Written to {@code config/icraft_music-client.toml}; loaded on physical clients only,
  * never on dedicated servers.
  */
 public class ClientConfig {
@@ -28,6 +28,27 @@ public class ClientConfig {
             .comment("Download the music files that other players share at a docking station on a server (private",
                     "servers only), so you can hear them. Switch off to only see the music notes.")
             .define("downloadSharedFiles", true);
+
+    public static final ModConfigSpec.ConfigValue<java.util.List<? extends String>> EXTRA_MUSIC_FOLDERS = BUILDER
+            .comment("Extra folders to read music from, in addition to <game folder>/ipod/music (for example a mounted",
+                    "network share). Absolute paths, or relative to the game folder. A share must be mounted first",
+                    "(smb:// addresses do not work; use the mount path, e.g. /mnt/nas-music or //nas/music on Windows). Albums are folders that directly",
+                    "contain audio files; Artist/Album folders are shown as 'Artist - Album'. The mod never writes there.")
+            .defineListAllowEmpty("extraMusicFolders", java.util.List.of(), () -> "", o -> o instanceof String);
+
+    public static final ModConfigSpec.ConfigValue<java.util.List<? extends String>> EXTRA_AUDIOBOOK_FOLDERS = BUILDER
+            .comment("Extra folders to read audiobooks from, in addition to <game folder>/ipod/audiobooks.",
+                    "One folder per book (also Author/Book).")
+            .defineListAllowEmpty("extraAudiobookFolders", java.util.List.of(), () -> "", o -> o instanceof String);
+
+    public static final ModConfigSpec.ConfigValue<java.util.List<? extends String>> EXTRA_PODCAST_FOLDERS = BUILDER
+            .comment("Extra folders to read podcasts from, in addition to <game folder>/ipod/podcasts.",
+                    "One folder per show.")
+            .defineListAllowEmpty("extraPodcastFolders", java.util.List.of(), () -> "", o -> o instanceof String);
+
+    public static final ModConfigSpec.BooleanValue SILENCE_BACKGROUND_MUSIC = BUILDER
+            .comment("Stop the game's own background music while an iPod or a dock plays music for you")
+            .define("silenceBackgroundMusic", true);
 
     // The full spec, handed to {@code ModContainer.registerConfig(...)} in the mod constructor.
     public static final ModConfigSpec SPEC = BUILDER.build();

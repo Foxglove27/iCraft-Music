@@ -3,7 +3,7 @@ package net.foxglove.icraft;
 import net.neoforged.neoforge.common.ModConfigSpec;
 
 /**
- * Server-side settings (<code>serverconfig/icraft-server.toml</code> in the world folder). They are sent to the
+ * Server-side settings (<code>serverconfig/icraft_music-server.toml</code> in the world folder). They are sent to the
  * players on joining, so the game knows whether file sharing is on.
  *
  * File sharing copies a player's own music, audiobooks and podcasts to the server and from there to the players

@@ -19,6 +19,8 @@ import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.BaseEntityBlock;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Mirror;
+import net.minecraft.world.level.block.Rotation;
 import net.minecraft.world.level.block.RenderShape;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntityTicker;
@@ -57,6 +59,17 @@ public class DockBlock extends BaseEntityBlock {
     @Override
     protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState> builder) {
         builder.add(FACING);
+    }
+
+    // A structure block (rotation / mirror on load) turns the block with the structure
+    @Override
+    protected BlockState rotate(BlockState state, Rotation rotation) {
+        return state.setValue(FACING, rotation.rotate(state.getValue(FACING)));
+    }
+
+    @Override
+    protected BlockState mirror(BlockState state, Mirror mirror) {
+        return state.rotate(mirror.getRotation(state.getValue(FACING)));
     }
 
     @Override
@@ -108,14 +121,14 @@ public class DockBlock extends BaseEntityBlock {
         }
         if (!level.isClientSide()) {
             if (dock.hasIpod()) {
-                player.displayClientMessage(Component.translatable("message.icraft.dock.full"), true);
+                player.displayClientMessage(Component.translatable("message.icraft_music.dock.full"), true);
             } else {
                 ItemStack docked = stack.split(1);
                 if (!docked.has(ModDataComponents.IPOD_ID.get())) { // a fresh iPod has no ID before it was in an inventory
                     docked.set(ModDataComponents.IPOD_ID.get(), UUID.randomUUID());
                 }
                 dock.setIpod(docked, player);
-                player.displayClientMessage(Component.translatable("message.icraft.dock.docked"), true);
+                player.displayClientMessage(Component.translatable("message.icraft_music.dock.docked"), true);
             }
         }
         return ItemInteractionResult.sidedSuccess(level.isClientSide());
@@ -129,19 +142,22 @@ public class DockBlock extends BaseEntityBlock {
 
         if (!dock.hasIpod()) {
             if (!level.isClientSide()) {
-                player.displayClientMessage(Component.translatable("message.icraft.dock.empty"), true);
+                player.displayClientMessage(Component.translatable("message.icraft_music.dock.empty"), true);
             }
             return InteractionResult.sidedSuccess(level.isClientSide());
         }
         dock.claimIfUnowned(player); // a dock filled by an older version belongs to whoever uses it first
 
         if (player.isShiftKeyDown()) {
+            if (level.isClientSide() && (dock.isOwner(player) || player.hasPermissions(2))) {
+                ClientHooks.ipodTakenFromDock(dock); // what the dock plays carries on for this player
+            }
             if (!level.isClientSide()) {
                 if (dock.isOwner(player) || player.hasPermissions(2)) { // the owner, or an operator / creative
                     player.getInventory().placeItemBackInInventory(dock.takeIpod());
-                    player.displayClientMessage(Component.translatable("message.icraft.dock.taken"), true);
+                    player.displayClientMessage(Component.translatable("message.icraft_music.dock.taken"), true);
                 } else {
-                    player.displayClientMessage(Component.translatable("message.icraft.dock.not_yours", dock.getOwnerName()), true);
+                    player.displayClientMessage(Component.translatable("message.icraft_music.dock.not_yours", dock.getOwnerName()), true);
                 }
             }
         } else if (level.isClientSide()) {

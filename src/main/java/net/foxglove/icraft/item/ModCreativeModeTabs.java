@@ -18,7 +18,7 @@ public class ModCreativeModeTabs {
 
     public static final Supplier<CreativeModeTab> ICRAFT_TAB = CREATIVE_MODE_TAB.register("icraft_tab",
             () -> CreativeModeTab.builder().icon(() -> new ItemStack(ModItems.IPOD.get()))
-                    .title(Component.translatable("creativetab.icraft.ipod"))
+                    .title(Component.translatable("creativetab.icraft_music.ipod"))
                     .displayItems((itemDisplayParameters, output) -> {
                         for (DeferredItem<IpodItem> ipod : ModItems.IPODS.values()) {
                             output.accept(ipod);

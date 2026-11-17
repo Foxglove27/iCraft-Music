@@ -37,13 +37,14 @@ public final class DockPlayback {
     // ---- creating ----
 
     /** Starts the list at disc {@code start}. */
-    public static DockPlayback start(int discCount, int start, boolean shuffle, RepeatMode repeat, long now, Random random) {
+    public static DockPlayback start(int discCount, int start, boolean shuffle, RepeatMode repeat, long now, Random random,
+                                     long startTicks) {
         DockPlayback p = new DockPlayback(random);
         p.shuffle = shuffle;
         p.repeat = repeat;
         p.order = p.buildOrder(discCount, start, shuffle);
         p.index = shuffle ? 0 : start;
-        p.positionBase = 0;
+        p.positionBase = Math.max(0, startTicks);
         p.changedAt = now;
         p.sequence = 1;
         return p;

@@ -18,7 +18,7 @@ import java.util.Map;
 
 /**
  * Where the player stopped in each audiobook chapter. Saved on the client in
- * <code>ipod/.icraft-progress.json</code>:
+ * <code>icraft_music-progress.json</code> in the game folder:
  * <pre>{ "audiobooks/Book": { "last": "audiobooks/Book/ch2.mp3", "pos": { "audiobooks/Book/ch2.mp3": 123.4 } } }</pre>
  * Every problem with the file is logged and ignored: losing progress must never break playback.
  */
@@ -31,15 +31,17 @@ public final class AudiobookProgress {
         Map<String, Double> pos = new LinkedHashMap<>();
     }
 
-    /** Reserved "book" that holds the positions of songs played while the iPod is linked to a speaker. */
-    public static final String MUSIC = "music";
-    private static final int MAX_MUSIC_ENTRIES = 200;
-
     private static Map<String, BookState> books;
 
     private AudiobookProgress() {}
 
+    // Progress is kept in the game folder, never in the library (which may be a read-only network share)
     private static Path file() {
+        return net.minecraft.client.Minecraft.getInstance().gameDirectory.toPath().resolve("icraft_music-progress.json");
+    }
+
+    // The file older versions wrote into the library folder; only read, once, if the new file does not exist yet
+    private static Path legacyFile() {
         return LocalMusic.libraryRoot().resolve(".icraft-progress.json");
     }
 
@@ -47,6 +49,7 @@ public final class AudiobookProgress {
         if (books != null) return books;
         books = new LinkedHashMap<>();
         Path file = file();
+        if (!Files.isRegularFile(file) && Files.isRegularFile(legacyFile())) file = legacyFile();
         if (Files.isRegularFile(file)) {
             try (Reader in = Files.newBufferedReader(file, StandardCharsets.UTF_8)) {
                 Map<String, BookState> read = GSON.fromJson(in,
@@ -92,13 +95,8 @@ public final class AudiobookProgress {
     public static void save(String bookKey, String chapterKey, double seconds) {
         BookState b = load().computeIfAbsent(bookKey, k -> new BookState());
         b.last = chapterKey;
-        b.pos.remove(chapterKey); // re-adding moves it to the end, so the oldest entries are the ones dropped below
+        b.pos.remove(chapterKey);
         b.pos.put(chapterKey, Math.round(seconds * 10) / 10.0);
-        if (bookKey.equals(MUSIC)) {
-            while (b.pos.size() > MAX_MUSIC_ENTRIES) {
-                b.pos.remove(b.pos.keySet().iterator().next());
-            }
-        }
         write();
     }
 

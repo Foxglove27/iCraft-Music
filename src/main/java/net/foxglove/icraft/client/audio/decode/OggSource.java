@@ -15,10 +15,14 @@ import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 
 /**
- * Ogg Vorbis through LWJGL's stb_vorbis. The file is memory-mapped, not copied into memory, so
- * only the parts being played are loaded and the size limit is the 2 GiB of a single mapping.
+ * Ogg Vorbis through LWJGL's stb_vorbis. Files up to {@link #READ_LIMIT} are read into a direct buffer in
+ * chunks (so a network share that disappears mid-song fails as an ordinary read error, not a crash of the
+ * game); bigger files are memory-mapped, so only the parts being played are loaded (limit 2 GiB).
  */
 public final class OggSource implements PcmSource {
+    /** Files up to this size are copied into memory instead of being mapped. */
+    public static final long READ_LIMIT = 256L * 1024 * 1024;
+
     private ByteBuffer mapped;
     private final boolean isMapped; // a mapped file is released when closed; a buffer from memory is left to the GC
     private final long handle;
@@ -29,7 +33,26 @@ public final class OggSource implements PcmSource {
     private boolean closed;
 
     public OggSource(Path path) throws IOException {
-        this(mapFile(path), true, path.getFileName().toString());
+        this(load(path), isMappedSize(path), path.getFileName().toString());
+    }
+
+    private static boolean isMappedSize(Path path) throws IOException {
+        return java.nio.file.Files.size(path) > READ_LIMIT;
+    }
+
+    // small files: read in chunks (safe on network shares); big files: map
+    private static ByteBuffer load(Path path) throws IOException {
+        try (FileChannel ch = FileChannel.open(path, StandardOpenOption.READ)) {
+            long size = ch.size();
+            if (size == 0) throw new IOException("File is empty");
+            if (size > READ_LIMIT) return mapFile(path);
+            ByteBuffer buffer = BufferUtils.createByteBuffer((int) size);
+            while (buffer.hasRemaining()) {
+                if (ch.read(buffer) < 0) throw new IOException("The file ended early");
+            }
+            buffer.flip();
+            return buffer;
+        }
     }
 
     /** Decodes an Ogg Vorbis file that is already in memory ({@code data} must be a direct buffer). */

@@ -4,19 +4,50 @@ All notable changes to iCraft, newest version first, following
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The top section is the version in `gradle.properties`;
 new changes go there until the next version bump.
 
-## [0.0.8]
+## [0.1.0]
 
 ### Added
-- Other players can stop a dock's music for themselves with a double-click on the middle wheel button of the dock's iPod screen, or with their own key (default `\`, "iPod: Stop a dock's music for me"). Nothing
-  else changes for anybody; it stays stopped through the next songs and ends when they walk away and come back, or when the dock stops.
 - **Private file sharing at a dock** (off by default). With `allowFileSharing=true` in the world's
-  `serverconfig/icraft-server.toml`, the player who docked the iPod can play their own music, audiobooks and
+  `serverconfig/icraft_music-server.toml`, the player who docked the iPod can play their own music, audiobooks and
   podcasts for everybody near the dock: the files are copied to the server, the other players download them
-  automatically (and can turn that off with `downloadSharedFiles` in `icraft-client.toml`), and late joiners hear
+  automatically (and can turn that off with `downloadSharedFiles` in `icraft_music-client.toml`), and late joiners hear
   them from the current position. The dock keeps playing when the owner leaves. Resume positions stay with the
   owner. For private use only: sharing is refused for players who are not on a private network address
   (`privateNetworkOnly`, on by default), the cache has size, per-player and age limits, and whoever runs the server is
   responsible for the licences of what is shared.
+
+### Fixed
+- Owners no longer download their own shared files.
+
+## [0.0.9]
+
+### Changed
+- Take the last disc out of an iPod in your hand with Ctrl + right-click (it was Shift + right-click, which clashed with
+  sneaking). Shift + right-click now simply opens the iPod. Taking a disc out in the inventory is unchanged.
+- A music disc that plays from your iPod carries on from the same second when you put the iPod into a dock (it used to
+  start again from the beginning).
+
+### Fixed
+- The game's own background music no longer starts over the iPod or a dock's music while it plays for you (it comes back
+  afterwards). Switch: `silenceBackgroundMusic` in `icraft_music-client.toml`.
+- Music recovers by itself when the game drops the sound: after the volume was set to 0 and back, after switching the
+  audio device, and after walking away from a dock and back (the song carries on at the right second).
+- Previous now keeps going back when it lands on a track that cannot be played (it used to jump forward again).
+- Holding Backspace in the iPod no longer jumps back through several menus; a held key only goes back one level.
+- Stacking speakers on a finished 2x4 wall no longer plays the "wall formed" chime and animation again.
+- Skipping tracks with several speakers at a dock no longer leaves the new track silent until the second press: the new
+  sounds now wait until the old speakers have given up their audio channels.
+- Breaking an extra speaker on a finished wall no longer plays the "wall broken" cue while a complete wall is still standing.
+- Shuffle and repeat are saved the moment you change them, not only when the iPod screen closes.
+- Speakers and docks keep facing the right way when a structure is rotated or mirrored.
+- Album covers are released again when you scroll past them, so a huge library no longer fills up video memory.
+- A big network library is no longer read again every time you open the iPod (at most every 30 seconds).
+- The speakers of a dock now start a track at the same moment (less echo at the start).
+- A song that is skipped while it is still loading no longer leaves its file open.
+
+## [0.0.8]
+
+### Added
 - **Other players hear a dock's speakers.** Music discs that play in a dock are now heard by everybody near its
   speakers, and everybody sees the music notes. Someone who walks up while a song is playing hears it from the
   current position.
@@ -26,19 +57,44 @@ new changes go there until the next version bump.
   also with the keys). Others get a message who it belongs to. Only that player (or an operator) can take the iPod
   out. When the owner plays one of their own files at a dock, only they hear it, but everybody sees the notes.
 - Music discs played from a dock can be skipped through by holding Next or Previous.
+- Other players can stop a dock's music for themselves: double-click the middle wheel button in the dock's iPod screen,
+  or use the new key (default `\`, "iPod: Stop a dock's music for me"). Nothing changes for the owner or anybody else;
+  it stays stopped through the next songs and ends when they walk away and come back, or when the dock stops.
+- **Big libraries and network shares.** `extraMusicFolders`, `extraAudiobookFolders` and `extraPodcastFolders` in
+  `icraft_music-client.toml` add more folders to the library (absolute, or relative to the game folder). A network share has
+  to be mounted first and its mount path used (`smb://` addresses do not work). A folder that directly contains audio
+  files is an album, book or show, up to three levels deep, so `Artist/Album` shows as "Artist - Album". The mod never
+  writes into these folders.
+- **NAS** entry in the iPod menu (between Music and Audiobooks, shown only when an extra folder is set) with a submenu
+  of Music, Audiobooks and Podcasts for the extra folders; the normal pages only show the local folders.
+- **Search** in the iPod menu (between Podcasts and Settings): type on the keyboard and the matching albums, songs,
+  audiobooks, chapters, podcasts and episodes (including the NAS) are listed live; accents and capitals do not matter
+  ("avici" finds "AVĪCI"). Enter or a click plays or opens the result, Backspace deletes a letter, and the Menu button
+  of an opened result goes back to the results.
+- Long titles scroll through the row when it is selected, so names that did not fit can be read in full.
+- Taking the iPod out of a dock keeps the music going for you: your own song carries on in your ears from the same
+  second, and a music disc the dock was playing continues at about the same position.
+
+### Changed
+- The library is scanned in the background (when you join a world and when the iPod opens), so a big library or a slow
+  share no longer freezes the game; the lists update when the scan is done ("Scanning library..."). Album covers also
+  load in the background, and animated dots after the title show that a scan is running.
+- Saved audiobook and podcast positions now live in `icraft_music-progress.json` in the game folder instead of inside the
+  library (an old `ipod/.icraft-progress.json` is read once as the starting point and left alone).
+- Songs no longer remember where you stopped and the song list shows no saved time: they always start from the
+  beginning. Only audiobook chapters and podcast episodes resume.
+- Ogg files up to 256 MiB are read into memory instead of memory-mapped, so a network share that disappears while a
+  song plays ends the song with a message instead of crashing the game.
+- Music discs in a dock are played by the mod itself instead of the game's own disc player, so they can start in
+  the middle. Discs played from an iPod you hold are unchanged.
+- The selected row of the iPod list is a dark grey bar with white text.
 
 ### Fixed
-- The play/pause key only controls docks you own; a listener's stop no longer ends by itself at the edge of the speaker range.
-- Owners no longer download their own shared files.
 - A dock that already held an iPod before this version had no owner, so nobody could control it (and no notes or
   sound followed). It now belongs to the first player who uses it.
 - Putting an iPod that is playing into a dock no longer leaves the music stuck and impossible to resume. A song or
   chapter carries on through the dock's speakers; a music disc is handed to the dock and plays from its start.
 - A dock without any speaker now plays its discs in its owner's own ears (it was silent).
-
-### Changed
-- Music discs in a dock are played by the mod itself instead of the game's own disc player, so they can start in
-  the middle. Discs played from an iPod you hold are unchanged.
 
 ## [0.0.7]
 
@@ -124,7 +180,7 @@ new changes go there until the next version bump.
 
 ### Added
 - **Shuffle and repeat.** New Settings page with `Shuffle: On/Off` and `Repeat: Off/List/One`. Both are
-  global (stored in `config/icraft-client.toml`, not per iPod) and take effect immediately, also while a
+  global (stored in `config/icraft_music-client.toml`, not per iPod) and take effect immediately, also while a
   song is playing. Next/Previous follow the shuffled order.
 - **Top-level menu** (Music, Settings). The iPod now opens on it; the Menu button goes up one level.
 

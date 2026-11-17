@@ -1,6 +1,6 @@
 {
   "values": [
-    "icraft:speaker",
-    "icraft:dock"
+    "icraft_music:speaker",
+    "icraft_music:dock"
   ]
 }

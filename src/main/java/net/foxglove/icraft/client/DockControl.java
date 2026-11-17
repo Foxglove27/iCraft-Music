@@ -40,6 +40,7 @@ public final class DockControl {
     @Nullable
     private static GlobalPos pendingDock;
     private static int pendingDisc;
+    private static double pendingSeconds;
     private static int pendingTicks;
 
     /**
@@ -48,7 +49,7 @@ public final class DockControl {
      * saved position lives (the key and the next item's key, as for audiobooks).
      */
     public record FileItem(Path file, Component title, Component album, @Nullable Path cover, double startSeconds,
-                           double endSeconds, String progressBook, String progressKey, @Nullable String nextKey) {}
+                           double endSeconds, @Nullable String progressBook, String progressKey, @Nullable String nextKey) {}
 
     // The list this player started at a dock: the tracks (a window of the album) and where the window starts
     private record Meta(List<FileItem> items, int offset) {}
@@ -94,7 +95,7 @@ public final class DockControl {
 
     public static Component currentSubtitle() {
         FileItem item = currentItem();
-        return item != null ? item.album() : Component.translatable("screen.icraft.ipod.discs");
+        return item != null ? item.album() : Component.translatable("screen.icraft_music.ipod.discs");
     }
 
     @Nullable
@@ -111,7 +112,7 @@ public final class DockControl {
         if (album.isEmpty() || startIndex < 0 || startIndex >= album.size()) return;
         IpodPlayer.stop();
         Minecraft mc = Minecraft.getInstance();
-        if (mc.player != null) mc.player.displayClientMessage(Component.translatable("message.icraft.share.preparing"), true);
+        if (mc.player != null) mc.player.displayClientMessage(Component.translatable("message.icraft_music.share.preparing"), true);
 
         int from = Math.max(0, startIndex - WINDOW_BEFORE);
         int to = Math.min(album.size(), from + DockQueuePayload.MAX_ENTRIES);
@@ -143,7 +144,7 @@ public final class DockControl {
             return new Object[]{entries, uploads};
         }, Util.backgroundExecutor()).thenAccept(result -> mc.execute(() -> {
             if (result == null) {
-                if (mc.player != null) mc.player.displayClientMessage(Component.translatable("message.icraft.share.unreadable"), true);
+                if (mc.player != null) mc.player.displayClientMessage(Component.translatable("message.icraft_music.share.unreadable"), true);
                 return;
             }
             @SuppressWarnings("unchecked") List<QueueEntry> entries = (List<QueueEntry>) result[0];
@@ -154,7 +155,7 @@ public final class DockControl {
             lastIndex = -1;
             lastDock = dock;
             FileItem first = window.get(startInWindow);
-            double saved = AudiobookProgress.get(first.progressBook(), first.progressKey());
+            double saved = first.progressBook() == null ? 0 : AudiobookProgress.get(first.progressBook(), first.progressKey()); // songs are not resumed
             int offsetTicks = (int) Math.round(Math.max(0, saved - 2.0) * 20); // a little earlier than where it was left
             PacketDistributor.sendToServer(new DockQueuePayload(dock.pos(), startInWindow, offsetTicks, shuffle, repeat, entries));
         }));
@@ -166,6 +167,7 @@ public final class DockControl {
         Meta m = meta;
         if (m == null || index < 0 || index >= m.items().size()) return;
         FileItem item = m.items().get(index);
+        if (item.progressBook() == null) return; // songs keep no position
         if (seconds >= length - 3.0) { // played to the end
             AudiobookProgress.finish(item.progressBook(), item.progressKey(), item.nextKey());
         } else if (seconds >= 1.0) {
@@ -206,9 +208,10 @@ public final class DockControl {
     }
 
     /** Starts disc {@code index} on the dock once it has reported that it holds the iPod (a few ticks). */
-    public static void playWhenDocked(GlobalPos dock, int index) {
+    public static void playWhenDocked(GlobalPos dock, int index, double seconds) {
         pendingDock = dock;
         pendingDisc = index;
+        pendingSeconds = seconds;
         pendingTicks = 60;
     }
 
@@ -222,7 +225,7 @@ public final class DockControl {
                 && dock.hasIpod() && dock.isOwner(mc.player)) {
             GlobalPos target = pendingDock;
             pendingDock = null;
-            play(target, pendingDisc);
+            play(target, pendingDisc, pendingSeconds);
         } else if (--pendingTicks <= 0) {
             pendingDock = null;
         }
@@ -278,14 +281,20 @@ public final class DockControl {
 
     private static void send(GlobalPos dock, int action, int arg) {
         PacketDistributor.sendToServer(new DockControlPayload(dock.pos(), action, arg,
-                IpodSettings.shuffle(), IpodSettings.repeat().ordinal()));
+                IpodSettings.shuffle(), IpodSettings.repeat().ordinal(), 0));
     }
 
     /** Starts the docked iPod's disc list at disc {@code index}. Stops anything this player plays locally. */
     public static void play(GlobalPos dock, int index) {
+        play(dock, index, 0);
+    }
+
+    /** Same, beginning {@code seconds} into the disc (a disc that was playing on a held iPod and was docked). */
+    public static void play(GlobalPos dock, int index, double seconds) {
         IpodPlayer.stop(); // a file or disc playing in the player's ears makes way
         lastDock = dock;
-        send(dock, DockControlPayload.PLAY, index);
+        PacketDistributor.sendToServer(new DockControlPayload(dock.pos(), DockControlPayload.PLAY, index,
+                IpodSettings.shuffle(), IpodSettings.repeat().ordinal(), (int) Math.round(seconds * 20)));
     }
 
     public static void togglePause() {
@@ -334,6 +343,6 @@ public final class DockControl {
     /** Tells a dock that the owner plays one of their own files there (so everybody sees the notes). */
     public static void setExternal(GlobalPos dock, boolean playing) {
         PacketDistributor.sendToServer(new DockControlPayload(dock.pos(), DockControlPayload.EXTERNAL,
-                playing ? 1 : 0, false, 0));
+                playing ? 1 : 0, false, 0, 0));
     }
 }

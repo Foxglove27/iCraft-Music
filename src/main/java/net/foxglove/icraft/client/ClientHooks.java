@@ -1,6 +1,7 @@
 package net.foxglove.icraft.client;
 
 import net.foxglove.icraft.block.DockBlockEntity;
+import net.foxglove.icraft.client.audio.LibraryCache;
 import net.foxglove.icraft.client.audio.LocalMusic;
 import net.foxglove.icraft.client.screen.IpodScreen;
 import net.foxglove.icraft.item.IpodColor;
@@ -16,7 +17,21 @@ import org.jetbrains.annotations.Nullable;
 public class ClientHooks {
     /** Opens the screen of an iPod the player holds. It plays in the player's ears. */
     public static void openIpodScreen(ItemStack ipod) {
-        openScreen(ipod, null, false, true);
+        openScreen(ipod, null, true);
+    }
+
+    /**
+     * Ctrl + right-click with an iPod in hand: takes its last disc out (the server does it, told by a message;
+     * a disc that is playing stops here). Returns false when Ctrl is not held or there is no disc.
+     */
+    public static boolean ejectDiscWithCtrl(ItemStack ipod, net.minecraft.world.InteractionHand hand) {
+        if (!net.minecraft.client.gui.screens.Screen.hasControlDown()) return false;
+        java.util.List<ItemStack> discs = IpodItem.getDiscs(ipod);
+        if (discs.isEmpty()) return true; // Ctrl was held: nothing to open either
+        discRemoved(discs.get(discs.size() - 1));
+        net.neoforged.neoforge.network.PacketDistributor.sendToServer(
+                new net.foxglove.icraft.net.EjectDiscPayload(hand == net.minecraft.world.InteractionHand.OFF_HAND));
+        return true;
     }
 
     /** Opens the screen of the iPod that sits in a dock. It plays through the dock's speakers. */
@@ -24,19 +39,16 @@ public class ClientHooks {
         Level level = dock.getLevel();
         if (level == null) return;
         Player player = Minecraft.getInstance().player;
-        openScreen(dock.getIpod(), GlobalPos.of(level.dimension(), dock.getBlockPos()), !dock.getSpeakers().isEmpty(),
+        openScreen(dock.getIpod(), GlobalPos.of(level.dimension(), dock.getBlockPos()),
                 player != null && dock.canControl(player));
     }
 
-    private static void openScreen(ItemStack ipod, @Nullable GlobalPos dock, boolean playsThroughSpeakers, boolean dockOwner) {
+    private static void openScreen(ItemStack ipod, @Nullable GlobalPos dock, boolean dockOwner) {
         // the GUI skin depends on the iPod's colour
         IpodColor color = ipod.getItem() instanceof IpodItem item ? item.getColor() : IpodColor.WHITE;
+        LibraryCache.refreshIfStale(); // the lists on the screen update themselves when the scan is done
         Minecraft.getInstance().setScreen(new IpodScreen(
                 IpodItem.getDiscs(ipod),
-                LocalMusic.albums(),
-                LocalMusic.books(),
-                LocalMusic.podcasts(),
-                playsThroughSpeakers,
                 dock,
                 dockOwner,
                 color.guiTexture(),
@@ -64,6 +76,11 @@ public class ClientHooks {
     /** A piece of a shared file arrived. */
     public static void fileData(net.foxglove.icraft.net.FileDataPayload data) {
         net.foxglove.icraft.client.share.SharedFiles.onData(data);
+    }
+
+    /** The player takes the iPod out of a dock (client side of the click, before the server answers). */
+    public static void ipodTakenFromDock(DockBlockEntity dock) {
+        IpodPlayer.pickupFromDock(dock);
     }
 
     /** A dock block entity went away on the client: stop what it was playing. */

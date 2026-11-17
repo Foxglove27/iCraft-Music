@@ -10,9 +10,15 @@ import net.foxglove.icraft.client.audio.AudiobookProgress;
 import net.foxglove.icraft.client.audio.IpodSoundInstance;
 import net.foxglove.icraft.client.audio.PcmAudioStream;
 import net.foxglove.icraft.client.audio.LocalMusic;
+import net.foxglove.icraft.block.DockPlayback;
+import net.foxglove.icraft.client.audio.DiscAudio;
 import net.foxglove.icraft.item.IpodItem;
+import net.minecraft.core.Holder;
+import net.minecraft.resources.ResourceLocation;
+import java.util.Optional;
 import net.foxglove.icraft.item.ModDataComponents;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.sounds.SoundManager;
 import net.minecraft.client.resources.sounds.SoundInstance;
 import net.minecraft.client.sounds.ChannelAccess;
 import net.minecraft.client.sounds.SoundEngine;
@@ -100,6 +106,8 @@ public class IpodPlayer {
     private static boolean started = false;
     // Tracks in a row that failed to play. When it reaches the list size, everything is broken: stop.
     private static int consecutiveFailures = 0;
+    // direction of the last skip (-1 = Previous): a broken track then skips further back, not forward
+    private static int lastStep = 1;
 
     public static Component getNowPlaying() {
         return DockControl.isActive() ? DockControl.currentName() : currentName;
@@ -140,6 +148,13 @@ public class IpodPlayer {
 
     // Called once per client tick (see ClientEvents). Starts the next track when one has finished.
     public static void clientTick() {
+        tickPickup();
+        if (restartPending) { // asked from a sound's tick; done here, outside the sound engine's loop
+            restartPending = false;
+            if (current != null) restartAtSamePlace();
+            return;
+        }
+        playPendingWhenFree();
         if (current == null || !started || paused) return;
         Minecraft mc = Minecraft.getInstance();
 
@@ -161,6 +176,8 @@ public class IpodPlayer {
         }
 
         if (mc.getSoundManager().isActive(current)) {
+            revives = 0;
+            reviveWait = 0;
             if (++ticksSinceRefresh >= REFRESH_TICKS) {
                 ticksSinceRefresh = 0;
                 refreshPosition();
@@ -178,11 +195,34 @@ public class IpodPlayer {
                 advanceAfterEnd(true);
             } else if (sound.streamEnded()) {
                 advanceAfterEnd(false);
+            } else if (revives < MAX_REVIVES && ++reviveWait >= REVIVE_TICKS * (1 + revives)) {
+                // The sound engine dropped it mid-song (audio device switch, a volume set to 0 and back):
+                // carry on at the same second. Tries a few times, further apart each time, then gives up.
+                reviveWait = 0;
+                revives++;
+                LOGGER.info("iPod: the sound stopped before the track ended, restarting it (try {} of {})", revives, MAX_REVIVES);
+                restartAtSamePlace();
             }
-            // else: the sound engine stopped it mid-song (for example an audio device switch). Leave it.
         } else {
             advanceAfterEnd(false); // a vanilla disc has no end-of-stream flag; inactive after starting = finished
         }
+    }
+
+    private static boolean restartPending;
+    // revives of a sound the engine dropped mid-song (see clientTick)
+    private static final int MAX_REVIVES = 5;
+    private static final int REVIVE_TICKS = 20;
+    private static int revives;
+    private static int reviveWait;
+
+    // Starts the current track again where it is, on whatever outputs it works out now (speakers or the player's ears)
+    private static void restartAtSamePlace() {
+        if (queueIndex < 0 || queueIndex >= order.length) return;
+        if (current instanceof IpodSoundInstance sound && sound.isFile()) {
+            refreshPosition();
+            pendingStartSeconds = positionSeconds();
+        }
+        queue.get(order[queueIndex]).run(); // works out the outputs again and records them
     }
 
     // The track is over (finished or failed): decide what plays next.
@@ -194,6 +234,12 @@ public class IpodPlayer {
             stop(); // clears the track, so the HUD disappears too
             return;
         }
+        if (failed && lastStep < 0) { // Previous landed on a broken track: keep going back
+            queueIndex = Math.floorMod(queueIndex - 1, order.length);
+            queue.get(order[queueIndex]).run();
+            return;
+        }
+        if (!failed) lastStep = 1;
 
         if (!failed) finishChapter(); // an audiobook chapter that played to the end forgets its position
 
@@ -277,11 +323,27 @@ public class IpodPlayer {
         Minecraft mc = Minecraft.getInstance();
         if (mc.player != null) {
             mc.player.displayClientMessage(
-                    Component.translatable("message.icraft.ipod.load_failed", currentName), true);
+                    Component.translatable("message.icraft_music.ipod.load_failed", currentName), true);
         }
     }
     
     public static void play(ItemStack disc, @Nullable UUID ipod) {
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.level == null) return;
+        // In the player's own ears a disc is decoded by us, so its position is known (it can carry on in a dock);
+        // other discs, or ones we cannot find the file of, use the game's own stream.
+        if (queueDock == null && outputsFor(mc, ipod, List.of()).isEmpty()) {
+            ResourceLocation path = JukeboxSong.fromStack(mc.level.registryAccess(), disc)
+                    .map(s -> DiscAudio.resolve(s.value().soundEvent().value())).orElse(null);
+            if (path != null) {
+                play(disc, ipod, 0);
+                return;
+            }
+        }
+        playVanillaDisc(disc, ipod);
+    }
+
+    private static void playVanillaDisc(ItemStack disc, @Nullable UUID ipod) {
         Minecraft mc = Minecraft.getInstance();
         if (mc.level == null) return;
 
@@ -297,9 +359,62 @@ public class IpodPlayer {
             }
             start(sounds, disc.copy(), outputs,
                     song.value().description(),
-                    Component.translatable("screen.icraft.ipod.discs"),
+                    Component.translatable("screen.icraft_music.ipod.discs"),
                     null, ipod);
         });
+    }
+
+    /** Like {@link #play(ItemStack, UUID)}, but starting {@code startSeconds} into the disc. */
+    public static void play(ItemStack disc, @Nullable UUID ipod, double startSeconds) {
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.level == null) return;
+        Optional<Holder<JukeboxSong>> song = JukeboxSong.fromStack(mc.level.registryAccess(), disc);
+        ResourceLocation path = song.map(s -> DiscAudio.resolve(s.value().soundEvent().value())).orElse(null);
+        if (song.isEmpty() || path == null) {
+            playVanillaDisc(disc, ipod); // cannot start in the middle: from the start
+            return;
+        }
+        queueDock = null;
+        IpodSoundInstance sound = IpodSoundInstance.forDiscAt(downmix -> DiscAudio.open(path, downmix),
+                path.toString(), null, 1.0F, startSeconds);
+        start(List.of(sound), disc.copy(), List.of(), song.get().value().description(),
+                Component.translatable("screen.icraft_music.ipod.discs"), null, ipod);
+    }
+
+    // ---- taking the iPod out of a dock: what the dock was playing carries on in the player's ears ----
+
+    private record Pickup(UUID ipod, ItemStack disc, double seconds, long deadline) {}
+    @Nullable
+    private static Pickup pickup;
+
+    /**
+     * The player is taking the iPod out of this dock (client side of the click). If the dock plays one of the
+     * iPod's discs right now, it is started on the player's iPod at the same position as soon as the iPod arrives.
+     */
+    public static void pickupFromDock(DockBlockEntity dock) {
+        Minecraft mc = Minecraft.getInstance();
+        DockPlayback pb = dock.getPlayback();
+        if (mc.level == null || !dock.hasIpod() || pb == null || !pb.isPlaying() || pb.isPaused()) return;
+        UUID id = dock.getIpod().get(ModDataComponents.IPOD_ID.get());
+        List<ItemStack> discs = IpodItem.getDiscs(dock.getIpod());
+        int index = pb.currentDisc();
+        if (id == null || index < 0 || index >= discs.size()) return;
+        long now = mc.level.getGameTime();
+        pickup = new Pickup(id, discs.get(index).copy(), pb.positionTicks(now) / 20.0, now + 100);
+    }
+
+    private static void tickPickup() {
+        Pickup p = pickup;
+        Minecraft mc = Minecraft.getInstance();
+        if (p == null) return;
+        if (mc.player == null || mc.level == null || mc.level.getGameTime() > p.deadline()) {
+            pickup = null;
+            return;
+        }
+        if (findIpod(mc.player, p.ipod()) != null) { // the iPod arrived in the inventory
+            pickup = null;
+            play(p.disc(), p.ipod(), p.seconds());
+        }
     }
 
     public static void playFile(Path file, @Nullable UUID ipod) {
@@ -326,12 +441,10 @@ public class IpodPlayer {
 
         List<DockOutputs.Output> outputs = outputsFor(mc, ipod, List.of());
 
-        // Progress is kept for audiobook chapters, and for songs while they play through a dock's speakers
+        // Progress is kept for audiobook chapters and podcast episodes only; songs always start from the beginning
         ProgressTarget target = null;
         if (chapter != null && bookKey != null) {
             target = new ProgressTarget(bookKey, chapter.key(), chapter.startSeconds(), nextKey);
-        } else if (!outputs.isEmpty()) {
-            target = new ProgressTarget(AudiobookProgress.MUSIC, LocalMusic.key(file), 0, null);
         }
         double itemStart = chapter != null ? chapter.startSeconds() : 0;
         double endSeconds = chapter != null ? chapter.endSeconds() : -1;
@@ -354,6 +467,14 @@ public class IpodPlayer {
             for (DockOutputs.Output o : outputs) {
                 sounds.add(IpodSoundInstance.forFile(file, o.pos(), o.volume(), startSeconds, endSeconds));
             }
+        }
+        // the speakers in earshot start together (a far one that the engine skips is not waited for)
+        if (mc.player != null && !outputs.isEmpty()) {
+            List<SoundInstance> heard = new ArrayList<>();
+            for (int i = 0; i < outputs.size(); i++) {
+                if (DockOutputs.inRange(outputs.get(i), mc.player.position())) heard.add(sounds.get(i));
+            }
+            IpodSoundInstance.startTogether(heard);
         }
         start(sounds, ItemStack.EMPTY, outputs, name, subtitle, cover, ipod);
         currentProgress = target; // after start(), which clears the previous one
@@ -442,6 +563,9 @@ public class IpodPlayer {
                               Component name, Component subtitle, @Nullable Path cover, @Nullable UUID ipod) {
         Minecraft mc = Minecraft.getInstance();
         DockControl.stop(); // a disc the dock plays makes way for what the player starts now
+        List<SoundInstance> retiring = new ArrayList<>(); // the old sounds still hold their audio channels for a moment
+        if (current != null) retiring.add(current);
+        retiring.addAll(extras);
         endCurrent(); // ends any current sound, but keeps the track list
         mc.getMusicManager().stopPlaying();
         current = instances.get(0);
@@ -452,7 +576,12 @@ public class IpodPlayer {
         currentSubtitle = subtitle;
         currentCover = cover;
         currentIpod = ipod;
-        for (SoundInstance instance : instances) mc.getSoundManager().play(instance);
+        // The engine frees a stopped sound's channel on its next tick and there are only 8 streaming channels:
+        // with several speakers the new sounds would find none (a silent track). Wait until the old ones are gone.
+        pendingPlay = new ArrayList<>(instances);
+        pendingRetiring = retiring;
+        pendingWait = 0;
+        playPendingWhenFree();
         setExternal(true);
     }
 
@@ -483,9 +612,13 @@ public class IpodPlayer {
         chapterFinished = false;
         if (current != null) {
             Minecraft.getInstance().getSoundManager().stop(current);
+            if (current instanceof IpodSoundInstance ours) ours.release();
             current = null;
         }
-        for (SoundInstance extra : extras) Minecraft.getInstance().getSoundManager().stop(extra);
+        for (SoundInstance extra : extras) {
+            Minecraft.getInstance().getSoundManager().stop(extra);
+            if (extra instanceof IpodSoundInstance ours) ours.release();
+        }
         extras = List.of();
         currentOutputs = List.of();
         currentDisc = ItemStack.EMPTY;
@@ -498,6 +631,28 @@ public class IpodPlayer {
         started = false;
         ticksSinceRefresh = 0;
         ticksSinceSave = 0;
+        pendingPlay = List.of(); // a track that never got to start is dropped
+        pendingRetiring = List.of();
+    }
+
+    // sounds of a new track waiting for the old sounds to give up their audio channels (see start)
+    private static List<SoundInstance> pendingPlay = List.of();
+    private static List<SoundInstance> pendingRetiring = List.of();
+    private static int pendingWait;
+
+    private static void playPendingWhenFree() {
+        if (pendingPlay.isEmpty()) return;
+        SoundManager sounds = Minecraft.getInstance().getSoundManager();
+        boolean free = true;
+        for (SoundInstance old : pendingRetiring) {
+            if (sounds.isActive(old)) free = false;
+        }
+        if (!free && ++pendingWait <= 20) return; // the 20 ticks are only a safety net
+        if (!free) LOGGER.debug("iPod: the old sounds still hold their channels after 20 ticks, starting anyway");
+        List<SoundInstance> toPlay = pendingPlay;
+        pendingPlay = List.of();
+        pendingRetiring = List.of();
+        for (SoundInstance instance : toPlay) sounds.play(instance);
     }
 
     /**
@@ -542,8 +697,10 @@ public class IpodPlayer {
                 break;
             }
         }
+        refreshPosition(); // where the disc is, so it carries on at the same second on the dock
+        double seconds = positionSeconds();
         stop();
-        if (index >= 0) DockControl.playWhenDocked(dock, index);
+        if (index >= 0) DockControl.playWhenDocked(dock, index, seconds);
     }
 
     // The iPod with this ID in the inventory (or on the cursor), or null
@@ -625,6 +782,7 @@ public class IpodPlayer {
         queue = tracks;
         queueIsBook = audiobook;
         consecutiveFailures = 0;
+        lastStep = 1;
         queueIndex = buildOrder(index);
         tracks.get(index).run();
     }
@@ -647,6 +805,7 @@ public class IpodPlayer {
 
     private static void skip(int step) {
         if (queue.isEmpty()) return;
+        lastStep = step;
         // floorMod keeps the position inside the list and wraps around at both ends
         queueIndex = Math.floorMod(queueIndex + step, order.length);
         queue.get(order[queueIndex]).run();
@@ -674,6 +833,11 @@ public class IpodPlayer {
 
     // True while any track is loaded (even paused or still loading), so the HUD can stay on
     // through Next/Previous transitions. Becomes false only once we stop completely.
+    /** True while a track is playing for this player (in their ears or on speakers), not paused. */
+    public static boolean isListening() {
+        return current != null && !paused;
+    }
+
     public static boolean hasTrack() {
         return DockControl.isActive() || !currentName.getString().isEmpty();
     }
@@ -750,7 +914,14 @@ public class IpodPlayer {
                     && !(mc.level.getBlockEntity(queueDock.pos()) instanceof DockBlockEntity dock
                     && dock.hasIpod()
                     && (currentIpod == null || currentIpod.equals(dock.getIpod().get(ModDataComponents.IPOD_ID.get()))))) {
-                stop();
+                if (currentIpod != null && findIpod(player, currentIpod) != null) {
+                    // the iPod was taken out and is in the player's inventory: carry on in the player's ears,
+                    // at the same second (the sounds on the speakers are replaced by one in the ears)
+                    setQueueDock(null);
+                    restartPending = true; // not here: this runs inside the sound engine's tick, which must not start sounds
+                } else {
+                    stop();
+                }
             }
         }
     }

@@ -191,7 +191,7 @@ public final class ShareServer {
     @SubscribeEvent
     public static void onServerStarting(ServerStartingEvent event) {
         MinecraftServer server = event.getServer();
-        SharedFileCache.start(server.getWorldPath(LevelResource.ROOT).resolve("icraft").resolve("shared"));
+        SharedFileCache.start(server.getWorldPath(LevelResource.ROOT).resolve("icraft_music").resolve("shared"));
         DockQueues.clear();
     }
 

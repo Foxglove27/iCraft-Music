@@ -98,7 +98,7 @@ public final class FileUploader {
                     sent = 0;
                     if (!noticeShown) {
                         noticeShown = true;
-                        message(Component.translatable("message.icraft.share.notice"));
+                        message(Component.translatable("message.icraft_music.share.notice"));
                     }
                 } catch (IOException e) {
                     REFUSED.add(item.hash());
@@ -111,7 +111,7 @@ public final class FileUploader {
                     closeChannel();
                     sending = null;
                 }
-                message(Component.translatable("message.icraft.share.refused." + status.reason(), item.title()));
+                message(Component.translatable("message.icraft_music.share.refused." + status.reason(), item.title()));
             }
         }
         return true;
@@ -142,7 +142,7 @@ public final class FileUploader {
             long now = System.currentTimeMillis();
             if (sending != null && now - lastMessage > 1000) {
                 lastMessage = now;
-                message(Component.translatable("message.icraft.share.sharing", sending.title(), (int) (100 * sent / sending.size())));
+                message(Component.translatable("message.icraft_music.share.sharing", sending.title(), (int) (100 * sent / sending.size())));
             }
             return;
         }

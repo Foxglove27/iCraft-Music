@@ -201,7 +201,7 @@ public class DockBlockEntity extends BlockEntity {
         LOGGER.info("Dock at {}: {} sent action {} (arg {}); owner is {}", worldPosition.toShortString(),
                 player.getGameProfile().getName(), message.action(), message.arg(), ownerName);
         if (!isOwner(player)) {
-            player.displayClientMessage(Component.translatable("message.icraft.dock.not_yours", ownerName), true);
+            player.displayClientMessage(Component.translatable("message.icraft_music.dock.not_yours", ownerName), true);
             return;
         }
         if (player.level() != level || player.distanceToSqr(Vec3.atCenterOf(worldPosition)) > CONTROL_DISTANCE * CONTROL_DISTANCE) return;
@@ -214,7 +214,11 @@ public class DockBlockEntity extends BlockEntity {
                 clearQueue(); // the iPod's own discs
                 discs = discCount();
                 if (message.arg() >= discs) return;
-                playback = DockPlayback.start(discs, message.arg(), message.shuffle(), repeatOf(message.repeat()), now, new Random());
+                // a disc carried over from a held iPod starts where it was; kept clear of the end so it cannot end at once
+                long length = discTicks(level, message.arg());
+                long startAt = length > 40 ? Math.max(0, Math.min(message.startTicks(), length - 40)) : 0;
+                playback = DockPlayback.start(discs, message.arg(), message.shuffle(), repeatOf(message.repeat()), now,
+                        new Random(), startAt);
                 externalPlaying = false;
             }
             case DockControlPayload.EXTERNAL -> {
@@ -246,13 +250,13 @@ public class DockBlockEntity extends BlockEntity {
         if (level == null || level.isClientSide() || !hasIpod() || !(player instanceof ServerPlayer serverPlayer)) return;
         claimIfUnowned(player);
         if (!isOwner(player)) {
-            player.displayClientMessage(Component.translatable("message.icraft.dock.not_yours", ownerName), true);
+            player.displayClientMessage(Component.translatable("message.icraft_music.dock.not_yours", ownerName), true);
             return;
         }
         if (player.level() != level || player.distanceToSqr(Vec3.atCenterOf(worldPosition)) > CONTROL_DISTANCE * CONTROL_DISTANCE) return;
         String why = ShareServer.refusal(serverPlayer);
         if (why != null) {
-            player.displayClientMessage(Component.translatable("message.icraft.share.refused." + why), true);
+            player.displayClientMessage(Component.translatable("message.icraft_music.share.refused." + why), true);
             return;
         }
 
@@ -272,7 +276,7 @@ public class DockBlockEntity extends BlockEntity {
 
         long now = level.getGameTime();
         int start = Math.max(0, Math.min(message.startIndex(), valid.size() - 1));
-        playback = DockPlayback.start(valid.size(), start, message.shuffle(), repeatOf(message.repeat()), now, new Random());
+        playback = DockPlayback.start(valid.size(), start, message.shuffle(), repeatOf(message.repeat()), now, new Random(), 0);
         playback.play(start, valid.size(), message.shuffle(), repeatOf(message.repeat()), now,
                 Math.max(0, Math.min(message.startOffsetTicks(), valid.get(start).playTicks() - 1)));
         externalPlaying = false;
@@ -349,7 +353,7 @@ public class DockBlockEntity extends BlockEntity {
         dock.changed();
         for (Player player : level.players()) {
             if (player.distanceToSqr(Vec3.atCenterOf(pos)) <= 16 * 16) {
-                player.displayClientMessage(Component.translatable("message.icraft.dock.speaker_lost",
+                player.displayClientMessage(Component.translatable("message.icraft_music.dock.speaker_lost",
                         dock.speakers.size(), MAX_SPEAKERS), true);
             }
         }

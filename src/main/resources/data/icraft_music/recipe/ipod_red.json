@@ -1,0 +1,15 @@
+{
+  "type": "icraft_music:ipod_dye",
+  "category": "misc",
+  "ingredients": [
+    {
+      "tag": "icraft_music:ipods"
+    },
+    {
+      "tag": "c:dyes/red"
+    }
+  ],
+  "result": {
+    "id": "icraft_music:ipod_red"
+  }
+}

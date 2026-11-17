@@ -59,7 +59,7 @@ public final class SharedFiles {
     private SharedFiles() {}
 
     private static Path dir() {
-        return Minecraft.getInstance().gameDirectory.toPath().resolve("icraft-shared");
+        return Minecraft.getInstance().gameDirectory.toPath().resolve("icraft_music-shared");
     }
 
     /** Where to find the file of an entry on this computer, or null if it is not here (yet). */
@@ -150,7 +150,7 @@ public final class SharedFiles {
             REFUSED_UNTIL.put(entry.hash(), System.currentTimeMillis() + REFUSED_MS);
             LOGGER.info("Shared files: the server refused {}: {}", entry.hash().substring(0, 12), status.reason());
             if (!"not_here".equals(status.reason())) {
-                message(Component.translatable("message.icraft.share.refused." + status.reason(), entry.title()));
+                message(Component.translatable("message.icraft_music.share.refused." + status.reason(), entry.title()));
             }
         }
         return true;
@@ -175,7 +175,7 @@ public final class SharedFiles {
                 long now = System.currentTimeMillis();
                 if (now - active.lastMessage > 1000) {
                     active.lastMessage = now;
-                    message(Component.translatable("message.icraft.share.downloading", active.entry.title(),
+                    message(Component.translatable("message.icraft_music.share.downloading", active.entry.title(),
                             (int) (100 * active.assembler.written() / active.total)));
                 }
                 return;

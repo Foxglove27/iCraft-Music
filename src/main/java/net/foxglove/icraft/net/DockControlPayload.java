@@ -10,9 +10,9 @@ import net.minecraft.resources.ResourceLocation;
 
 /**
  * Sent by the player who owns a dock to change what it plays. The server checks everything (see
- * {@code DockBlockEntity.control}). {@code arg} is the disc index for PLAY, ticks for SEEK, 1 or 0 for EXTERNAL.
+ * {@code DockBlockEntity.control}). {@code arg} is the disc index for PLAY ({@code startTicks} = where in the disc to begin), ticks for SEEK, 1 or 0 for EXTERNAL.
  */
-public record DockControlPayload(BlockPos pos, int action, int arg, boolean shuffle, int repeat)
+public record DockControlPayload(BlockPos pos, int action, int arg, boolean shuffle, int repeat, int startTicks)
         implements CustomPacketPayload {
     public static final int PLAY = 0;
     public static final int PAUSE = 1;
@@ -33,6 +33,7 @@ public record DockControlPayload(BlockPos pos, int action, int arg, boolean shuf
             ByteBufCodecs.VAR_INT, DockControlPayload::arg,
             ByteBufCodecs.BOOL, DockControlPayload::shuffle,
             ByteBufCodecs.VAR_INT, DockControlPayload::repeat,
+            ByteBufCodecs.VAR_INT, DockControlPayload::startTicks,
             DockControlPayload::new);
 
     @Override

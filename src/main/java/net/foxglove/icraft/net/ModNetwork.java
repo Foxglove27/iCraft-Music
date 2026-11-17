@@ -5,6 +5,8 @@ import net.foxglove.icraft.client.ClientHooks;
 import net.foxglove.icraft.net.share.ShareServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.foxglove.icraft.iCraft;
+import net.foxglove.icraft.item.IpodItem;
+import net.minecraft.world.InteractionHand;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
@@ -20,6 +22,7 @@ public class ModNetwork {
     public static void register(RegisterPayloadHandlersEvent event) {
         PayloadRegistrar registrar = event.registrar(VERSION);
         registrar.playToServer(DockControlPayload.TYPE, DockControlPayload.STREAM_CODEC, ModNetwork::onDockControl);
+        registrar.playToServer(EjectDiscPayload.TYPE, EjectDiscPayload.STREAM_CODEC, ModNetwork::onEjectDisc);
 
         // file sharing
         registrar.playToServer(FileOfferPayload.TYPE, FileOfferPayload.STREAM_CODEC,
@@ -33,6 +36,14 @@ public class ModNetwork {
                 (m, c) -> c.enqueueWork(() -> ClientHooks.fileStatus(m)));
         registrar.playToClient(FileDataPayload.TYPE, FileDataPayload.STREAM_CODEC,
                 (m, c) -> c.enqueueWork(() -> ClientHooks.fileData(m)));
+    }
+
+    private static void onEjectDisc(EjectDiscPayload message, IPayloadContext context) {
+        context.enqueueWork(() -> {
+            var player = context.player();
+            var stack = player.getItemInHand(message.offHand() ? InteractionHand.OFF_HAND : InteractionHand.MAIN_HAND);
+            if (stack.getItem() instanceof IpodItem) IpodItem.ejectLastDisc(player, stack);
+        });
     }
 
     private static void onDockQueue(DockQueuePayload message, IPayloadContext context) {

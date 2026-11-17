@@ -20,7 +20,10 @@ import net.foxglove.icraft.client.IpodPlayer;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.concurrent.CompletableFuture;
+import java.util.List;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.DoubleSupplier;
 
 public class IpodSoundInstance extends AbstractTickableSoundInstance {
@@ -41,10 +44,69 @@ public class IpodSoundInstance extends AbstractTickableSoundInstance {
     private final double endSeconds;           // where to stop (-1 = the end of the file)
     @Nullable
     private volatile PcmAudioStream stream; // set once a file has been opened; null for discs
+    private volatile boolean released;      // stopped by us: a stream that finishes opening later is closed at once
+    @Nullable
+    private volatile StartGroup group;      // the sounds of one track on several speakers that start together
+
+    /**
+     * Sounds that belong together (one track on several speakers). Each waits, once its own file is open, until
+     * all of them are open, so the speakers start at the same moment instead of a few tens of ms apart.
+     */
+    private static final class StartGroup {
+        private final int size;
+        private final AtomicInteger opened = new AtomicInteger();
+        private final CompletableFuture<Void> allOpened = new CompletableFuture<>();
+
+        StartGroup(int size) {
+            this.size = size;
+        }
+
+        void arrive() {
+            if (opened.incrementAndGet() >= size) allOpened.complete(null);
+        }
+    }
+
+    /** Makes the sounds in the list (those we decode ourselves) start together. Call before playing them. */
+    public static void startTogether(List<? extends SoundInstance> sounds) {
+        List<IpodSoundInstance> ours = sounds.stream()
+                .filter(s -> s instanceof IpodSoundInstance i && i.opener != null)
+                .map(s -> (IpodSoundInstance) s).toList();
+        if (ours.size() < 2) return;
+        StartGroup shared = new StartGroup(ours.size());
+        for (IpodSoundInstance sound : ours) sound.group = shared;
+    }
+
+    /**
+     * The sound was stopped by us. A stream that is still being opened is closed when it is ready; one the engine
+     * never attached (it was stopped first) is closed after a moment. Closing twice does nothing.
+     */
+    public void release() {
+        released = true;
+        CompletableFuture.runAsync(this::closeStream, CompletableFuture.delayedExecutor(2, TimeUnit.SECONDS));
+    }
+
+    private void closeStream() {
+        PcmAudioStream s = stream;
+        if (s == null) return;
+        try {
+            s.close();
+        } catch (IOException ignored) {
+            // nothing more to do
+        }
+    }
 
     // A vanilla music disc sound
     public static IpodSoundInstance forDisc(SoundEvent sound, @Nullable Vec3 pos, float volume) {
         return new IpodSoundInstance(sound, null, "disc", true, pos, volume, () -> 0, -1);
+    }
+
+    /**
+     * A music disc played by {@code IpodPlayer} but decoded by us, so it can start in the middle
+     * (for example when the iPod is taken out of a dock that was playing it).
+     */
+    public static IpodSoundInstance forDiscAt(Opener opener, String label, @Nullable Vec3 pos, float volume,
+                                              double startSeconds) {
+        return new IpodSoundInstance(borrowedEvent(), opener, label, true, pos, volume, () -> startSeconds, -1);
     }
 
     /**
@@ -132,6 +194,7 @@ public class IpodSoundInstance extends AbstractTickableSoundInstance {
             // This sound was replaced or stopped while it was still loading.
             // Without this check it could start playing later with nothing controlling it.
             stop();
+            release();
             return;
         }
         IpodPlayer.tick(this);
@@ -174,6 +237,10 @@ public class IpodSoundInstance extends AbstractTickableSoundInstance {
                         LOGGER.info("Dock sound {} opened: {} Hz, {} s in, {}", label, opened.sampleRate(), start,
                                 positional ? "from a speaker" : "in the player's ears");
                     }
+                    if (released) { // stopped while it was opening: nobody will play it
+                        opened.close();
+                        return new SilentAudioStream();
+                    }
                     stream = opened;
                     return opened;
                 } catch (IOException e) {
@@ -184,7 +251,7 @@ public class IpodSoundInstance extends AbstractTickableSoundInstance {
 
         // If loading fails, tell the player (back on the main thread) and give the engine a short
         // silent stream instead of a failed one, so it releases the sound channel (see SilentAudioStream)
-        return future.handle((stream, error) -> {
+        CompletableFuture<AudioStream> handled = future.handle((stream, error) -> {
             if (error == null) return stream;
             if (managed) {
                 Minecraft.getInstance().execute(() -> IpodPlayer.onLoadFailed(this, error));
@@ -192,6 +259,14 @@ public class IpodSoundInstance extends AbstractTickableSoundInstance {
                 LOGGER.warn("Could not play {} from a dock", label, error.getCause() != null ? error.getCause() : error);
             }
             return new SilentAudioStream();
+        });
+
+        // Speakers of one track: every sound waits until all of them are open (at most a second), so they start together
+        StartGroup together = group;
+        if (together == null || opener == null) return handled;
+        return handled.thenCompose(ready -> {
+            together.arrive();
+            return together.allOpened.orTimeout(1, TimeUnit.SECONDS).handle((done, error) -> ready);
         });
     }
 }
