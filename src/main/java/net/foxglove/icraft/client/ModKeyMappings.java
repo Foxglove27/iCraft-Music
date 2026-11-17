@@ -16,15 +16,15 @@ import org.lwjgl.glfw.GLFW;
  */
 @EventBusSubscriber(modid = iCraft.MOD_ID, value = Dist.CLIENT)
 public class ModKeyMappings {
-    private static final String CATEGORY = "key.categories.icraft";
+    private static final String CATEGORY = "key.categories.icraft_music";
 
-    public static final KeyMapping PLAY_PAUSE = new KeyMapping("key.icraft.play_pause",
+    public static final KeyMapping PLAY_PAUSE = new KeyMapping("key.icraft_music.play_pause",
             KeyConflictContext.IN_GAME, InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_WORLD_1, CATEGORY);
-    public static final KeyMapping STOP_FOR_ME = new KeyMapping("key.icraft.stop_for_me",
+    public static final KeyMapping STOP_FOR_ME = new KeyMapping("key.icraft_music.stop_for_me",
             KeyConflictContext.IN_GAME, InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_BACKSLASH, CATEGORY);
-    public static final KeyMapping NEXT = new KeyMapping("key.icraft.next",
+    public static final KeyMapping NEXT = new KeyMapping("key.icraft_music.next",
             KeyConflictContext.IN_GAME, InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_PERIOD, CATEGORY);
-    public static final KeyMapping PREVIOUS = new KeyMapping("key.icraft.previous",
+    public static final KeyMapping PREVIOUS = new KeyMapping("key.icraft_music.previous",
             KeyConflictContext.IN_GAME, InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_COMMA, CATEGORY);
 
     @SubscribeEvent

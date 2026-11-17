@@ -1,0 +1,33 @@
+{
+  "textures": {
+    "particle": "icraft_music:block/dock",
+    "dock": "icraft_music:block/dock"
+  },
+  "elements": [
+    {
+      "name": "base",
+      "from": [1, 0, 1],
+      "to": [15, 3, 15],
+      "faces": {
+        "north": { "texture": "#dock" },
+        "east": { "texture": "#dock" },
+        "south": { "texture": "#dock" },
+        "west": { "texture": "#dock" },
+        "up": { "texture": "#dock" },
+        "down": { "texture": "#dock" }
+      }
+    },
+    {
+      "name": "back rest",
+      "from": [3, 3, 10],
+      "to": [13, 10, 14],
+      "faces": {
+        "north": { "texture": "#dock" },
+        "east": { "texture": "#dock" },
+        "south": { "texture": "#dock" },
+        "west": { "texture": "#dock" },
+        "up": { "texture": "#dock" }
+      }
+    }
+  ]
+}

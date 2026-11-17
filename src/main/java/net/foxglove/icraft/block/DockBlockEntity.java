@@ -163,7 +163,7 @@ public class DockBlockEntity extends BlockEntity {
         LOGGER.info("Dock at {}: {} sent action {} (arg {}); owner is {}", worldPosition.toShortString(),
                 player.getGameProfile().getName(), message.action(), message.arg(), ownerName);
         if (!isOwner(player)) {
-            player.displayClientMessage(Component.translatable("message.icraft.dock.not_yours", ownerName), true);
+            player.displayClientMessage(Component.translatable("message.icraft_music.dock.not_yours", ownerName), true);
             return;
         }
         if (player.level() != level || player.distanceToSqr(Vec3.atCenterOf(worldPosition)) > CONTROL_DISTANCE * CONTROL_DISTANCE) return;
@@ -261,7 +261,7 @@ public class DockBlockEntity extends BlockEntity {
         dock.changed();
         for (Player player : level.players()) {
             if (player.distanceToSqr(Vec3.atCenterOf(pos)) <= 16 * 16) {
-                player.displayClientMessage(Component.translatable("message.icraft.dock.speaker_lost",
+                player.displayClientMessage(Component.translatable("message.icraft_music.dock.speaker_lost",
                         dock.speakers.size(), MAX_SPEAKERS), true);
             }
         }
