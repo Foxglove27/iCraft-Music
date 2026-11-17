@@ -7,6 +7,13 @@ new changes go there until the next version bump.
 ## [0.0.8]
 
 ### Added
+- Long titles scroll through the row when it is selected, so names that did not fit can be read in full.
+- Taking the iPod out of a dock keeps the music going for you: your own song carries on in your ears from the same second,
+  and a music disc the dock was playing continues at about the same position.
+- **Search** in the iPod menu (between Podcasts and Settings): type on the keyboard and the list of matching albums, songs,
+  audiobooks, chapters, podcasts and episodes (including the NAS) filters live; accents and capitals do not matter
+  ("avici" finds "AVĪCI"). Backspace deletes a letter, Enter or a click plays or opens the result, and the Menu button of
+  an opened result goes back to the results.
 - **Big libraries and network shares.** `extraMusicFolders`, `extraAudiobookFolders` and `extraPodcastFolders` in
   `icraft-client.toml` add more folders (absolute, or relative to the game folder; for example a mounted NAS share) to the
   library. Everything from the extra folders gets its own **NAS** entry in the iPod menu (between Music and Audiobooks, shown only
@@ -31,6 +38,8 @@ new changes go there until the next version bump.
 - A dock without any speaker now plays its discs in its owner's own ears (it was silent).
 
 ### Changed
+- Songs no longer remember where you stopped (and the song list shows no saved time any more): they always start from the
+  beginning. Only audiobook chapters and podcast episodes resume.
 - The library is scanned in the background (when you join a world and when the iPod opens), so a big library or a slow
   share no longer freezes the game; the lists update when the scan is done ("Scanning library..."). Album covers also
   load in the background; animated dots after the title show that a scan is running.

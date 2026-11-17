@@ -48,6 +48,15 @@ public class IpodSoundInstance extends AbstractTickableSoundInstance {
     }
 
     /**
+     * A music disc played by {@code IpodPlayer} but decoded by us, so it can start in the middle
+     * (for example when the iPod is taken out of a dock that was playing it).
+     */
+    public static IpodSoundInstance forDiscAt(Opener opener, String label, @Nullable Vec3 pos, float volume,
+                                              double startSeconds) {
+        return new IpodSoundInstance(borrowedEvent(), opener, label, true, pos, volume, () -> startSeconds, -1);
+    }
+
+    /**
      * A sound a dock plays (not controlled by IpodPlayer): a disc decoded by us so it can start anywhere.
      * {@code startSeconds} is asked when the stream opens, so the time spent loading is not lost.
      */

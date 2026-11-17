@@ -24,6 +24,7 @@ import org.jetbrains.annotations.Nullable;
 import org.lwjgl.glfw.GLFW;
 
 import java.nio.file.Path;
+import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -93,7 +94,7 @@ public class IpodScreen extends Screen {
 
     // Which list the display is showing. Menu goes up one level: TRACKS -> ALBUMS -> MENU,
     // CHAPTERS -> BOOKS -> MENU, SETTINGS -> MENU.
-    private enum Page { MENU, ALBUMS, TRACKS, BOOKS, CHAPTERS, SETTINGS }
+    private enum Page { MENU, ALBUMS, TRACKS, BOOKS, CHAPTERS, SETTINGS, SEARCH }
 
     // ids of the menu entries (the rows are Music, NAS (only with extra folders), Audiobooks, Podcasts, Settings)
     private static final int MENU_MUSIC = 0;
@@ -102,6 +103,7 @@ public class IpodScreen extends Screen {
     private static final int MENU_SETTINGS = 3;
     private static final int MENU_NAS = 4;
     // the entries of the NAS submenu
+    private static final int MENU_SEARCH = 8;
     private static final int NAS_MUSIC = 5;
     private static final int NAS_BOOKS = 6;
     private static final int NAS_PODCASTS = 7;
@@ -121,6 +123,18 @@ public class IpodScreen extends Screen {
     // The ALBUMS and TRACKS pages show either the local music or the NAS music
     private enum AlbumSection { MUSIC, NAS }
     private AlbumSection albumSection = AlbumSection.MUSIC;
+    // ---- search: an index of everything the lists show, filtered by the typed text ----
+    // 'row' is -1 for the album/book/show itself, otherwise the track/chapter/episode row inside 'view'.
+    private record SearchEntry(AlbumView view, int row, boolean chapters, String label, String text, String compact,
+                               String tag) {}
+    private static final int SEARCH_MAX_RESULTS = 200;
+    private static final int SEARCH_MAX_LENGTH = 32;
+    private final List<SearchEntry> searchIndex = new ArrayList<>();
+    private List<SearchEntry> results = List.of();
+    private String searchQuery = "";
+    private boolean cameFromSearch; // the album page was opened from a search result: Menu goes back to the results
+    private int searchSelected;
+
     private final boolean nasEnabled = LocalMusic.hasNasFolders();
     private boolean inNas; // the MENU page shows the NAS submenu (Music, Audiobooks, Podcasts from the extra folders)
 
@@ -137,8 +151,8 @@ public class IpodScreen extends Screen {
             if (LocalMusic.hasNasFolders(LocalMusic.Section.PODCASTS)) ids.add(NAS_PODCASTS);
             return ids;
         }
-        return nasEnabled ? List.of(MENU_MUSIC, MENU_NAS, MENU_BOOKS, MENU_PODCASTS, MENU_SETTINGS)
-                : List.of(MENU_MUSIC, MENU_BOOKS, MENU_PODCASTS, MENU_SETTINGS);
+        return nasEnabled ? List.of(MENU_MUSIC, MENU_NAS, MENU_BOOKS, MENU_PODCASTS, MENU_SEARCH, MENU_SETTINGS)
+                : List.of(MENU_MUSIC, MENU_BOOKS, MENU_PODCASTS, MENU_SEARCH, MENU_SETTINGS);
     }
 
     private int menuRowOf(int id) {
@@ -238,11 +252,8 @@ public class IpodScreen extends Screen {
         for (LocalMusic.Album album : snapshot.albums()) {
             List<Track> tracks = new ArrayList<>();
             for (Path file : album.files()) {
-                // while a speaker is linked, songs resume where they were left: show that time
-                double saved = linked ? AudiobookProgress.get(AudiobookProgress.MUSIC, LocalMusic.key(file)) : 0;
                 tracks.add(new Track(Component.literal(LocalMusic.displayName(file)),
-                        () -> IpodPlayer.playFile(file, ipod),
-                        saved >= 1 ? formatTime(saved) : null));
+                        () -> IpodPlayer.playFile(file, ipod)));
             }
             albums.add(new AlbumView(album.name(), album.cover(), null, tracks));
         }
@@ -250,10 +261,8 @@ public class IpodScreen extends Screen {
         for (LocalMusic.Album album : snapshot.nas()) {
             List<Track> tracks = new ArrayList<>();
             for (Path file : album.files()) {
-                double saved = linked ? AudiobookProgress.get(AudiobookProgress.MUSIC, LocalMusic.key(file)) : 0;
                 tracks.add(new Track(Component.literal(LocalMusic.displayName(file)),
-                        () -> IpodPlayer.playFile(file, ipod),
-                        saved >= 1 ? formatTime(saved) : null));
+                        () -> IpodPlayer.playFile(file, ipod)));
             }
             nas.add(new AlbumView(album.name(), album.cover(), null, tracks));
         }
@@ -262,6 +271,70 @@ public class IpodScreen extends Screen {
         buildBooks(snapshot.podcasts(), podcasts, ipod);
         buildBooks(snapshot.nasBooks(), nasBooks, ipod);
         buildBooks(snapshot.nasPodcasts(), nasPodcasts, ipod);
+        buildSearchIndex();
+    }
+
+    // Lower case, no accents, only letters and digits separated by single spaces ("AVĪCI" -> "avici", "AC+DC" -> "ac dc")
+    private static String normalize(String text) {
+        String s = Normalizer.normalize(text, Normalizer.Form.NFD).replaceAll("\\p{M}+", "");
+        return s.toLowerCase(Locale.ROOT).replace("ß", "ss").replaceAll("[^\\p{L}\\p{N}]+", " ").trim();
+    }
+
+    private void buildSearchIndex() {
+        searchIndex.clear();
+        for (AlbumView view : albums) indexList(view, view.icon() != null ? "disc" : "album", view.icon() != null ? "disc" : "song", false);
+        for (AlbumView view : nas) indexList(view, "album", "song", false);
+        for (AlbumView view : books) indexList(view, "book", "chapter", true);
+        for (AlbumView view : nasBooks) indexList(view, "book", "chapter", true);
+        for (AlbumView view : podcasts) indexList(view, "show", "episode", true);
+        for (AlbumView view : nasPodcasts) indexList(view, "show", "episode", true);
+        updateResults();
+    }
+
+    private void indexList(AlbumView view, String albumTag, String trackTag, boolean chapters) {
+        String album = view.name().getString();
+        searchIndex.add(new SearchEntry(view, -1, chapters, album, normalize(album), normalize(album).replace(" ", ""), albumTag));
+        for (int i = 0; i < view.tracks().size(); i++) {
+            String track = view.tracks().get(i).name().getString();
+            String label = album + " - " + track;
+            String text = normalize(label);
+            searchIndex.add(new SearchEntry(view, i, chapters, label, text, text.replace(" ", ""), trackTag));
+        }
+    }
+
+    // Finds the entries that contain every typed word (best: every word starts a word); albums before tracks
+    private void updateResults() {
+        String q = normalize(searchQuery);
+        if (q.isEmpty()) {
+            results = List.of();
+            return;
+        }
+        String[] words = q.split(" ");
+        String compactQuery = q.replace(" ", "");
+        List<SearchEntry> prefix = new ArrayList<>();
+        List<SearchEntry> contains = new ArrayList<>();
+        for (SearchEntry e : searchIndex) {
+            String padded = " " + e.text();
+            boolean allPrefix = true, allContain = true;
+            for (String w : words) {
+                if (!padded.contains(" " + w)) allPrefix = false;
+                if (!e.text().contains(w)) allContain = false;
+            }
+            if (allPrefix) prefix.add(e);
+            else if (allContain || e.compact().contains(compactQuery)) contains.add(e);
+        }
+        List<SearchEntry> all = new ArrayList<>(prefix.size() + contains.size());
+        for (List<SearchEntry> group : List.of(prefix, contains)) {
+            for (SearchEntry e : group) if (e.row() < 0) all.add(e);
+            for (SearchEntry e : group) if (e.row() >= 0) all.add(e);
+        }
+        results = all.size() > SEARCH_MAX_RESULTS ? new ArrayList<>(all.subList(0, SEARCH_MAX_RESULTS)) : all;
+    }
+
+    private void searchChanged() {
+        updateResults();
+        selected = 0;
+        scroll = 0;
     }
 
 
@@ -353,6 +426,7 @@ public class IpodScreen extends Screen {
             } else {
                 open = null;
                 inNas = false;
+                cameFromSearch = false;
                 goTo(Page.MENU, 0);
             }
         }
@@ -461,9 +535,13 @@ public class IpodScreen extends Screen {
             case BOOKS -> Component.translatable(isPodcastSection()
                     ? "screen.icraft.ipod.podcast_list" : "screen.icraft.ipod.books");
             case SETTINGS -> Component.translatable("screen.icraft.ipod.settings");
+            case SEARCH -> Component.literal(searchQuery.isEmpty() ? Component.translatable("screen.icraft.ipod.search").getString()
+                    : searchQuery + ((Util.getMillis() / 500) % 2 == 0 ? "_" : " "));
             case TRACKS, CHAPTERS -> open.name();
         };
-        String shownTitle = fit(title.getString(), right - left - 10);
+        String shownTitle = page == Page.SEARCH && !searchQuery.isEmpty()
+                ? this.font.plainSubstrByWidth(title.getString(), right - left - 10, true) // the end of a long query
+                : fit(title.getString(), right - left - 10);
         g.drawString(this.font, shownTitle, left, DISPLAY_Y + (HEADER_H - 8) / 2, 0xFF0A2A66, false);
         if (LibraryCache.get().scanning() && page != Page.TRACKS && page != Page.CHAPTERS && page != Page.SETTINGS) {
             // a library scan is running: animated dots after the title
@@ -474,7 +552,9 @@ public class IpodScreen extends Screen {
 
         // Nothing to show (only the album and book lists can be empty)
         if (count == 0) {
-            g.drawWordWrap(this.font, Component.translatable(LibraryCache.get().scanning() ? "screen.icraft.ipod.scanning"
+            g.drawWordWrap(this.font, Component.translatable(page == Page.SEARCH
+                            ? (searchQuery.isEmpty() ? "screen.icraft.ipod.search_hint" : "screen.icraft.ipod.no_results")
+                            : LibraryCache.get().scanning() ? "screen.icraft.ipod.scanning"
                             : page == Page.ALBUMS && albumSection == AlbumSection.NAS ? "screen.icraft.ipod.no_nas"
                             : page != Page.BOOKS ? "screen.icraft.ipod.empty"
                             : isPodcastSection() ? "screen.icraft.ipod.no_podcasts"
@@ -490,7 +570,7 @@ public class IpodScreen extends Screen {
             int rowY = LIST_Y + row * ROW_H;
             boolean isSelected = index == selected;
             if (isSelected) {
-                g.fill(DISPLAY_X + 1, rowY, DISPLAY_X + DISPLAY_W - 1, rowY + ROW_H - 1, 0xDDFFFFFF);
+                g.fill(DISPLAY_X + 1, rowY, DISPLAY_X + DISPLAY_W - 1, rowY + ROW_H - 1, 0xEE3A3A3A);
             }
 
             int textX = left;
@@ -509,16 +589,34 @@ public class IpodScreen extends Screen {
                     if (track.detail() != null) { // the saved time, right-aligned in grey
                         int detailW = this.font.width(track.detail());
                         g.drawString(this.font, track.detail(), right - detailW, rowY + 2,
-                                isSelected ? 0xFF5A7AB0 : 0xFFAAAAAA, false);
+                                isSelected ? 0xFFFFFFFF : 0xFFAAAAAA, false);
                         right2 = right - detailW - 3;
                     }
                 }
                 case SETTINGS -> name = settingRow(index);
+                case SEARCH -> {
+                    SearchEntry entry = results.get(index);
+                    name = Component.literal(entry.label());
+                    String tag = Component.translatable("screen.icraft.ipod.result_" + entry.tag()).getString();
+                    int tagW = this.font.width(tag);
+                    g.drawString(this.font, tag, right - tagW, rowY + 2, isSelected ? 0xFFFFFFFF : 0xFFAAAAAA, false);
+                    right2 = right - tagW - 3;
+                }
                 default -> name = menuRow(menuIds().get(index));
             }
 
-            int color = isSelected ? 0xFF0A3A8C : 0xFFFFFFFF;
-            g.drawString(this.font, fit(name.getString(), right2 - textX), textX, rowY + 2, color, !isSelected);
+            int color = isSelected ? 0xFFFFFFFF : 0xFFFFFFFF;
+            String full = name.getString();
+            int available = right2 - textX;
+            if (isSelected && this.font.width(full) > available) {
+                // too long: slide the whole title through the row (clipped), pausing at both ends
+                int offset = marqueeOffset(this.font.width(full) - available, index);
+                scissor(g, textX, rowY, right2, rowY + ROW_H);
+                g.drawString(this.font, full, textX - offset, rowY + 2, color, false);
+                g.disableScissor();
+            } else {
+                g.drawString(this.font, fit(full, available), textX, rowY + 2, color, !isSelected);
+            }
         }
 
         // Volume bar along the bottom of the display
@@ -526,6 +624,38 @@ public class IpodScreen extends Screen {
         int barW = right - left;
         g.fill(left, barY, left + barW, barY + 2, 0x66000000);
         g.fill(left, barY, left + (int) (barW * IpodVolume.get()), barY + 2, 0xFFFFFFFF);
+    }
+
+    // In this Minecraft version GuiGraphics.enableScissor takes plain screen coordinates and ignores the scaling of the
+    // pose stack, while the iPod is drawn scaled: transform the rectangle ourselves.
+    private static void scissor(GuiGraphics g, int x1, int y1, int x2, int y2) {
+        org.joml.Matrix4f m = g.pose().last().pose();
+        org.joml.Vector3f a = m.transformPosition(new org.joml.Vector3f(x1, y1, 0));
+        org.joml.Vector3f b = m.transformPosition(new org.joml.Vector3f(x2, y2, 0));
+        g.enableScissor(Math.round(Math.min(a.x, b.x)), Math.round(Math.min(a.y, b.y)),
+                Math.round(Math.max(a.x, b.x)), Math.round(Math.max(a.y, b.y)));
+    }
+
+    // ---- scrolling of a selected title that does not fit ----
+    private static final long MARQUEE_PAUSE_MS = 800;
+    private static final double MARQUEE_PX_PER_SECOND = 25;
+    private int marqueeKey = -1;
+    private long marqueeStart;
+
+    // How far (in pixels) the title is moved left now; restarts when the selection or page changes
+    private int marqueeOffset(int overflow, int index) {
+        int key = java.util.Objects.hash(page, index, open == null ? 0 : System.identityHashCode(open));
+        long now = Util.getMillis();
+        if (key != marqueeKey) {
+            marqueeKey = key;
+            marqueeStart = now;
+        }
+        long scrollMs = (long) (overflow / MARQUEE_PX_PER_SECOND * 1000);
+        long cycle = MARQUEE_PAUSE_MS + scrollMs + MARQUEE_PAUSE_MS;
+        long t = (now - marqueeStart) % cycle;
+        if (t < MARQUEE_PAUSE_MS) return 0;
+        if (t >= MARQUEE_PAUSE_MS + scrollMs) return overflow;
+        return (int) ((t - MARQUEE_PAUSE_MS) * overflow / Math.max(1, scrollMs));
     }
 
     // A small triangle while playing, two bars while paused, nothing when idle
@@ -579,6 +709,7 @@ public class IpodScreen extends Screen {
         return switch (page) {
             case MENU -> menuIds().size();
             case SETTINGS -> SETTING_ROWS;
+            case SEARCH -> results.size();
             case ALBUMS -> shownAlbums().size();
             case BOOKS -> shownBooks().size();
             case TRACKS, CHAPTERS -> open.tracks().size();
@@ -589,6 +720,7 @@ public class IpodScreen extends Screen {
         return Component.translatable(switch (index) {
             case MENU_MUSIC -> "screen.icraft.ipod.music";
             case MENU_NAS -> "screen.icraft.ipod.nas";
+            case MENU_SEARCH -> "screen.icraft.ipod.search";
             case NAS_MUSIC -> "screen.icraft.ipod.music";
             case NAS_BOOKS -> "screen.icraft.ipod.audiobooks";
             case NAS_PODCASTS -> "screen.icraft.ipod.podcasts";
@@ -654,6 +786,7 @@ public class IpodScreen extends Screen {
                         };
                         yield Page.BOOKS;
                     }
+                    case MENU_SEARCH -> Page.SEARCH;
                     default -> Page.SETTINGS;
                 }, 0);
             }
@@ -667,19 +800,19 @@ public class IpodScreen extends Screen {
                 open = shownBooks().get(selected);
                 goTo(Page.CHAPTERS, open.startRow());
             }
-            case TRACKS, CHAPTERS -> {
-                if (page == Page.TRACKS && dock != null && open.icon() != null) {
-                    // the discs of a docked iPod: the dock (the server) plays them for everybody near it
-                    lastPlayingSeen = selected;
-                    DockControl.play(dock, selected);
-                    return;
+            case TRACKS, CHAPTERS -> playFromOpen();
+            case SEARCH -> {
+                SearchEntry entry = results.get(selected);
+                cameFromSearch = true;
+                searchSelected = selected;
+                open = entry.view();
+                Page target = entry.chapters() ? Page.CHAPTERS : Page.TRACKS;
+                if (entry.row() < 0) {
+                    goTo(target, entry.chapters() ? open.startRow() : 0); // the album/book/show: open its list
+                } else {
+                    goTo(target, entry.row()); // a track: open its album with this row selected and start from it
+                    playFromOpen();
                 }
-                List<Runnable> actions = open.tracks().stream().map(Track::play).toList();
-                playedAlbum = open;
-                playedActions = actions;
-                lastPlayingSeen = selected;
-                IpodPlayer.setQueueDock(dockOwner ? dock : null); // only the owner's files play through the dock
-                IpodPlayer.playQueue(actions, selected, page == Page.CHAPTERS);
             }
             case SETTINGS -> {
                 if (selected == SETTING_SHUFFLE) {
@@ -691,11 +824,34 @@ public class IpodScreen extends Screen {
         }
     }
 
+    // Starts the open album/book from the selected row (the discs of a docked iPod go through the dock)
+    private void playFromOpen() {
+        if (page == Page.TRACKS && dock != null && open.icon() != null) {
+            // the discs of a docked iPod: the dock (the server) plays them for everybody near it
+            lastPlayingSeen = selected;
+            DockControl.play(dock, selected);
+            return;
+        }
+        List<Runnable> actions = open.tracks().stream().map(Track::play).toList();
+        playedAlbum = open;
+        playedActions = actions;
+        lastPlayingSeen = selected;
+        IpodPlayer.setQueueDock(dockOwner ? dock : null); // only the owner's files play through the dock
+        IpodPlayer.playQueue(actions, selected, page == Page.CHAPTERS);
+    }
+
     // The Menu button: one level up. The row we came from stays highlighted.
     private void menu() {
         switch (page) {
-            case TRACKS -> goTo(Page.ALBUMS, openedIndex);
-            case CHAPTERS -> goTo(Page.BOOKS, openedIndex);
+            case TRACKS, CHAPTERS -> {
+                if (cameFromSearch) { // back to the results the album was opened from
+                    cameFromSearch = false;
+                    goTo(Page.SEARCH, searchSelected);
+                } else {
+                    goTo(page == Page.TRACKS ? Page.ALBUMS : Page.BOOKS, openedIndex);
+                }
+            }
+            case SEARCH -> goTo(Page.MENU, menuRowOf(MENU_SEARCH));
             case ALBUMS -> {
                 inNas = albumSection == AlbumSection.NAS;
                 goTo(Page.MENU, menuRowOf(inNas ? NAS_MUSIC : MENU_MUSIC));
@@ -836,11 +992,28 @@ public class IpodScreen extends Screen {
                 return true;
             }
             if (keyCode == GLFW.GLFW_KEY_BACKSPACE) {
-                menu();
+                if (page == Page.SEARCH && !searchQuery.isEmpty()) { // delete a letter; with nothing typed it goes back
+                    searchQuery = searchQuery.substring(0, searchQuery.length() - 1);
+                    searchChanged();
+                } else {
+                    menu();
+                }
                 return true;
             }
         }
         return super.keyPressed(keyCode, scanCode, modifiers);
+    }
+
+    // Typing on the search page
+    @Override
+    public boolean charTyped(char codePoint, int modifiers) {
+        if (settled() && page == Page.SEARCH && codePoint >= ' ' && codePoint != 127
+                && searchQuery.length() < SEARCH_MAX_LENGTH) {
+            searchQuery += codePoint;
+            searchChanged();
+            return true;
+        }
+        return super.charTyped(codePoint, modifiers);
     }
 
     @Override

@@ -55,5 +55,15 @@
   "message.icraft.dock.not_yours": "This iPod belongs to %s.",
   "screen.icraft.ipod.scanning": "Scanning library...",
   "screen.icraft.ipod.nas": "NAS",
-  "screen.icraft.ipod.no_nas": "No music found in the NAS folders from the config."
+  "screen.icraft.ipod.no_nas": "No music found in the NAS folders from the config.",
+  "screen.icraft.ipod.search": "Search",
+  "screen.icraft.ipod.search_hint": "Type to search your music, audiobooks and podcasts.",
+  "screen.icraft.ipod.no_results": "No results.",
+  "screen.icraft.ipod.result_album": "Album",
+  "screen.icraft.ipod.result_song": "Song",
+  "screen.icraft.ipod.result_book": "Book",
+  "screen.icraft.ipod.result_chapter": "Chapter",
+  "screen.icraft.ipod.result_show": "Show",
+  "screen.icraft.ipod.result_episode": "Episode",
+  "screen.icraft.ipod.result_disc": "Disc"
 }

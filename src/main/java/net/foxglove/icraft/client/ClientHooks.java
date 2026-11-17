@@ -53,6 +53,11 @@ public class ClientHooks {
         IpodPlayer.handOverToDock(dock, ipod.get(ModDataComponents.IPOD_ID.get()), ipod);
     }
 
+    /** The player takes the iPod out of a dock (client side of the click, before the server answers). */
+    public static void ipodTakenFromDock(DockBlockEntity dock) {
+        IpodPlayer.pickupFromDock(dock);
+    }
+
     /** A dock block entity went away on the client: stop what it was playing. */
     public static void dockRemoved(DockBlockEntity dock) {
         DockClientPlayer.cleanup(dock);

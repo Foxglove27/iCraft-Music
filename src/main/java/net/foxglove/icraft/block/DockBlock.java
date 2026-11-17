@@ -136,6 +136,9 @@ public class DockBlock extends BaseEntityBlock {
         dock.claimIfUnowned(player); // a dock filled by an older version belongs to whoever uses it first
 
         if (player.isShiftKeyDown()) {
+            if (level.isClientSide() && (dock.isOwner(player) || player.hasPermissions(2))) {
+                ClientHooks.ipodTakenFromDock(dock); // what the dock plays carries on for this player
+            }
             if (!level.isClientSide()) {
                 if (dock.isOwner(player) || player.hasPermissions(2)) { // the owner, or an operator / creative
                     player.getInventory().placeItemBackInInventory(dock.takeIpod());
