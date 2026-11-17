@@ -214,7 +214,7 @@ public final class DockClientPlayer {
         best.locallyStopped = true;
         stopSounds(best);
         Minecraft mc = Minecraft.getInstance();
-        if (mc.player != null) mc.player.displayClientMessage(Component.translatable("message.icraft.dock.stopped_for_you"), true);
+        if (mc.player != null) mc.player.displayClientMessage(Component.translatable("message.icraft_music.dock.stopped_for_you"), true);
         return true;
     }
 

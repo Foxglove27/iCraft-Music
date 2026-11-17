@@ -4,7 +4,7 @@ import net.neoforged.neoforge.common.ModConfigSpec;
 
 /**
  * Client-side configuration, registered as {@code ModConfig.Type.CLIENT} in {@link iCraft}.
- * Written to {@code config/icraft-client.toml}; loaded on physical clients only,
+ * Written to {@code config/icraft_music-client.toml}; loaded on physical clients only,
  * never on dedicated servers.
  */
 public class ClientConfig {

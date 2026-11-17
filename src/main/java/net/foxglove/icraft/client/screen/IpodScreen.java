@@ -219,7 +219,7 @@ public class IpodScreen extends Screen {
 
     public IpodScreen(List<ItemStack> discs, @Nullable GlobalPos dock, boolean dockOwner,
                       ResourceLocation skin, @Nullable UUID ipod) {
-        super(Component.translatable("screen.icraft.ipod"));
+        super(Component.translatable("screen.icraft_music.ipod"));
         this.skin = skin;
         this.dock = dock;
         this.dockOwner = dockOwner;
@@ -244,7 +244,7 @@ public class IpodScreen extends Screen {
             for (ItemStack disc : discs) {
                 tracks.add(new Track(discName(disc), () -> IpodPlayer.play(disc, ipod)));
             }
-            albums.add(new AlbumView(Component.translatable("screen.icraft.ipod.discs"),
+            albums.add(new AlbumView(Component.translatable("screen.icraft_music.ipod.discs"),
                     null, new ItemStack(Items.MUSIC_DISC_CAT), tracks));
         }
 
@@ -528,13 +528,13 @@ public class IpodScreen extends Screen {
 
         // Header: dark text on the light blue strip, plus a play/pause symbol
         Component title = switch (page) {
-            case MENU -> Component.translatable(inNas ? "screen.icraft.ipod.nas" : "screen.icraft.ipod.menu");
+            case MENU -> Component.translatable(inNas ? "screen.icraft_music.ipod.nas" : "screen.icraft_music.ipod.menu");
             case ALBUMS -> Component.translatable(albumSection == AlbumSection.NAS
-                    ? "screen.icraft.ipod.nas" : "screen.icraft.ipod.albums");
+                    ? "screen.icraft_music.ipod.nas" : "screen.icraft_music.ipod.albums");
             case BOOKS -> Component.translatable(isPodcastSection()
-                    ? "screen.icraft.ipod.podcast_list" : "screen.icraft.ipod.books");
-            case SETTINGS -> Component.translatable("screen.icraft.ipod.settings");
-            case SEARCH -> Component.literal(searchQuery.isEmpty() ? Component.translatable("screen.icraft.ipod.search").getString()
+                    ? "screen.icraft_music.ipod.podcast_list" : "screen.icraft_music.ipod.books");
+            case SETTINGS -> Component.translatable("screen.icraft_music.ipod.settings");
+            case SEARCH -> Component.literal(searchQuery.isEmpty() ? Component.translatable("screen.icraft_music.ipod.search").getString()
                     : searchQuery + ((Util.getMillis() / 500) % 2 == 0 ? "_" : " "));
             case TRACKS, CHAPTERS -> open.name();
         };
@@ -552,12 +552,12 @@ public class IpodScreen extends Screen {
         // Nothing to show (only the album and book lists can be empty)
         if (count == 0) {
             g.drawWordWrap(this.font, Component.translatable(page == Page.SEARCH
-                            ? (searchQuery.isEmpty() ? "screen.icraft.ipod.search_hint" : "screen.icraft.ipod.no_results")
-                            : LibraryCache.get().scanning() ? "screen.icraft.ipod.scanning"
-                            : page == Page.ALBUMS && albumSection == AlbumSection.NAS ? "screen.icraft.ipod.no_nas"
-                            : page != Page.BOOKS ? "screen.icraft.ipod.empty"
-                            : isPodcastSection() ? "screen.icraft.ipod.no_podcasts"
-                            : "screen.icraft.ipod.no_books"),
+                            ? (searchQuery.isEmpty() ? "screen.icraft_music.ipod.search_hint" : "screen.icraft_music.ipod.no_results")
+                            : LibraryCache.get().scanning() ? "screen.icraft_music.ipod.scanning"
+                            : page == Page.ALBUMS && albumSection == AlbumSection.NAS ? "screen.icraft_music.ipod.no_nas"
+                            : page != Page.BOOKS ? "screen.icraft_music.ipod.empty"
+                            : isPodcastSection() ? "screen.icraft_music.ipod.no_podcasts"
+                            : "screen.icraft_music.ipod.no_books"),
                     left, LIST_Y + 3, right - left, 0xFFFFFFFF);
         }
 
@@ -596,7 +596,7 @@ public class IpodScreen extends Screen {
                 case SEARCH -> {
                     SearchEntry entry = results.get(index);
                     name = Component.literal(entry.label());
-                    String tag = Component.translatable("screen.icraft.ipod.result_" + entry.tag()).getString();
+                    String tag = Component.translatable("screen.icraft_music.ipod.result_" + entry.tag()).getString();
                     int tagW = this.font.width(tag);
                     g.drawString(this.font, tag, right - tagW, rowY + 2, isSelected ? 0xFFFFFFFF : 0xFFAAAAAA, false);
                     right2 = right - tagW - 3;
@@ -717,28 +717,28 @@ public class IpodScreen extends Screen {
 
     private static Component menuRow(int index) {
         return Component.translatable(switch (index) {
-            case MENU_MUSIC -> "screen.icraft.ipod.music";
-            case MENU_NAS -> "screen.icraft.ipod.nas";
-            case MENU_SEARCH -> "screen.icraft.ipod.search";
-            case NAS_MUSIC -> "screen.icraft.ipod.music";
-            case NAS_BOOKS -> "screen.icraft.ipod.audiobooks";
-            case NAS_PODCASTS -> "screen.icraft.ipod.podcasts";
-            case MENU_BOOKS -> "screen.icraft.ipod.audiobooks";
-            case MENU_PODCASTS -> "screen.icraft.ipod.podcasts";
-            default -> "screen.icraft.ipod.settings";
+            case MENU_MUSIC -> "screen.icraft_music.ipod.music";
+            case MENU_NAS -> "screen.icraft_music.ipod.nas";
+            case MENU_SEARCH -> "screen.icraft_music.ipod.search";
+            case NAS_MUSIC -> "screen.icraft_music.ipod.music";
+            case NAS_BOOKS -> "screen.icraft_music.ipod.audiobooks";
+            case NAS_PODCASTS -> "screen.icraft_music.ipod.podcasts";
+            case MENU_BOOKS -> "screen.icraft_music.ipod.audiobooks";
+            case MENU_PODCASTS -> "screen.icraft_music.ipod.podcasts";
+            default -> "screen.icraft_music.ipod.settings";
         });
     }
 
     // "Shuffle: Off", "Repeat: List"...
     private static Component settingRow(int index) {
         if (index == SETTING_SHUFFLE) {
-            return Component.translatable("screen.icraft.ipod.setting",
-                    Component.translatable("screen.icraft.ipod.shuffle"),
-                    Component.translatable(IpodSettings.shuffle() ? "screen.icraft.ipod.on" : "screen.icraft.ipod.off"));
+            return Component.translatable("screen.icraft_music.ipod.setting",
+                    Component.translatable("screen.icraft_music.ipod.shuffle"),
+                    Component.translatable(IpodSettings.shuffle() ? "screen.icraft_music.ipod.on" : "screen.icraft_music.ipod.off"));
         }
-        return Component.translatable("screen.icraft.ipod.setting",
-                Component.translatable("screen.icraft.ipod.repeat"),
-                Component.translatable("screen.icraft.ipod.repeat." + IpodSettings.repeat().name().toLowerCase(Locale.ROOT)));
+        return Component.translatable("screen.icraft_music.ipod.setting",
+                Component.translatable("screen.icraft_music.ipod.repeat"),
+                Component.translatable("screen.icraft_music.ipod.repeat." + IpodSettings.repeat().name().toLowerCase(Locale.ROOT)));
     }
 
     private void goTo(Page next, int row) {

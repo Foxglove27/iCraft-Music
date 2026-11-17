@@ -1,0 +1,8 @@
+{
+  "variants": {
+    "facing=north": { "model": "icraft_music:block/dock" },
+    "facing=east":  { "model": "icraft_music:block/dock", "y": 90 },
+    "facing=south": { "model": "icraft_music:block/dock", "y": 180 },
+    "facing=west":  { "model": "icraft_music:block/dock", "y": 270 }
+  }
+}

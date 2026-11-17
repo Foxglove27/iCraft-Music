@@ -17,7 +17,7 @@ import net.neoforged.neoforge.event.BuildCreativeModeTabContentsEvent;
 // Must match the mod id declared in META-INF/neoforge.mods.toml
 @Mod(iCraft.MOD_ID)
 public class iCraft {
-    public static final String MOD_ID ="icraft";
+    public static final String MOD_ID = "icraft_music";
 
     // Runs first when the mod is loaded; FML injects the mod event bus and the ModContainer
     // (used for config registration) automatically.
@@ -33,7 +33,7 @@ public class iCraft {
         // Add the iPod and speaker to the vanilla creative tabs (the custom iCraft tab is built in ModCreativeModeTabs)
         modEventBus.addListener(this::addCreative);
 
-        // Let FML create and load the client-side config file (config/icraft-client.toml) from our spec
+        // Let FML create and load the client-side config file (config/icraft_music-client.toml) from our spec
         modContainer.registerConfig(ModConfig.Type.CLIENT, ClientConfig.SPEC);
 
     }

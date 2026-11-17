@@ -14,7 +14,7 @@ new changes go there until the next version bump.
 
 ### Fixed
 - The game's own background music no longer starts over the iPod or a dock's music while it plays for you (it comes back
-  afterwards). Switch: `silenceBackgroundMusic` in `icraft-client.toml`.
+  afterwards). Switch: `silenceBackgroundMusic` in `icraft_music-client.toml`.
 - Music recovers by itself when the game drops the sound: after the volume was set to 0 and back, after switching the
   audio device, and after walking away from a dock and back (the song carries on at the right second).
 - Previous now keeps going back when it lands on a track that cannot be played (it used to jump forward again).
@@ -46,7 +46,7 @@ new changes go there until the next version bump.
   or use the new key (default `\`, "iPod: Stop a dock's music for me"). Nothing changes for the owner or anybody else;
   it stays stopped through the next songs and ends when they walk away and come back, or when the dock stops.
 - **Big libraries and network shares.** `extraMusicFolders`, `extraAudiobookFolders` and `extraPodcastFolders` in
-  `icraft-client.toml` add more folders to the library (absolute, or relative to the game folder). A network share has
+  `icraft_music-client.toml` add more folders to the library (absolute, or relative to the game folder). A network share has
   to be mounted first and its mount path used (`smb://` addresses do not work). A folder that directly contains audio
   files is an album, book or show, up to three levels deep, so `Artist/Album` shows as "Artist - Album". The mod never
   writes into these folders.
@@ -64,7 +64,7 @@ new changes go there until the next version bump.
 - The library is scanned in the background (when you join a world and when the iPod opens), so a big library or a slow
   share no longer freezes the game; the lists update when the scan is done ("Scanning library..."). Album covers also
   load in the background, and animated dots after the title show that a scan is running.
-- Saved audiobook and podcast positions now live in `icraft-progress.json` in the game folder instead of inside the
+- Saved audiobook and podcast positions now live in `icraft_music-progress.json` in the game folder instead of inside the
   library (an old `ipod/.icraft-progress.json` is read once as the starting point and left alone).
 - Songs no longer remember where you stopped and the song list shows no saved time: they always start from the
   beginning. Only audiobook chapters and podcast episodes resume.
@@ -165,7 +165,7 @@ new changes go there until the next version bump.
 
 ### Added
 - **Shuffle and repeat.** New Settings page with `Shuffle: On/Off` and `Repeat: Off/List/One`. Both are
-  global (stored in `config/icraft-client.toml`, not per iPod) and take effect immediately, also while a
+  global (stored in `config/icraft_music-client.toml`, not per iPod) and take effect immediately, also while a
   song is playing. Next/Previous follow the shuffled order.
 - **Top-level menu** (Music, Settings). The iPod now opens on it; the Menu button goes up one level.
 

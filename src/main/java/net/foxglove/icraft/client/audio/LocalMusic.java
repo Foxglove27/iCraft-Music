@@ -184,7 +184,7 @@ public class LocalMusic {
                     albums.add(new Album(Component.literal(name), coverOf(dir), files)));
         }
         if (!singles.isEmpty()) {
-            albums.add(0, new Album(Component.translatable("screen.icraft.ipod.singles"), null, singles));
+            albums.add(0, new Album(Component.translatable("screen.icraft_music.ipod.singles"), null, singles));
         }
         return albums;
     }
@@ -452,7 +452,7 @@ public class LocalMusic {
 
     // The album (or book) a file belongs to: its folder name (with the artist folders in front), or "Singles" for loose music files
     public static Component albumNameFor(Path file) {
-        if (isDirectlyInMusicRoot(file)) return Component.translatable("screen.icraft.ipod.singles");
+        if (isDirectlyInMusicRoot(file)) return Component.translatable("screen.icraft_music.ipod.singles");
         Path dir = file.getParent();
         for (Section section : Section.values()) {
             Path root = rootOf(section, file);

@@ -114,7 +114,7 @@ public class IpodPlayer {
     }
 
     public static Component getNowPlayingSubtitle() {
-        return DockControl.isActive() ? Component.translatable("screen.icraft.ipod.discs") : currentSubtitle;
+        return DockControl.isActive() ? Component.translatable("screen.icraft_music.ipod.discs") : currentSubtitle;
     }
 
     @Nullable
@@ -323,7 +323,7 @@ public class IpodPlayer {
         Minecraft mc = Minecraft.getInstance();
         if (mc.player != null) {
             mc.player.displayClientMessage(
-                    Component.translatable("message.icraft.ipod.load_failed", currentName), true);
+                    Component.translatable("message.icraft_music.ipod.load_failed", currentName), true);
         }
     }
     
@@ -359,7 +359,7 @@ public class IpodPlayer {
             }
             start(sounds, disc.copy(), outputs,
                     song.value().description(),
-                    Component.translatable("screen.icraft.ipod.discs"),
+                    Component.translatable("screen.icraft_music.ipod.discs"),
                     null, ipod);
         });
     }
@@ -378,7 +378,7 @@ public class IpodPlayer {
         IpodSoundInstance sound = IpodSoundInstance.forDiscAt(downmix -> DiscAudio.open(path, downmix),
                 path.toString(), null, 1.0F, startSeconds);
         start(List.of(sound), disc.copy(), List.of(), song.get().value().description(),
-                Component.translatable("screen.icraft.ipod.discs"), null, ipod);
+                Component.translatable("screen.icraft_music.ipod.discs"), null, ipod);
     }
 
     // ---- taking the iPod out of a dock: what the dock was playing carries on in the player's ears ----
