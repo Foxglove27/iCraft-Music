@@ -17,7 +17,7 @@ import org.jetbrains.annotations.Nullable;
 public class ClientHooks {
     /** Opens the screen of an iPod the player holds. It plays in the player's ears. */
     public static void openIpodScreen(ItemStack ipod) {
-        openScreen(ipod, null, false, true);
+        openScreen(ipod, null, true);
     }
 
     /**
@@ -39,17 +39,16 @@ public class ClientHooks {
         Level level = dock.getLevel();
         if (level == null) return;
         Player player = Minecraft.getInstance().player;
-        openScreen(dock.getIpod(), GlobalPos.of(level.dimension(), dock.getBlockPos()), !dock.getSpeakers().isEmpty(),
+        openScreen(dock.getIpod(), GlobalPos.of(level.dimension(), dock.getBlockPos()),
                 player != null && dock.canControl(player));
     }
 
-    private static void openScreen(ItemStack ipod, @Nullable GlobalPos dock, boolean playsThroughSpeakers, boolean dockOwner) {
+    private static void openScreen(ItemStack ipod, @Nullable GlobalPos dock, boolean dockOwner) {
         // the GUI skin depends on the iPod's colour
         IpodColor color = ipod.getItem() instanceof IpodItem item ? item.getColor() : IpodColor.WHITE;
         LibraryCache.refreshIfStale(); // the lists on the screen update themselves when the scan is done
         Minecraft.getInstance().setScreen(new IpodScreen(
                 IpodItem.getDiscs(ipod),
-                playsThroughSpeakers,
                 dock,
                 dockOwner,
                 color.guiTexture(),

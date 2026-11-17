@@ -31,10 +31,6 @@ public final class AudiobookProgress {
         Map<String, Double> pos = new LinkedHashMap<>();
     }
 
-    /** Reserved "book" that holds the positions of songs played while the iPod is linked to a speaker. */
-    public static final String MUSIC = "music";
-    private static final int MAX_MUSIC_ENTRIES = 200;
-
     private static Map<String, BookState> books;
 
     private AudiobookProgress() {}
@@ -99,13 +95,8 @@ public final class AudiobookProgress {
     public static void save(String bookKey, String chapterKey, double seconds) {
         BookState b = load().computeIfAbsent(bookKey, k -> new BookState());
         b.last = chapterKey;
-        b.pos.remove(chapterKey); // re-adding moves it to the end, so the oldest entries are the ones dropped below
+        b.pos.remove(chapterKey);
         b.pos.put(chapterKey, Math.round(seconds * 10) / 10.0);
-        if (bookKey.equals(MUSIC)) {
-            while (b.pos.size() > MAX_MUSIC_ENTRIES) {
-                b.pos.remove(b.pos.keySet().iterator().next());
-            }
-        }
         write();
     }
 

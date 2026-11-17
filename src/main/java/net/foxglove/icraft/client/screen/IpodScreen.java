@@ -213,19 +213,17 @@ public class IpodScreen extends Screen {
     private float closeFrom;
 
     private final List<ItemStack> discs;
-    private final boolean linked;
     @Nullable
     private final UUID ipodId;
     private LibraryCache.Snapshot shown = LibraryCache.get(); // the scan the lists were built from
 
-    public IpodScreen(List<ItemStack> discs, boolean linked, @Nullable GlobalPos dock, boolean dockOwner,
+    public IpodScreen(List<ItemStack> discs, @Nullable GlobalPos dock, boolean dockOwner,
                       ResourceLocation skin, @Nullable UUID ipod) {
         super(Component.translatable("screen.icraft.ipod"));
         this.skin = skin;
         this.dock = dock;
         this.dockOwner = dockOwner;
         this.discs = discs;
-        this.linked = linked;
         this.ipodId = ipod;
         buildLists(shown);
 
