@@ -6,10 +6,19 @@ license="${mod_license}"
 modId="${mod_id}"
 version="${mod_version}"
 displayName="${mod_name}"
-authors="Foxglove"
+authors="Foxglove27"
+logoFile="assets/icraft_music/icon.png"
+logoBlur=false
+credits="JLayer (JavaZoom), JAAD (in-somnia, DV8FromTheWorld), the ALAC decoder by Peter McQuillan"
+# displayURL="https://www.curseforge.com/minecraft/mc-mods/..."   (add when the mod page is up)
+# issueTrackerURL="https://..."                                    (add with the bug tracker)
 description='''
-A portable iPod for Minecraft. Play music discs or your own audio files
-(Ogg, MP3, FLAC, WAV, M4A) and share the sound with a Speaker block.
+A pocket music player for Minecraft: a click-wheel iPod, a docking station and speakers.
+
+Play your own music, audiobooks and podcasts (Ogg, MP3, FLAC, WAV, M4A/M4B) or the music discs from the game.
+Search your library, add a network share as an extra folder, and dye the iPod in eight colours.
+
+Your files stay yours: iCraft only reads them and never writes into your library.
 '''
 
 [[dependencies.${mod_id}]]

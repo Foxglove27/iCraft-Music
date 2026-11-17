@@ -1,0 +1,12 @@
+{
+  "parent": "minecraft:block/cube",
+  "textures": {
+    "particle": "icraft_music:block/speaker_side",
+    "down": "icraft_music:block/speaker_side",
+    "up": "icraft_music:block/speaker_side",
+    "north": "icraft_music:block/speaker_front",
+    "south": "icraft_music:block/speaker_side",
+    "east": "icraft_music:block/speaker_side",
+    "west": "icraft_music:block/speaker_side"
+  }
+}

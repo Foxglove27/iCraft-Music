@@ -1,5 +1,5 @@
 <p align="center"><img src="./docs/icon.png" alt="iCraft logo" width="200"></p>
-<h1 align="center">iCraft<br>
+<h1 align="center">iCraft - Music Player<br>
 	<img src="https://img.shields.io/badge/Minecraft-1.21.1-5B8731?style=flat" alt="Minecraft 1.21.1">
 	<img src="https://img.shields.io/badge/NeoForge-21.1.233-E68C37?style=flat" alt="NeoForge 21.1">
 	<img src="https://img.shields.io/badge/status-alpha-orange?style=flat" alt="Status: alpha">
@@ -7,9 +7,9 @@
 	<br><br>
 </h1>
 
-<p>Welcome to iCraft, a mod that puts a pocket music player into Minecraft: a click-wheel iPod, a docking station and speakers.</p>
+<p>Welcome to iCraft - Music Player, a mod that puts an iPod into Minecraft: a click-wheel on the iPod, a docking station and speakers.</p>
 <p>Play your own music, audiobooks and podcasts, or the music discs you find in the game.</p>
-<p>Your files stay yours: iCraft only reads them from a folder on your computer (or a network share) and never writes into your library.</p>
+<p>Your files stay yours: iCraft - Music Player only reads them from a folder on your computer (or a network share) and never writes into your library.</p>
 
 ## Features
 
@@ -43,7 +43,7 @@ ipod/
 
 ### Extra folders and network shares
 
-`config/icraft-client.toml` has three lists, `extraMusicFolders`, `extraAudiobookFolders` and `extraPodcastFolders`. Add absolute paths (for example `/mnt/nas/music`); they are merged with the local folders and show up under a separate **NAS** menu. Mount the share in your operating system first; `smb://` addresses do not work.
+`config/icraft_music-client.toml` has three lists, `extraMusicFolders`, `extraAudiobookFolders` and `extraPodcastFolders`. Add absolute paths (for example `/mnt/nas/music`); they are merged with the local folders and show up under a separate **NAS** menu. Mount the share in your operating system first; `smb://` addresses do not work.
 
 ## Controls
 
@@ -65,4 +65,4 @@ A single speaker carries about 32 blocks; a wall of 2 wide x 4 tall speakers fac
 
 The code is under the MIT License. The artwork (everything in `src/main/resources/assets/`) is all rights reserved. See [LICENSE.md](LICENSE.md). Bundled libraries (JLayer, JAAD, an ALAC decoder) are listed in [THIRD_PARTY.md](THIRD_PARTY.md). See the [changelog](CHANGELOG.md) for what changed in each version.
 
-iCraft is a fan-made mod. "iPod" is a trademark of Apple Inc.; iCraft is not affiliated with or endorsed by Apple.
+iCraft - Music Player is a fan-made mod. "iPod" is a trademark of Apple Inc.; iCraft is not affiliated with or endorsed by Apple.

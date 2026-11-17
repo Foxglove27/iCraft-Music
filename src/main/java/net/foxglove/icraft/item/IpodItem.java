@@ -140,7 +140,7 @@ public class IpodItem extends Item {
         if (level.getBlockState(pos).is(ModBlocks.DOCK.get()) && player != null && player.isShiftKeyDown()) {
             if (!level.isClientSide()) {
                 ipod.set(ModDataComponents.LINKED_DOCK.get(), GlobalPos.of(level.dimension(), pos));
-                player.displayClientMessage(Component.translatable("message.icraft.dock.linked"), true);
+                player.displayClientMessage(Component.translatable("message.icraft_music.dock.linked"), true);
             }
             return InteractionResult.sidedSuccess(level.isClientSide());
         }
@@ -157,12 +157,12 @@ public class IpodItem extends Item {
     private static void toggleSpeaker(Level level, BlockPos clicked, ItemStack ipod, Player player) {
         GlobalPos dockPos = ipod.get(ModDataComponents.LINKED_DOCK.get());
         if (dockPos == null) {
-            player.displayClientMessage(Component.translatable("message.icraft.dock.link_first"), true);
+            player.displayClientMessage(Component.translatable("message.icraft_music.dock.link_first"), true);
             return;
         }
         if (!dockPos.dimension().equals(level.dimension())
                 || !(level.getBlockEntity(dockPos.pos()) instanceof DockBlockEntity dock)) {
-            player.displayClientMessage(Component.translatable("message.icraft.dock.missing"), true);
+            player.displayClientMessage(Component.translatable("message.icraft_music.dock.missing"), true);
             return;
         }
 
@@ -171,19 +171,19 @@ public class IpodItem extends Item {
 
         if (!dock.hasSpeaker(anchor)) {
             if (dock.isFull()) {
-                player.displayClientMessage(Component.translatable("message.icraft.dock.speakers_full",
+                player.displayClientMessage(Component.translatable("message.icraft_music.dock.speakers_full",
                         DockBlockEntity.MAX_SPEAKERS), true);
                 return;
             }
             if (Vec3.atCenterOf(anchor).distanceTo(Vec3.atCenterOf(dockPos.pos())) > DockBlockEntity.MAX_SPEAKER_DISTANCE) {
-                player.displayClientMessage(Component.translatable("message.icraft.dock.too_far",
+                player.displayClientMessage(Component.translatable("message.icraft_music.dock.too_far",
                         (int) DockBlockEntity.MAX_SPEAKER_DISTANCE), true);
                 return;
             }
         }
         boolean added = dock.toggleSpeaker(anchor, big);
         player.displayClientMessage(Component.translatable(
-                added ? "message.icraft.dock.speaker_added" : "message.icraft.dock.speaker_removed",
+                added ? "message.icraft_music.dock.speaker_added" : "message.icraft_music.dock.speaker_removed",
                 dock.getSpeakers().size(), DockBlockEntity.MAX_SPEAKERS), true);
     }
 }

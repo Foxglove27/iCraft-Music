@@ -18,7 +18,7 @@ import java.util.Map;
 
 /**
  * Where the player stopped in each audiobook chapter. Saved on the client in
- * <code>icraft-progress.json</code> in the game folder:
+ * <code>icraft_music-progress.json</code> in the game folder:
  * <pre>{ "audiobooks/Book": { "last": "audiobooks/Book/ch2.mp3", "pos": { "audiobooks/Book/ch2.mp3": 123.4 } } }</pre>
  * Every problem with the file is logged and ignored: losing progress must never break playback.
  */
@@ -37,7 +37,7 @@ public final class AudiobookProgress {
 
     // Progress is kept in the game folder, never in the library (which may be a read-only network share)
     private static Path file() {
-        return net.minecraft.client.Minecraft.getInstance().gameDirectory.toPath().resolve("icraft-progress.json");
+        return net.minecraft.client.Minecraft.getInstance().gameDirectory.toPath().resolve("icraft_music-progress.json");
     }
 
     // The file older versions wrote into the library folder; only read, once, if the new file does not exist yet

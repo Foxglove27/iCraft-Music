@@ -12,7 +12,7 @@ public class ModRecipes {
     public static final DeferredRegister<RecipeSerializer<?>> SERIALIZERS =
             DeferredRegister.create(Registries.RECIPE_SERIALIZER, iCraft.MOD_ID);
 
-    // The recipe type used in the JSON files as "icraft:ipod_dye"
+    // The recipe type used in the JSON files as "icraft_music:ipod_dye"
     public static final Supplier<RecipeSerializer<IpodDyeRecipe>> IPOD_DYE =
             SERIALIZERS.register("ipod_dye", IpodDyeRecipe.Serializer::new);
 
