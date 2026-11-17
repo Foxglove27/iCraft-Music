@@ -52,5 +52,8 @@
   "message.icraft.dock.speaker_added": "Speaker added to the dock (%s/%s)",
   "message.icraft.dock.speaker_removed": "Speaker removed from the dock (%s/%s)",
   "message.icraft.dock.speaker_lost": "A speaker was removed from the dock (%s/%s)",
-  "message.icraft.dock.not_yours": "This iPod belongs to %s."
+  "message.icraft.dock.not_yours": "This iPod belongs to %s.",
+  "screen.icraft.ipod.scanning": "Scanning library...",
+  "screen.icraft.ipod.nas": "NAS",
+  "screen.icraft.ipod.no_nas": "No music found in the NAS folders from the config."
 }

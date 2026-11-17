@@ -7,6 +7,7 @@ import net.foxglove.icraft.client.IpodSettings;
 import net.foxglove.icraft.client.IpodVolume;
 import net.foxglove.icraft.client.audio.AudiobookProgress;
 import net.foxglove.icraft.client.audio.CoverArt;
+import net.foxglove.icraft.client.audio.LibraryCache;
 import net.foxglove.icraft.client.audio.LocalMusic;
 import net.minecraft.Util;
 import net.minecraft.client.Minecraft;
@@ -94,13 +95,18 @@ public class IpodScreen extends Screen {
     // CHAPTERS -> BOOKS -> MENU, SETTINGS -> MENU.
     private enum Page { MENU, ALBUMS, TRACKS, BOOKS, CHAPTERS, SETTINGS }
 
+    // ids of the menu entries (the rows are Music, NAS (only with extra folders), Audiobooks, Podcasts, Settings)
     private static final int MENU_MUSIC = 0;
     private static final int MENU_BOOKS = 1;
     private static final int MENU_PODCASTS = 2;
     private static final int MENU_SETTINGS = 3;
+    private static final int MENU_NAS = 4;
+    // the entries of the NAS submenu
+    private static final int NAS_MUSIC = 5;
+    private static final int NAS_BOOKS = 6;
+    private static final int NAS_PODCASTS = 7;
     private static final int SETTING_SHUFFLE = 0;
     private static final int SETTING_REPEAT = 1;
-    private static final int MENU_ROWS = 4;
     private static final int SETTING_ROWS = 2;
 
     private Page page = Page.MENU;
@@ -110,15 +116,58 @@ public class IpodScreen extends Screen {
     private final boolean dockOwner; // only the player who docked the iPod controls the dock
     private final ResourceLocation skin; // the GUI texture for this iPod's colour
     private final List<AlbumView> albums = new ArrayList<>();
+    private final List<AlbumView> nas = new ArrayList<>();
+
+    // The ALBUMS and TRACKS pages show either the local music or the NAS music
+    private enum AlbumSection { MUSIC, NAS }
+    private AlbumSection albumSection = AlbumSection.MUSIC;
+    private final boolean nasEnabled = LocalMusic.hasNasFolders();
+    private boolean inNas; // the MENU page shows the NAS submenu (Music, Audiobooks, Podcasts from the extra folders)
+
+    private List<AlbumView> shownAlbums() {
+        return albumSection == AlbumSection.NAS ? nas : albums;
+    }
+
+    // the menu entries in the order they are shown
+    private List<Integer> menuIds() {
+        if (inNas) {
+            List<Integer> ids = new ArrayList<>();
+            if (LocalMusic.hasNasFolders(LocalMusic.Section.MUSIC)) ids.add(NAS_MUSIC);
+            if (LocalMusic.hasNasFolders(LocalMusic.Section.AUDIOBOOKS)) ids.add(NAS_BOOKS);
+            if (LocalMusic.hasNasFolders(LocalMusic.Section.PODCASTS)) ids.add(NAS_PODCASTS);
+            return ids;
+        }
+        return nasEnabled ? List.of(MENU_MUSIC, MENU_NAS, MENU_BOOKS, MENU_PODCASTS, MENU_SETTINGS)
+                : List.of(MENU_MUSIC, MENU_BOOKS, MENU_PODCASTS, MENU_SETTINGS);
+    }
+
+    private int menuRowOf(int id) {
+        return Math.max(0, menuIds().indexOf(id));
+    }
     private final List<AlbumView> books = new ArrayList<>();
     private final List<AlbumView> podcasts = new ArrayList<>();
+    private final List<AlbumView> nasBooks = new ArrayList<>();
+    private final List<AlbumView> nasPodcasts = new ArrayList<>();
 
     // The BOOKS and CHAPTERS pages show either the audiobooks or the podcasts
-    private enum BookSection { AUDIOBOOKS, PODCASTS }
+    private enum BookSection { AUDIOBOOKS, PODCASTS, NAS_AUDIOBOOKS, NAS_PODCASTS }
     private BookSection bookSection = BookSection.AUDIOBOOKS;
 
     private List<AlbumView> shownBooks() {
-        return bookSection == BookSection.PODCASTS ? podcasts : books;
+        return switch (bookSection) {
+            case PODCASTS -> podcasts;
+            case NAS_AUDIOBOOKS -> nasBooks;
+            case NAS_PODCASTS -> nasPodcasts;
+            case AUDIOBOOKS -> books;
+        };
+    }
+
+    private boolean isPodcastSection() {
+        return bookSection == BookSection.PODCASTS || bookSection == BookSection.NAS_PODCASTS;
+    }
+
+    private boolean isNasBookSection() {
+        return bookSection == BookSection.NAS_AUDIOBOOKS || bookSection == BookSection.NAS_PODCASTS;
     }
     @Nullable
     private AlbumView open;   // the album shown on the TRACKS page, or the book on the CHAPTERS page
@@ -148,14 +197,35 @@ public class IpodScreen extends Screen {
     private boolean closing;
     private float closeFrom;
 
-    public IpodScreen(List<ItemStack> discs, List<LocalMusic.Album> library, List<LocalMusic.Book> audiobookLibrary,
-                      List<LocalMusic.Book> podcastLibrary, boolean linked, @Nullable GlobalPos dock, boolean dockOwner,
+    private final List<ItemStack> discs;
+    private final boolean linked;
+    @Nullable
+    private final UUID ipodId;
+    private LibraryCache.Snapshot shown = LibraryCache.get(); // the scan the lists were built from
+
+    public IpodScreen(List<ItemStack> discs, boolean linked, @Nullable GlobalPos dock, boolean dockOwner,
                       ResourceLocation skin, @Nullable UUID ipod) {
         super(Component.translatable("screen.icraft.ipod"));
         this.skin = skin;
         this.dock = dock;
         this.dockOwner = dockOwner;
+        this.discs = discs;
+        this.linked = linked;
+        this.ipodId = ipod;
+        buildLists(shown);
 
+        animStart = Util.getMillis();
+    }
+
+    // (Re)builds the album, book and podcast lists from a library scan
+    private void buildLists(LibraryCache.Snapshot snapshot) {
+        UUID ipod = ipodId;
+        albums.clear();
+        nas.clear();
+        books.clear();
+        podcasts.clear();
+        nasBooks.clear();
+        nasPodcasts.clear();
         if (!discs.isEmpty()) {
             List<Track> tracks = new ArrayList<>();
             for (ItemStack disc : discs) {
@@ -165,7 +235,7 @@ public class IpodScreen extends Screen {
                     null, new ItemStack(Items.MUSIC_DISC_CAT), tracks));
         }
 
-        for (LocalMusic.Album album : library) {
+        for (LocalMusic.Album album : snapshot.albums()) {
             List<Track> tracks = new ArrayList<>();
             for (Path file : album.files()) {
                 // while a speaker is linked, songs resume where they were left: show that time
@@ -177,11 +247,23 @@ public class IpodScreen extends Screen {
             albums.add(new AlbumView(album.name(), album.cover(), null, tracks));
         }
 
-        buildBooks(audiobookLibrary, books, ipod);
-        buildBooks(podcastLibrary, podcasts, ipod);
+        for (LocalMusic.Album album : snapshot.nas()) {
+            List<Track> tracks = new ArrayList<>();
+            for (Path file : album.files()) {
+                double saved = linked ? AudiobookProgress.get(AudiobookProgress.MUSIC, LocalMusic.key(file)) : 0;
+                tracks.add(new Track(Component.literal(LocalMusic.displayName(file)),
+                        () -> IpodPlayer.playFile(file, ipod),
+                        saved >= 1 ? formatTime(saved) : null));
+            }
+            nas.add(new AlbumView(album.name(), album.cover(), null, tracks));
+        }
 
-        animStart = Util.getMillis();
+        buildBooks(snapshot.books(), books, ipod);
+        buildBooks(snapshot.podcasts(), podcasts, ipod);
+        buildBooks(snapshot.nasBooks(), nasBooks, ipod);
+        buildBooks(snapshot.nasPodcasts(), nasPodcasts, ipod);
     }
+
 
     // Turns books (or podcast shows) into list entries whose rows play a chapter (or episode)
     private static void buildBooks(List<LocalMusic.Book> library, List<AlbumView> into, @Nullable UUID ipod) {
@@ -252,8 +334,44 @@ public class IpodScreen extends Screen {
         animStart = Util.getMillis();
     }
 
+    // A newer library scan finished: rebuild the lists if something changed, keeping the open album where possible
+    private void refreshLibrary() {
+        LibraryCache.Snapshot latest = LibraryCache.get();
+        if (latest.generation() == shown.generation()) return;
+        boolean changed = !latest.sameContentAs(shown);
+        shown = latest;
+        if (!changed) return;
+
+        Component openName = open != null ? open.name() : null;
+        Component playedName = playedAlbum != null ? playedAlbum.name() : null;
+        buildLists(latest);
+        playedAlbum = playedName == null ? null : findByName(playedName);
+        if (page == Page.TRACKS || page == Page.CHAPTERS) {
+            AlbumView again = openName == null ? null : findByName(openName);
+            if (again != null) {
+                open = again;
+            } else {
+                open = null;
+                inNas = false;
+                goTo(Page.MENU, 0);
+            }
+        }
+        selected = Mth.clamp(selected, 0, Math.max(0, listSize() - 1));
+    }
+
+    @Nullable
+    private AlbumView findByName(Component name) {
+        for (List<AlbumView> list : List.of(albums, nas, books, podcasts, nasBooks, nasPodcasts)) {
+            for (AlbumView view : list) {
+                if (view.name().getString().equals(name.getString())) return view;
+            }
+        }
+        return null;
+    }
+
     @Override
     public void tick() {
+        refreshLibrary();
         // A single click on the middle button has waited long enough: no second click came, so do it now
         if (pendingActivateAt >= 0 && Util.getMillis() >= pendingActivateAt) {
             pendingActivateAt = -1;
@@ -337,21 +455,29 @@ public class IpodScreen extends Screen {
 
         // Header: dark text on the light blue strip, plus a play/pause symbol
         Component title = switch (page) {
-            case MENU -> Component.translatable("screen.icraft.ipod.menu");
-            case ALBUMS -> Component.translatable("screen.icraft.ipod.albums");
-            case BOOKS -> Component.translatable(bookSection == BookSection.PODCASTS
+            case MENU -> Component.translatable(inNas ? "screen.icraft.ipod.nas" : "screen.icraft.ipod.menu");
+            case ALBUMS -> Component.translatable(albumSection == AlbumSection.NAS
+                    ? "screen.icraft.ipod.nas" : "screen.icraft.ipod.albums");
+            case BOOKS -> Component.translatable(isPodcastSection()
                     ? "screen.icraft.ipod.podcast_list" : "screen.icraft.ipod.books");
             case SETTINGS -> Component.translatable("screen.icraft.ipod.settings");
             case TRACKS, CHAPTERS -> open.name();
         };
-        g.drawString(this.font, fit(title.getString(), right - left - 10), left,
-                DISPLAY_Y + (HEADER_H - 8) / 2, 0xFF0A2A66, false);
+        String shownTitle = fit(title.getString(), right - left - 10);
+        g.drawString(this.font, shownTitle, left, DISPLAY_Y + (HEADER_H - 8) / 2, 0xFF0A2A66, false);
+        if (LibraryCache.get().scanning() && page != Page.TRACKS && page != Page.CHAPTERS && page != Page.SETTINGS) {
+            // a library scan is running: animated dots after the title
+            String dots = ".".repeat(1 + (int) ((Util.getMillis() / 400) % 3));
+            g.drawString(this.font, dots, left + this.font.width(shownTitle) + 2, DISPLAY_Y + (HEADER_H - 8) / 2, 0xFF0A2A66, false);
+        }
         drawStatusIcon(g, right - 5, DISPLAY_Y + (HEADER_H - 5) / 2);
 
         // Nothing to show (only the album and book lists can be empty)
         if (count == 0) {
-            g.drawWordWrap(this.font, Component.translatable(page != Page.BOOKS ? "screen.icraft.ipod.empty"
-                            : bookSection == BookSection.PODCASTS ? "screen.icraft.ipod.no_podcasts"
+            g.drawWordWrap(this.font, Component.translatable(LibraryCache.get().scanning() ? "screen.icraft.ipod.scanning"
+                            : page == Page.ALBUMS && albumSection == AlbumSection.NAS ? "screen.icraft.ipod.no_nas"
+                            : page != Page.BOOKS ? "screen.icraft.ipod.empty"
+                            : isPodcastSection() ? "screen.icraft.ipod.no_podcasts"
                             : "screen.icraft.ipod.no_books"),
                     left, LIST_Y + 3, right - left, 0xFFFFFFFF);
         }
@@ -372,7 +498,7 @@ public class IpodScreen extends Screen {
             Component name;
             switch (page) {
                 case ALBUMS, BOOKS -> {
-                    AlbumView album = (page == Page.ALBUMS ? albums : shownBooks()).get(index);
+                    AlbumView album = (page == Page.ALBUMS ? shownAlbums() : shownBooks()).get(index);
                     drawCover(g, album, left, rowY + 1, THUMB);
                     textX = left + THUMB + 3;
                     name = album.name();
@@ -388,7 +514,7 @@ public class IpodScreen extends Screen {
                     }
                 }
                 case SETTINGS -> name = settingRow(index);
-                default -> name = menuRow(index);
+                default -> name = menuRow(menuIds().get(index));
             }
 
             int color = isSelected ? 0xFF0A3A8C : 0xFFFFFFFF;
@@ -451,9 +577,9 @@ public class IpodScreen extends Screen {
 
     private int listSize() {
         return switch (page) {
-            case MENU -> MENU_ROWS;
+            case MENU -> menuIds().size();
             case SETTINGS -> SETTING_ROWS;
-            case ALBUMS -> albums.size();
+            case ALBUMS -> shownAlbums().size();
             case BOOKS -> shownBooks().size();
             case TRACKS, CHAPTERS -> open.tracks().size();
         };
@@ -462,6 +588,10 @@ public class IpodScreen extends Screen {
     private static Component menuRow(int index) {
         return Component.translatable(switch (index) {
             case MENU_MUSIC -> "screen.icraft.ipod.music";
+            case MENU_NAS -> "screen.icraft.ipod.nas";
+            case NAS_MUSIC -> "screen.icraft.ipod.music";
+            case NAS_BOOKS -> "screen.icraft.ipod.audiobooks";
+            case NAS_PODCASTS -> "screen.icraft.ipod.podcasts";
             case MENU_BOOKS -> "screen.icraft.ipod.audiobooks";
             case MENU_PODCASTS -> "screen.icraft.ipod.podcasts";
             default -> "screen.icraft.ipod.settings";
@@ -503,17 +633,33 @@ public class IpodScreen extends Screen {
     private void activate() {
         if (listSize() == 0) return;
         switch (page) {
-            case MENU -> goTo(switch (selected) {
-                case MENU_MUSIC -> Page.ALBUMS;
-                case MENU_BOOKS, MENU_PODCASTS -> {
-                    bookSection = selected == MENU_PODCASTS ? BookSection.PODCASTS : BookSection.AUDIOBOOKS;
-                    yield Page.BOOKS;
+            case MENU -> {
+                int id = menuIds().get(selected);
+                if (id == MENU_NAS) { // open the NAS submenu
+                    inNas = true;
+                    goTo(Page.MENU, 0);
+                    return;
                 }
-                default -> Page.SETTINGS;
-            }, 0);
+                goTo(switch (id) {
+                    case MENU_MUSIC, NAS_MUSIC -> {
+                        albumSection = id == NAS_MUSIC ? AlbumSection.NAS : AlbumSection.MUSIC;
+                        yield Page.ALBUMS;
+                    }
+                    case MENU_BOOKS, MENU_PODCASTS, NAS_BOOKS, NAS_PODCASTS -> {
+                        bookSection = switch (id) {
+                            case MENU_PODCASTS -> BookSection.PODCASTS;
+                            case NAS_BOOKS -> BookSection.NAS_AUDIOBOOKS;
+                            case NAS_PODCASTS -> BookSection.NAS_PODCASTS;
+                            default -> BookSection.AUDIOBOOKS;
+                        };
+                        yield Page.BOOKS;
+                    }
+                    default -> Page.SETTINGS;
+                }, 0);
+            }
             case ALBUMS -> {
                 openedIndex = selected;
-                open = albums.get(selected);
+                open = shownAlbums().get(selected);
                 goTo(Page.TRACKS, 0);
             }
             case BOOKS -> {
@@ -550,10 +696,26 @@ public class IpodScreen extends Screen {
         switch (page) {
             case TRACKS -> goTo(Page.ALBUMS, openedIndex);
             case CHAPTERS -> goTo(Page.BOOKS, openedIndex);
-            case ALBUMS -> goTo(Page.MENU, MENU_MUSIC);
-            case BOOKS -> goTo(Page.MENU, bookSection == BookSection.PODCASTS ? MENU_PODCASTS : MENU_BOOKS);
-            case SETTINGS -> goTo(Page.MENU, MENU_SETTINGS);
-            case MENU -> { }
+            case ALBUMS -> {
+                inNas = albumSection == AlbumSection.NAS;
+                goTo(Page.MENU, menuRowOf(inNas ? NAS_MUSIC : MENU_MUSIC));
+            }
+            case BOOKS -> {
+                inNas = isNasBookSection();
+                goTo(Page.MENU, menuRowOf(switch (bookSection) {
+                    case PODCASTS -> MENU_PODCASTS;
+                    case NAS_AUDIOBOOKS -> NAS_BOOKS;
+                    case NAS_PODCASTS -> NAS_PODCASTS;
+                    case AUDIOBOOKS -> MENU_BOOKS;
+                }));
+            }
+            case SETTINGS -> goTo(Page.MENU, menuRowOf(MENU_SETTINGS));
+            case MENU -> {
+                if (inNas) { // back from the NAS submenu to the main menu
+                    inNas = false;
+                    goTo(Page.MENU, menuRowOf(MENU_NAS));
+                }
+            }
         }
     }
 

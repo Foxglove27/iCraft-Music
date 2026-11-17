@@ -52,5 +52,8 @@
   "message.icraft.dock.speaker_added": "Lautsprecher zur Dockingstation hinzugefügt (%s/%s)",
   "message.icraft.dock.speaker_removed": "Lautsprecher von der Dockingstation entfernt (%s/%s)",
   "message.icraft.dock.speaker_lost": "Ein Lautsprecher wurde von der Dockingstation entfernt (%s/%s)",
-  "message.icraft.dock.not_yours": "Dieser iPod gehört %s."
+  "message.icraft.dock.not_yours": "Dieser iPod gehört %s.",
+  "screen.icraft.ipod.scanning": "Bibliothek wird durchsucht...",
+  "screen.icraft.ipod.nas": "NAS",
+  "screen.icraft.ipod.no_nas": "Keine Musik in den NAS-Ordnern aus der Konfiguration gefunden."
 }

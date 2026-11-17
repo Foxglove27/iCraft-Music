@@ -1,6 +1,7 @@
 package net.foxglove.icraft.client;
 
 import net.foxglove.icraft.block.DockBlockEntity;
+import net.foxglove.icraft.client.audio.LibraryCache;
 import net.foxglove.icraft.client.audio.LocalMusic;
 import net.foxglove.icraft.client.screen.IpodScreen;
 import net.foxglove.icraft.item.IpodColor;
@@ -31,11 +32,9 @@ public class ClientHooks {
     private static void openScreen(ItemStack ipod, @Nullable GlobalPos dock, boolean playsThroughSpeakers, boolean dockOwner) {
         // the GUI skin depends on the iPod's colour
         IpodColor color = ipod.getItem() instanceof IpodItem item ? item.getColor() : IpodColor.WHITE;
+        LibraryCache.refreshAsync(); // the lists on the screen update themselves when the scan is done
         Minecraft.getInstance().setScreen(new IpodScreen(
                 IpodItem.getDiscs(ipod),
-                LocalMusic.albums(),
-                LocalMusic.books(),
-                LocalMusic.podcasts(),
                 playsThroughSpeakers,
                 dock,
                 dockOwner,

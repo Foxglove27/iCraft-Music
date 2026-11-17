@@ -1,6 +1,7 @@
 package net.foxglove.icraft.client.audio;
 
 import com.mojang.logging.LogUtils;
+import net.foxglove.icraft.ClientConfig;
 import net.foxglove.icraft.client.audio.decode.Mp4File;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
@@ -12,20 +13,26 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.Set;
 import java.util.stream.Stream;
 
 /**
- * The player's own library, read from <code>&lt;game directory&gt;/ipod</code>:
+ * The player's own library. Per section (music, audiobooks, podcasts) it reads
+ * <code>&lt;game directory&gt;/ipod/&lt;section&gt;</code> plus any extra folders from the client config
+ * (for example a mounted NAS share), and for music the old <code>ipod_music</code> folder.
  * <ul>
- *   <li><code>ipod/music/&lt;album&gt;/...</code> (loose files are the "Singles" album)</li>
- *   <li><code>ipod/audiobooks/&lt;book&gt;/...</code> (one folder per book, chapters as files, or one .m4b with chapter markers)</li>
+ *   <li>A folder that directly contains audio files is an album (or book, or show). Folders are searched up to
+ *       {@link #MAX_DEPTH} levels below a root; <code>Artist/Album</code> is shown as "Artist - Album".</li>
+ *   <li>Loose music files in a music root are the "Singles" album.</li>
+ *   <li>A book's chapters are files, or one .m4b whose chapter markers become entries.</li>
  * </ul>
- * The old <code>ipod_music</code> folder is still read as an extra music folder.
+ * The scan can be slow on a network share, so it runs on a background thread ({@link LibraryCache}); the
+ * mod never writes into the library (only the local <code>ipod</code> folders are created).
  */
 public class LocalMusic {
     public record Album(Component name, @Nullable Path cover, List<Path> files) {}
@@ -39,7 +46,21 @@ public class LocalMusic {
 
     public record Book(Component name, @Nullable Path cover, List<Chapter> chapters, String key) {}
 
+    /** The three parts of the library; {@code folder} is the folder name below <code>ipod/</code> and the start of progress keys. */
+    public enum Section {
+        MUSIC("music"), AUDIOBOOKS("audiobooks"), PODCASTS("podcasts");
+
+        public final String folder;
+
+        Section(String folder) {
+            this.folder = folder;
+        }
+    }
+
     private static final Logger LOGGER = LogUtils.getLogger();
+
+    /** How many folder levels below a root are searched (Artist/Album/Disc). */
+    public static final int MAX_DEPTH = 3;
 
     private static final Set<String> AUDIO = Set.of("ogg", "mp3", "flac", "wav", "m4a", "m4b");
     private static final Set<String> MP4_EXT = Set.of("m4a", "m4b");
@@ -47,6 +68,7 @@ public class LocalMusic {
             "folder.png", "folder.jpg", "folder.jpeg");
 
     private static boolean legacyLogged;
+    private static final Set<Path> REPORTED = ConcurrentHashMap.newKeySet(); // extra folders already complained about
 
     // ---- folders ----
 
@@ -71,11 +93,43 @@ public class LocalMusic {
         return Minecraft.getInstance().gameDirectory.toPath().resolve("ipod_music");
     }
 
-    /** All folders music is read from: ipod/music, plus the old ipod_music if it exists. */
-    public static List<Path> musicRoots() {
+    // The extra folders from the config as paths (absolute, or relative to the game directory). No disk access.
+    private static List<Path> extraRoots(Section section) {
+        List<? extends String> configured;
+        try {
+            configured = switch (section) {
+                case MUSIC -> ClientConfig.EXTRA_MUSIC_FOLDERS.get();
+                case AUDIOBOOKS -> ClientConfig.EXTRA_AUDIOBOOK_FOLDERS.get();
+                case PODCASTS -> ClientConfig.EXTRA_PODCAST_FOLDERS.get();
+            };
+        } catch (IllegalStateException e) {
+            return List.of(); // the config is not loaded (yet)
+        }
+        Path game = Minecraft.getInstance().gameDirectory.toPath();
         List<Path> roots = new ArrayList<>();
-        roots.add(musicRoot());
-        if (Files.isDirectory(legacyMusicRoot())) {
+        for (String text : configured) {
+            if (text == null || text.isBlank()) continue;
+            if (text.trim().matches("(?i)^[a-z][a-z0-9+.-]+://.*")) { // smb://, nfs://, http://...: not a file path
+                if (REPORTED.add(Path.of("url:" + text))) {
+                    LOGGER.warn("The library folder '{}' is a network address, not a folder. Mount the share first "
+                            + "(for example to /mnt/nas-music) and put the mount path in the config.", text);
+                }
+                continue;
+            }
+            try {
+                roots.add(game.resolve(text.trim()).normalize());
+            } catch (RuntimeException e) {
+                if (REPORTED.add(Path.of("invalid:" + text))) LOGGER.warn("Ignoring the invalid library folder '{}'", text);
+            }
+        }
+        return roots;
+    }
+
+    /** The folders of a section that exist: the local one, for music the old ipod_music, then the extra folders. */
+    public static List<Path> roots(Section section) {
+        List<Path> roots = new ArrayList<>();
+        roots.add(libraryRoot().resolve(section.folder));
+        if (section == Section.MUSIC && Files.isDirectory(legacyMusicRoot())) {
             roots.add(legacyMusicRoot());
             if (!legacyLogged) {
                 legacyLogged = true;
@@ -83,15 +137,27 @@ public class LocalMusic {
                         legacyMusicRoot(), musicRoot());
             }
         }
+        for (Path extra : extraRoots(section)) {
+            if (Files.isDirectory(extra)) {
+                roots.add(extra);
+            } else if (REPORTED.add(extra)) {
+                LOGGER.warn("The library folder {} does not exist or cannot be read; skipping it", extra);
+            }
+        }
         return roots;
     }
 
-    // ---- music ----
+    // The roots without touching the disk (for names and keys while scanning)
+    private static List<Path> rawRoots(Section section) {
+        List<Path> roots = new ArrayList<>();
+        roots.add(libraryRoot().resolve(section.folder));
+        if (section == Section.MUSIC) roots.add(legacyMusicRoot());
+        roots.addAll(extraRoots(section));
+        return roots;
+    }
 
-    // creates the folders on first use
-    public static List<Album> albums() {
-        List<Album> albums = new ArrayList<>();
-        List<Path> singles = new ArrayList<>();
+    // creates the local folders on first use (never anything inside an extra folder)
+    private static void ensureLocalFolders() {
         try {
             Files.createDirectories(musicRoot());
             Files.createDirectories(audiobookRoot());
@@ -99,15 +165,23 @@ public class LocalMusic {
         } catch (IOException e) {
             LOGGER.warn("Could not create the library folders under {}", libraryRoot(), e);
         }
+    }
 
-        for (Path root : musicRoots()) {
+    // ---- scanning (slow on a network share: call from a background thread) ----
+
+    // cover of every album folder found by the last scans, so playing a file needs no directory listing
+    private static final Map<Path, Optional<Path>> COVER_OF_DIR = new ConcurrentHashMap<>();
+
+    /** The music of the local folders: ipod/music and the old ipod_music (the extra folders are {@link #nasAlbums()}). */
+    public static List<Album> albums() {
+        ensureLocalFolders();
+        List<Album> albums = new ArrayList<>();
+        List<Path> singles = new ArrayList<>();
+        for (Path root : roots(Section.MUSIC)) {
+            if (isExtra(Section.MUSIC, root)) continue;
             singles.addAll(listAudio(root));
-            for (Path dir : listFolders(root)) {
-                List<Path> files = listAudio(dir);
-                if (!files.isEmpty()) {
-                    albums.add(new Album(Component.literal(dir.getFileName().toString()), findCover(dir), files));
-                }
-            }
+            scanFolders(root, (dir, name, files) ->
+                    albums.add(new Album(Component.literal(name), coverOf(dir), files)));
         }
         if (!singles.isEmpty()) {
             albums.add(0, new Album(Component.translatable("screen.icraft.ipod.singles"), null, singles));
@@ -115,46 +189,119 @@ public class LocalMusic {
         return albums;
     }
 
-    // ---- audiobooks ----
+    /** The music of the extra music folders from the config (a NAS), shown on its own page. */
+    public static List<Album> nasAlbums() {
+        List<Album> albums = new ArrayList<>();
+        for (Path root : roots(Section.MUSIC)) {
+            if (!isExtra(Section.MUSIC, root)) continue;
+            List<Path> loose = listAudio(root);
+            if (!loose.isEmpty()) {
+                Path name = root.getFileName();
+                albums.add(new Album(Component.literal(name != null ? name.toString() : root.toString()), coverOf(root), loose));
+            }
+            scanFolders(root, (dir, name, files) ->
+                    albums.add(new Album(Component.literal(name), coverOf(dir), files)));
+        }
+        return albums;
+    }
 
+    /** True if any extra folder is set in the config (the iPod then shows the NAS entry). */
+    public static boolean hasNasFolders() {
+        return hasNasFolders(Section.MUSIC) || hasNasFolders(Section.AUDIOBOOKS) || hasNasFolders(Section.PODCASTS);
+    }
+
+    /** True if an extra folder is set for this section. */
+    public static boolean hasNasFolders(Section section) {
+        return !extraRoots(section).isEmpty();
+    }
+
+    private static boolean isExtra(Section section, Path root) {
+        return extraRoots(section).contains(root);
+    }
+
+    /** Audiobooks of the local folder (ipod/audiobooks). */
     public static List<Book> books() {
-        return scanBooks(audiobookRoot());
+        return scanBooks(Section.AUDIOBOOKS, false);
     }
 
-    // ---- podcasts: shows are folders and episodes are files, exactly like books and chapters ----
-
+    // podcasts: shows are folders and episodes are files, exactly like books and chapters
     public static List<Book> podcasts() {
-        return scanBooks(podcastRoot());
+        return scanBooks(Section.PODCASTS, false);
     }
 
-    private static List<Book> scanBooks(Path root) {
+    /** Audiobooks of the extra audiobook folders from the config (the NAS). */
+    public static List<Book> nasBooks() {
+        return scanBooks(Section.AUDIOBOOKS, true);
+    }
+
+    /** Podcasts of the extra podcast folders from the config (the NAS). */
+    public static List<Book> nasPodcasts() {
+        return scanBooks(Section.PODCASTS, true);
+    }
+
+    private interface FolderVisitor {
+        void found(Path dir, String name, List<Path> audioFiles);
+    }
+
+    // Calls the visitor for every folder below the root (up to MAX_DEPTH) that directly holds audio files.
+    private static void scanFolders(Path root, FolderVisitor visitor) {
+        scanFolders(root, root, 1, visitor);
+    }
+
+    private static void scanFolders(Path root, Path dir, int depth, FolderVisitor visitor) {
+        for (Path sub : listFolders(dir)) {
+            List<Path> files = listAudio(sub);
+            if (!files.isEmpty()) visitor.found(sub, nameBelow(root, sub), files);
+            if (depth < MAX_DEPTH) scanFolders(root, sub, depth + 1, visitor);
+        }
+    }
+
+    // "Artist/Album" below the root becomes "Artist - Album"; a folder directly in the root keeps its name
+    private static String nameBelow(Path root, Path dir) {
+        Path rel = root.relativize(dir);
+        StringBuilder name = new StringBuilder();
+        for (Path part : rel) {
+            if (name.length() > 0) name.append(" - ");
+            name.append(part);
+        }
+        return name.toString();
+    }
+
+    private static List<Book> scanBooks(Section section, boolean extra) {
         List<Book> books = new ArrayList<>();
-        for (Path dir : listFolders(root)) {
-            List<Chapter> chapters = new ArrayList<>();
-            for (Path file : listAudio(dir)) {
-                chapters.addAll(chaptersOf(file));
-            }
-            if (!chapters.isEmpty()) {
-                books.add(new Book(Component.literal(dir.getFileName().toString()), findCover(dir), chapters, key(dir)));
-            }
+        for (Path root : roots(section)) {
+            if (isExtra(section, root) != extra) continue;
+            scanFolders(root, (dir, name, files) -> {
+                List<Chapter> chapters = new ArrayList<>();
+                for (Path file : files) chapters.addAll(chaptersOf(file));
+                if (!chapters.isEmpty()) books.add(new Book(Component.literal(name), coverOf(dir), chapters, key(dir)));
+            });
         }
         return books;
     }
 
+    @Nullable
+    private static Path coverOf(Path dir) {
+        Path cover = findCover(dir);
+        COVER_OF_DIR.put(dir, Optional.ofNullable(cover));
+        return cover;
+    }
+
     // marker parsing is cached per file (path, size, modification time)
     private record Stamp(long size, long modified) {}
-    private static final Map<Path, Stamp> CACHE_STAMP = new HashMap<>();
-    private static final Map<Path, List<Chapter>> CACHE = new HashMap<>();
+    private static final Map<Path, Stamp> CACHE_STAMP = new ConcurrentHashMap<>();
+    private static final Map<Path, List<Chapter>> CACHE = new ConcurrentHashMap<>();
 
     private static List<Chapter> chaptersOf(Path file) {
         String ext = extension(file);
         if (MP4_EXT.contains(ext)) {
             try {
                 Stamp stamp = new Stamp(Files.size(file), Files.getLastModifiedTime(file).toMillis());
-                if (stamp.equals(CACHE_STAMP.get(file))) return CACHE.get(file);
+                List<Chapter> cached = CACHE.get(file);
+                if (cached != null && stamp.equals(CACHE_STAMP.get(file))) return cached;
                 List<Chapter> chapters = readMarkers(file);
-                CACHE_STAMP.put(file, stamp);
                 CACHE.put(file, chapters);
+                CACHE_STAMP.put(file, stamp);
                 return chapters;
             } catch (IOException e) {
                 // fall through to a plain chapter
@@ -180,8 +327,19 @@ public class LocalMusic {
         return chapters;
     }
 
-    /** The path relative to the ipod folder, with forward slashes. Identifies a file or book in saved progress. */
+    /**
+     * Identifies a file or folder in saved progress. For the local layout and the old ipod_music it is the path
+     * relative to the ipod folder (as always); for a file in an extra folder it is the section name plus the
+     * path below that folder. Forward slashes.
+     */
     public static String key(Path path) {
+        for (Section section : Section.values()) {
+            for (Path extra : extraRoots(section)) {
+                if (path.startsWith(extra)) {
+                    return section.folder + "/" + extra.relativize(path).toString().replace('\\', '/');
+                }
+            }
+        }
         try {
             return libraryRoot().relativize(path).toString().replace('\\', '/');
         } catch (IllegalArgumentException e) {
@@ -189,9 +347,12 @@ public class LocalMusic {
         }
     }
 
-    /** True for a file inside the audiobook folder. */
+    /** True for a file inside an audiobook folder. */
     public static boolean isAudiobookFile(Path file) {
-        return file.startsWith(audiobookRoot());
+        for (Path root : rawRoots(Section.AUDIOBOOKS)) {
+            if (file.startsWith(root)) return true;
+        }
+        return false;
     }
 
     // ---- scanning ----
@@ -271,25 +432,40 @@ public class LocalMusic {
         return dot > 0 ? name.substring(0, dot) : name;
     }
 
+    // The root of a section that holds this file, or null
+    @Nullable
+    private static Path rootOf(Section section, Path file) {
+        for (Path root : rawRoots(section)) {
+            if (file.startsWith(root)) return root;
+        }
+        return null;
+    }
+
     private static boolean isDirectlyInMusicRoot(Path file) {
         Path dir = file.getParent();
         if (dir == null) return true;
-        for (Path root : musicRoots()) {
+        for (Path root : rawRoots(Section.MUSIC)) {
             if (dir.equals(root)) return true;
         }
         return false;
     }
 
-    // The album (or book) a file belongs to: its folder name, or "Singles" for loose music files
+    // The album (or book) a file belongs to: its folder name (with the artist folders in front), or "Singles" for loose music files
     public static Component albumNameFor(Path file) {
         if (isDirectlyInMusicRoot(file)) return Component.translatable("screen.icraft.ipod.singles");
-        return Component.literal(file.getParent().getFileName().toString());
+        Path dir = file.getParent();
+        for (Section section : Section.values()) {
+            Path root = rootOf(section, file);
+            if (root != null && dir.startsWith(root) && !dir.equals(root)) return Component.literal(nameBelow(root, dir));
+        }
+        return Component.literal(dir.getFileName().toString());
     }
 
-    // The cover image in a file's folder, or null if there isn't one
+    // The cover image in a file's folder, or null if there isn't one (answered from the scan, no disk access)
     @Nullable
     public static Path coverFor(Path file) {
         if (isDirectlyInMusicRoot(file)) return null; // loose files have no album folder
-        return findCover(file.getParent());
+        Optional<Path> known = COVER_OF_DIR.get(file.getParent());
+        return known != null ? known.orElse(null) : findCover(file.getParent());
     }
 }

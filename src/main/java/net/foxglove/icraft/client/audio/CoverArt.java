@@ -18,23 +18,52 @@ import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
+import java.util.Queue;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
+/**
+ * Album art as small textures. Images are decoded and scaled on a background thread (a cover on a network share
+ * can be slow); only turning the finished pixels into a texture happens on the render thread.
+ */
 public class CoverArt {
     public static final int SIZE = 128;
     private static final Logger LOGGER = LogUtils.getLogger();
 
+    private record Ready(Path path, @Nullable NativeImage image) {}
+
     private static final Map<Path, ResourceLocation> LOADED = new HashMap<>();
     private static final Set<Path> FAILED = new HashSet<>();
+    private static final Set<Path> LOADING = ConcurrentHashMap.newKeySet();
+    private static final Queue<Ready> READY = new ConcurrentLinkedQueue<>();
+    private static final ExecutorService DECODER = Executors.newSingleThreadExecutor(r -> {
+        Thread t = new Thread(r, "iCraft cover decoder");
+        t.setDaemon(true);
+        return t;
+    });
     private static int nextId = 0;
 
-    // Must be called on the render thread (e.g. from a screen's render method)
+    /**
+     * The texture of a cover image, or null while it is still loading (ask again next frame) or if it cannot be
+     * read. Must be called on the render thread (e.g. from a screen's render method).
+     */
     @Nullable
     public static ResourceLocation get(Path imageFile) {
+        for (Ready ready; (ready = READY.poll()) != null; ) register(ready);
+
         ResourceLocation cached = LOADED.get(imageFile);
         if (cached != null) return cached;
         if (FAILED.contains(imageFile)) return null;
+        if (LOADING.add(imageFile)) DECODER.execute(() -> decode(imageFile));
+        return null;
+    }
 
+    // background thread: read, scale to SIZE x SIZE
+    private static void decode(Path imageFile) {
+        NativeImage image = null;
         try {
             BufferedImage source = ImageIO.read(imageFile.toFile());
             if (source == null) throw new IOException("Unsupported image format (ImageIO can read: "
@@ -47,22 +76,26 @@ public class CoverArt {
                     thumb.setRGB(x, y, source.getRGB(x * source.getWidth() / SIZE, sy));
                 }
             }
-
             ByteArrayOutputStream png = new ByteArrayOutputStream();
             ImageIO.write(thumb, "png", png);
-            NativeImage image = NativeImage.read(new ByteArrayInputStream(png.toByteArray()));
-
-            DynamicTexture texture = new DynamicTexture(image);
-            texture.setFilter(true, false); // smooth when scaled down
-            ResourceLocation id = ResourceLocation.fromNamespaceAndPath(iCraft.MOD_ID, "cover/" + nextId++);
-            Minecraft.getInstance().getTextureManager().register(id, texture);
-
-            LOADED.put(imageFile, id);
-            return id;
+            image = NativeImage.read(new ByteArrayInputStream(png.toByteArray()));
         } catch (IOException | RuntimeException | LinkageError e) {
             LOGGER.warn("Could not load cover image {}", imageFile, e); // once per file, see FAILED
-            FAILED.add(imageFile);
-            return null;
         }
+        READY.add(new Ready(imageFile, image));
+    }
+
+    // render thread
+    private static void register(Ready ready) {
+        LOADING.remove(ready.path());
+        if (ready.image() == null) {
+            FAILED.add(ready.path());
+            return;
+        }
+        DynamicTexture texture = new DynamicTexture(ready.image());
+        texture.setFilter(true, false); // smooth when scaled down
+        ResourceLocation id = ResourceLocation.fromNamespaceAndPath(iCraft.MOD_ID, "cover/" + nextId++);
+        Minecraft.getInstance().getTextureManager().register(id, texture);
+        LOADED.put(ready.path(), id);
     }
 }

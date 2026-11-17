@@ -18,7 +18,7 @@ import java.util.Map;
 
 /**
  * Where the player stopped in each audiobook chapter. Saved on the client in
- * <code>ipod/.icraft-progress.json</code>:
+ * <code>icraft-progress.json</code> in the game folder:
  * <pre>{ "audiobooks/Book": { "last": "audiobooks/Book/ch2.mp3", "pos": { "audiobooks/Book/ch2.mp3": 123.4 } } }</pre>
  * Every problem with the file is logged and ignored: losing progress must never break playback.
  */
@@ -39,7 +39,13 @@ public final class AudiobookProgress {
 
     private AudiobookProgress() {}
 
+    // Progress is kept in the game folder, never in the library (which may be a read-only network share)
     private static Path file() {
+        return net.minecraft.client.Minecraft.getInstance().gameDirectory.toPath().resolve("icraft-progress.json");
+    }
+
+    // The file older versions wrote into the library folder; only read, once, if the new file does not exist yet
+    private static Path legacyFile() {
         return LocalMusic.libraryRoot().resolve(".icraft-progress.json");
     }
 
@@ -47,6 +53,7 @@ public final class AudiobookProgress {
         if (books != null) return books;
         books = new LinkedHashMap<>();
         Path file = file();
+        if (!Files.isRegularFile(file) && Files.isRegularFile(legacyFile())) file = legacyFile();
         if (Files.isRegularFile(file)) {
             try (Reader in = Files.newBufferedReader(file, StandardCharsets.UTF_8)) {
                 Map<String, BookState> read = GSON.fromJson(in,

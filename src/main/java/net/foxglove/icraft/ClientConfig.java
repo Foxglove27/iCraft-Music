@@ -24,6 +24,23 @@ public class ClientConfig {
             .comment("What happens when a track ends: OFF (stop after the last), LIST (start over) or ONE (same track again)")
             .defineEnum("repeat", RepeatMode.OFF);
 
+    public static final ModConfigSpec.ConfigValue<java.util.List<? extends String>> EXTRA_MUSIC_FOLDERS = BUILDER
+            .comment("Extra folders to read music from, in addition to <game folder>/ipod/music (for example a mounted",
+                    "network share). Absolute paths, or relative to the game folder. A share must be mounted first",
+                    "(smb:// addresses do not work; use the mount path, e.g. /mnt/nas-music or //nas/music on Windows). Albums are folders that directly",
+                    "contain audio files; Artist/Album folders are shown as 'Artist - Album'. The mod never writes there.")
+            .defineListAllowEmpty("extraMusicFolders", java.util.List.of(), () -> "", o -> o instanceof String);
+
+    public static final ModConfigSpec.ConfigValue<java.util.List<? extends String>> EXTRA_AUDIOBOOK_FOLDERS = BUILDER
+            .comment("Extra folders to read audiobooks from, in addition to <game folder>/ipod/audiobooks.",
+                    "One folder per book (also Author/Book).")
+            .defineListAllowEmpty("extraAudiobookFolders", java.util.List.of(), () -> "", o -> o instanceof String);
+
+    public static final ModConfigSpec.ConfigValue<java.util.List<? extends String>> EXTRA_PODCAST_FOLDERS = BUILDER
+            .comment("Extra folders to read podcasts from, in addition to <game folder>/ipod/podcasts.",
+                    "One folder per show.")
+            .defineListAllowEmpty("extraPodcastFolders", java.util.List.of(), () -> "", o -> o instanceof String);
+
     // The full spec, handed to {@code ModContainer.registerConfig(...)} in the mod constructor.
     public static final ModConfigSpec SPEC = BUILDER.build();
 }

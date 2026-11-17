@@ -7,6 +7,12 @@ new changes go there until the next version bump.
 ## [0.0.8]
 
 ### Added
+- **Big libraries and network shares.** `extraMusicFolders`, `extraAudiobookFolders` and `extraPodcastFolders` in
+  `icraft-client.toml` add more folders (absolute, or relative to the game folder; for example a mounted NAS share) to the
+  library. Everything from the extra folders gets its own **NAS** entry in the iPod menu (between Music and Audiobooks, shown only
+  when an extra folder is set) with a submenu of Music, Audiobooks and Podcasts; the normal Music, Audiobooks and Podcasts
+  pages only show the local folders. A network share has to be mounted first (use the mount path; `smb://` addresses do not work). A folder that directly contains audio files is an album, book or show, up to three levels deep, so
+  `Artist/Album` shows as "Artist - Album". The mod never writes into these folders.
 - **Other players hear a dock's speakers.** Music discs that play in a dock are now heard by everybody near its
   speakers, and everybody sees the music notes. Someone who walks up while a song is playing hears it from the
   current position.
@@ -25,6 +31,13 @@ new changes go there until the next version bump.
 - A dock without any speaker now plays its discs in its owner's own ears (it was silent).
 
 ### Changed
+- The library is scanned in the background (when you join a world and when the iPod opens), so a big library or a slow
+  share no longer freezes the game; the lists update when the scan is done ("Scanning library..."). Album covers also
+  load in the background; animated dots after the title show that a scan is running.
+- Saved audiobook, podcast and song positions now live in `icraft-progress.json` in the game folder instead of inside
+  the library (an old `ipod/.icraft-progress.json` is read once as the starting point and left alone).
+- Ogg files up to 256 MiB are read into memory instead of memory-mapped, so a network share that disappears while a
+  song plays ends the song with a message instead of crashing the game.
 - Music discs in a dock are played by the mod itself instead of the game's own disc player, so they can start in
   the middle. Discs played from an iPod you hold are unchanged.
 
