@@ -4,6 +4,12 @@ All notable changes to iCraft, newest version first, following
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The top section is the version in `gradle.properties`;
 new changes go there until the next version bump.
 
+## [0.0.9]
+
+### Fixed
+- The game's own background music no longer starts over the iPod or a dock's music while it plays for you (it comes back
+  afterwards). Switch: `silenceBackgroundMusic` in `icraft-client.toml`.
+
 ## [0.0.8]
 
 ### Added
@@ -49,8 +55,6 @@ new changes go there until the next version bump.
 - The selected row of the iPod list is a dark grey bar with white text.
 
 ### Fixed
-- The game's own background music no longer starts over the iPod or a dock's music while it plays for you (it comes back
-  afterwards). Switch: `silenceBackgroundMusic` in `icraft-client.toml`.
 - A dock that already held an iPod before this version had no owner, so nobody could control it (and no notes or
   sound followed). It now belongs to the first player who uses it.
 - Putting an iPod that is playing into a dock no longer leaves the music stuck and impossible to resume. A song or
