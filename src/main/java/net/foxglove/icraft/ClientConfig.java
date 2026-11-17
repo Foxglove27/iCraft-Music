@@ -41,6 +41,10 @@ public class ClientConfig {
                     "One folder per show.")
             .defineListAllowEmpty("extraPodcastFolders", java.util.List.of(), () -> "", o -> o instanceof String);
 
+    public static final ModConfigSpec.BooleanValue SILENCE_BACKGROUND_MUSIC = BUILDER
+            .comment("Stop the game's own background music while an iPod or a dock plays music for you")
+            .define("silenceBackgroundMusic", true);
+
     // The full spec, handed to {@code ModContainer.registerConfig(...)} in the mod constructor.
     public static final ModConfigSpec SPEC = BUILDER.build();
 }

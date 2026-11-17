@@ -191,8 +191,17 @@ public final class DockClientPlayer {
         return false;
     }
 
+    /** True while the player hears at least one dock (its sounds are playing). */
+    public static boolean hasActiveSounds() {
+        for (State s : ALL) {
+            if (s.isPlaying()) return true;
+        }
+        return false;
+    }
+
     private static void startSounds(Level level, DockBlockEntity dock, State s, DockPlayback pb) {
         stopSounds(s);
+        Minecraft.getInstance().getMusicManager().stopPlaying(); // the game's own music makes way for the dock's
         s.sequence = pb.sequence();
         s.playingOutputs = s.outputs;
 

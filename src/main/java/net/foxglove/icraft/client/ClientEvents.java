@@ -1,6 +1,10 @@
 package net.foxglove.icraft.client;
 
+import net.foxglove.icraft.ClientConfig;
 import net.foxglove.icraft.iCraft;
+import net.minecraft.client.resources.sounds.SoundInstance;
+import net.minecraft.sounds.SoundSource;
+import net.neoforged.neoforge.client.event.sound.PlaySoundEvent;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
@@ -20,6 +24,26 @@ public class ClientEvents {
     public static void onLoggingOut(ClientPlayerNetworkEvent.LoggingOut event) {
         IpodPlayer.stop();
         DockClientPlayer.stopAll();
+    }
+
+    // While iCraft music plays for the player, the game's own background music (source MUSIC) is not started.
+    // Cancelling the sound is enough: the music manager's own timer ends it and tries again later, so it comes
+    // back by itself once the iPod or dock stops. Our own sounds are RECORDS and never affected.
+    @SubscribeEvent
+    public static void onPlaySound(PlaySoundEvent event) {
+        SoundInstance sound = event.getSound();
+        if (sound != null && sound.getSource() == SoundSource.MUSIC && silenceBackgroundMusic()
+                && (IpodPlayer.isListening() || DockClientPlayer.hasActiveSounds())) {
+            event.setSound(null);
+        }
+    }
+
+    private static boolean silenceBackgroundMusic() {
+        try {
+            return ClientConfig.SILENCE_BACKGROUND_MUSIC.get();
+        } catch (IllegalStateException e) {
+            return false; // the config is not loaded yet
+        }
     }
 
     // Once per client tick: notices when a track has finished so the next one can start
