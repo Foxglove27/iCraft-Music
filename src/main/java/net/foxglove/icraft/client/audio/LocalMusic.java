@@ -141,7 +141,7 @@ public class LocalMusic {
             if (Files.isDirectory(extra)) {
                 roots.add(extra);
             } else if (REPORTED.add(extra)) {
-                LOGGER.warn("The library folder {} does not exist or cannot be read; skipping it", extra);
+                LOGGER.warn("The library folder {} does not exist or cannot be read; skipping it (a launcher in a sandbox such as Flatpak or Snap needs access to this path)", extra);
             }
         }
         return roots;

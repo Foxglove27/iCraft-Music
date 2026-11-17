@@ -43,7 +43,7 @@ ipod/
 
 ### Extra folders and network shares
 
-`config/icraft_music-client.toml` has three lists, `extraMusicFolders`, `extraAudiobookFolders` and `extraPodcastFolders`. Add absolute paths (for example `/mnt/nas/music`); they are merged with the local folders and show up under a separate **NAS** menu. Mount the share in your operating system first; `smb://` addresses do not work.
+`config/icraft_music-client.toml` has three lists, `extraMusicFolders`, `extraAudiobookFolders` and `extraPodcastFolders`. Add absolute paths (for example `/mnt/nas/music`); they are merged with the local folders and show up under a separate **NAS** menu. Mount the share in your operating system first; `smb://` addresses do not work. If your launcher is a Flatpak (for example Prism on Linux), give it access to the folder as well, e.g. `flatpak override --user --filesystem=/mnt/nas/music:ro org.prismlauncher.PrismLauncher`.
 
 ## Controls
 
@@ -64,5 +64,7 @@ A single speaker carries about 32 blocks; a wall of 2 wide x 4 tall speakers fac
 ## License
 
 The code is under the MIT License. The artwork (everything in `src/main/resources/assets/`) is all rights reserved. See [LICENSE.md](LICENSE.md). Bundled libraries (JLayer, JAAD, an ALAC decoder) are listed in [THIRD_PARTY.md](THIRD_PARTY.md). See the [changelog](CHANGELOG.md) for what changed in each version.
+
+See [AI-DISCLOSURE.md](AI-DISCLOSURE.md) for how AI was used in this project.
 
 iCraft - Music Player is a fan-made mod. "iPod" is a trademark of Apple Inc.; iCraft is not affiliated with or endorsed by Apple.
