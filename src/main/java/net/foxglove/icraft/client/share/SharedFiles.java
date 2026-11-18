@@ -10,7 +10,6 @@ import net.foxglove.icraft.net.share.ChunkAssembler;
 import net.foxglove.icraft.net.share.QueueEntry;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
-import net.neoforged.neoforge.network.PacketDistributor;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 
@@ -65,6 +64,7 @@ public final class SharedFiles {
     /** Where to find the file of an entry on this computer, or null if it is not here (yet). */
     @Nullable
     public static Path pathFor(QueueEntry entry) {
+        if (!QueueEntry.isSafe(entry.hash(), entry.ext())) return null; // no file name from an unchecked value
         Path own = LocalFileIndex.get(entry.hash());
         if (own != null) return own;
         Path cached = dir().resolve(entry.hash() + "." + entry.ext());
@@ -99,8 +99,20 @@ public final class SharedFiles {
         if (mc.player != null) mc.player.displayClientMessage(text, true);
     }
 
+    /** Forgets everything (leaving a world, a lost connection): no download, no wanted files. */
+    public static void reset() {
+        cancel();
+        WANTED.clear();
+        RETRY_AT.clear();
+        REFUSED_UNTIL.clear();
+    }
+
     /** Every client tick. */
     public static void tick() {
+        if (!net.foxglove.icraft.client.ClientNet.connected()) { // left the world, or the server stopped: nothing to ask for
+            if (active != null || !WANTED.isEmpty()) reset();
+            return;
+        }
         if (!enabled()) {
             cancel();
             return;
@@ -123,9 +135,9 @@ public final class SharedFiles {
 
     private static void start(QueueEntry entry) {
         trimCache(allWanted().stream().map(QueueEntry::hash).collect(Collectors.toSet()));
-        active = new Download(entry);
         LOGGER.info("Shared files: asking the server for {} ({})", entry.hash().substring(0, 12), entry.title());
-        PacketDistributor.sendToServer(new FileRequestPayload(entry.hash(), 0));
+        if (!net.foxglove.icraft.client.ClientNet.send(new FileRequestPayload(entry.hash(), 0))) return; // no connection
+        active = new Download(entry);
     }
 
     private static void cancel() {

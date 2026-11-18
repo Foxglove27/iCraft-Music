@@ -17,7 +17,6 @@ import net.minecraft.core.GlobalPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.JukeboxSong;
-import net.neoforged.neoforge.network.PacketDistributor;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.IOException;
@@ -121,34 +120,51 @@ public final class DockControl {
         boolean shuffle = !book && IpodSettings.shuffle();
         int repeat = book ? 0 : IpodSettings.repeat().ordinal();
 
-        CompletableFuture.supplyAsync(() -> {
-            List<QueueEntry> entries = new ArrayList<>();
-            List<FileUploader.Item> uploads = new ArrayList<>();
-            for (FileItem item : window) {
-                FileHasher.Info info;
-                try {
-                    info = FileHasher.of(item.file());
-                } catch (IOException e) {
-                    return null; // a file cannot be read: do not start a list that has a hole in it
+        CompletableFuture.<Object>supplyAsync(() -> {
+            // returns the entries and uploads, or the name of the file that could not be used (a String)
+            try {
+                List<QueueEntry> entries = new ArrayList<>();
+                List<FileUploader.Item> uploads = new ArrayList<>();
+                long lastProgress = System.currentTimeMillis();
+                int done = 0;
+                for (FileItem item : window) {
+                    done++;
+                    long nowMs = System.currentTimeMillis();
+                    if (window.size() > 3 && nowMs - lastProgress > 1000) { // hashing a big list from a network share takes a while
+                        lastProgress = nowMs;
+                        int shown = done;
+                        mc.execute(() -> {
+                            if (mc.player != null) mc.player.displayClientMessage(Component.translatable(
+                                    "message.icraft_music.share.preparing_n", shown, window.size()), true);
+                        });
+                    }
+                    FileHasher.Info info;
+                    try {
+                        info = FileHasher.of(item.file());
+                    } catch (IOException e) {
+                        return item.file().getFileName().toString(); // a file cannot be read: do not start a list that has a hole in it
+                    }
+                    String name = item.file().getFileName().toString();
+                    String ext = name.substring(name.lastIndexOf('.') + 1).toLowerCase(java.util.Locale.ROOT);
+                    double length = info.lengthSeconds() > 0 ? info.lengthSeconds() : info.size() * 8.0 / 128_000; // unknown: guess 128 kbit/s
+                    Optional<QueueEntry> entry = QueueEntry.validated(info.hash(), ext, item.title().getString(),
+                            item.album().getString(), (int) Math.round(item.startSeconds() * 20),
+                            item.endSeconds() >= 0 ? (int) Math.round(item.endSeconds() * 20) : -1, (int) Math.round(length * 20));
+                    if (entry.isEmpty()) return item.file().getFileName().toString();
+                    entries.add(entry.get());
+                    uploads.add(new FileUploader.Item(info.hash(), item.file(), ext, info.size(), item.title().getString()));
                 }
-                String name = item.file().getFileName().toString();
-                String ext = name.substring(name.lastIndexOf('.') + 1).toLowerCase(java.util.Locale.ROOT);
-                double length = info.lengthSeconds() > 0 ? info.lengthSeconds() : info.size() * 8.0 / 128_000; // unknown: guess 128 kbit/s
-                Optional<QueueEntry> entry = QueueEntry.validated(info.hash(), ext, item.title().getString(),
-                        item.album().getString(), (int) Math.round(item.startSeconds() * 20),
-                        item.endSeconds() >= 0 ? (int) Math.round(item.endSeconds() * 20) : -1, (int) Math.round(length * 20));
-                if (entry.isEmpty()) return null;
-                entries.add(entry.get());
-                uploads.add(new FileUploader.Item(info.hash(), item.file(), ext, info.size(), item.title().getString()));
+                return new Object[]{entries, uploads};
+            } finally {
+                FileHasher.flush(); // remember the new hashes on disk
             }
-            return new Object[]{entries, uploads};
         }, Util.backgroundExecutor()).thenAccept(result -> mc.execute(() -> {
-            if (result == null) {
-                if (mc.player != null) mc.player.displayClientMessage(Component.translatable("message.icraft_music.share.unreadable"), true);
+            if (result instanceof String badFile) {
+                if (mc.player != null) mc.player.displayClientMessage(Component.translatable("message.icraft_music.share.unreadable", badFile), true);
                 return;
             }
-            @SuppressWarnings("unchecked") List<QueueEntry> entries = (List<QueueEntry>) result[0];
-            @SuppressWarnings("unchecked") List<FileUploader.Item> uploads = (List<FileUploader.Item>) result[1];
+            @SuppressWarnings("unchecked") List<QueueEntry> entries = (List<QueueEntry>) ((Object[]) result)[0];
+            @SuppressWarnings("unchecked") List<FileUploader.Item> uploads = (List<FileUploader.Item>) ((Object[]) result)[1];
             for (int i = 0; i < window.size(); i++) LocalFileIndex.put(entries.get(i).hash(), window.get(i).file());
             FileUploader.reset(uploads);
             meta = new Meta(window, from);
@@ -157,7 +173,7 @@ public final class DockControl {
             FileItem first = window.get(startInWindow);
             double saved = first.progressBook() == null ? 0 : AudiobookProgress.get(first.progressBook(), first.progressKey()); // songs are not resumed
             int offsetTicks = (int) Math.round(Math.max(0, saved - 2.0) * 20); // a little earlier than where it was left
-            PacketDistributor.sendToServer(new DockQueuePayload(dock.pos(), startInWindow, offsetTicks, shuffle, repeat, entries));
+            net.foxglove.icraft.client.ClientNet.send(new DockQueuePayload(dock.pos(), startInWindow, offsetTicks, shuffle, repeat, entries));
         }));
     }
 
@@ -231,6 +247,14 @@ public final class DockControl {
         }
     }
 
+    /** The player left a world (or joined one): forget lists, docks and pending actions of the old one. */
+    public static void forgetWorld() {
+        meta = null;
+        lastIndex = -1;
+        lastDock = null;
+        pendingDock = null;
+    }
+
     // ---- what is going on ----
 
     /** The dock whose disc list this player is playing right now, or null. */
@@ -280,7 +304,7 @@ public final class DockControl {
     // ---- sending ----
 
     private static void send(GlobalPos dock, int action, int arg) {
-        PacketDistributor.sendToServer(new DockControlPayload(dock.pos(), action, arg,
+        net.foxglove.icraft.client.ClientNet.send(new DockControlPayload(dock.pos(), action, arg,
                 IpodSettings.shuffle(), IpodSettings.repeat().ordinal(), 0));
     }
 
@@ -293,7 +317,7 @@ public final class DockControl {
     public static void play(GlobalPos dock, int index, double seconds) {
         IpodPlayer.stop(); // a file or disc playing in the player's ears makes way
         lastDock = dock;
-        PacketDistributor.sendToServer(new DockControlPayload(dock.pos(), DockControlPayload.PLAY, index,
+        net.foxglove.icraft.client.ClientNet.send(new DockControlPayload(dock.pos(), DockControlPayload.PLAY, index,
                 IpodSettings.shuffle(), IpodSettings.repeat().ordinal(), (int) Math.round(seconds * 20)));
     }
 
@@ -342,7 +366,7 @@ public final class DockControl {
 
     /** Tells a dock that the owner plays one of their own files there (so everybody sees the notes). */
     public static void setExternal(GlobalPos dock, boolean playing) {
-        PacketDistributor.sendToServer(new DockControlPayload(dock.pos(), DockControlPayload.EXTERNAL,
+        net.foxglove.icraft.client.ClientNet.send(new DockControlPayload(dock.pos(), DockControlPayload.EXTERNAL,
                 playing ? 1 : 0, false, 0, 0));
     }
 }

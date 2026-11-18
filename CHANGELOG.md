@@ -14,10 +14,19 @@ new changes go there until the next version bump.
   them from the current position. The dock keeps playing when the owner leaves. Resume positions stay with the
   owner. For private use only: sharing is refused for players who are not on a private network address
   (`privateNetworkOnly`, on by default), the cache has size, per-player and age limits, and whoever runs the server is
-  responsible for the licences of what is shared.
+  responsible for the licences of what is shared. Defaults: files up to 512 MB, 2 GB cache, 512 MB per player, unused
+  files are deleted after 7 days (an existing config file keeps its old values).
+- Music from the NAS folders can be shared at a dock like local files (audiobooks and podcasts from the NAS already could). The
+  checksums of your files are remembered in `icraft_music-hashes.json`, so a big album on a network share is read once;
+  while a long list is prepared the action bar shows the progress, and if a file cannot be read it says which one.
 
 ### Fixed
 - Owners no longer download their own shared files.
+- No more crash when you leave a world, or the server stops or restarts, while a shared file is being requested.
+- Safer file sharing: the game checks the file names in a shared list before it uses them, and two players uploading the
+  same file at the same time no longer break each other's upload.
+- A paused song is no longer heard for a split second after closing the Esc menu (the pause is applied again right away).
+- The iPod can be taken out of a dock with sneak + right-click even when something is in the off hand.
 
 ## [0.0.9]
 

@@ -448,6 +448,7 @@ public class DockBlockEntity extends BlockEntity {
         if (tag.contains("queue", Tag.TAG_LIST)) {
             for (Tag raw : tag.getList("queue", Tag.TAG_COMPOUND)) {
                 CompoundTag t = (CompoundTag) raw;
+                if (!QueueEntry.isSafe(t.getString("hash"), t.getString("ext"))) continue; // never trust a name from a saved or sent tag
                 queue.add(new QueueEntry(t.getString("hash"), t.getString("ext"), t.getString("title"), t.getString("album"),
                         t.getInt("start"), t.getInt("end"), t.getInt("length")));
             }

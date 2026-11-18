@@ -26,20 +26,21 @@ public class ServerConfig {
             .define("privateNetworkOnly", true);
 
     public static final ModConfigSpec.IntValue MAX_FILE_SIZE_MB = BUILDER
-            .comment("Largest single file that may be uploaded, in MiB (audiobooks can be big)")
+            .comment("Largest single file that may be uploaded, in MiB (audiobooks can be big). If you raise this, also",
+                    "raise perPlayerQuotaMb: a player can only share files that fit into their quota.")
             .defineInRange("maxFileSizeMb", 512, 1, 4096);
 
     public static final ModConfigSpec.IntValue MAX_CACHE_SIZE_MB = BUILDER
             .comment("Total size of the shared file cache on the server, in MiB. The least recently used files are deleted first.")
-            .defineInRange("maxCacheSizeMb", 4096, 16, 1_000_000);
+            .defineInRange("maxCacheSizeMb", 2048, 16, 1_000_000);
 
     public static final ModConfigSpec.IntValue PLAYER_QUOTA_MB = BUILDER
             .comment("How much one player may have in the cache at the same time, in MiB")
-            .defineInRange("perPlayerQuotaMb", 1024, 1, 1_000_000);
+            .defineInRange("perPlayerQuotaMb", 512, 1, 1_000_000);
 
     public static final ModConfigSpec.IntValue CACHE_DAYS = BUILDER
             .comment("Shared files that were not used for this many days are deleted")
-            .defineInRange("cacheDays", 14, 1, 3650);
+            .defineInRange("cacheDays", 7, 1, 3650);
 
     public static final ModConfigSpec.IntValue MAX_QUEUE_ITEMS = BUILDER
             .comment("How many tracks a dock queue may hold (a list is sent in one message, so at most 100)")

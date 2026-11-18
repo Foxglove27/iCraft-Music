@@ -81,8 +81,9 @@ public final class SharedFileCache {
         return total;
     }
 
-    public Path partFile(String hash) {
-        return root.resolve(hash + ".part");
+    /** The unfinished upload of this player (one file per player, so two uploads of the same file cannot clash). */
+    public Path partFile(String hash, UUID player) {
+        return root.resolve(hash + "." + player + ".part");
     }
 
     // ---- changing ----

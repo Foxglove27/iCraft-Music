@@ -29,7 +29,7 @@ public class ClientHooks {
         java.util.List<ItemStack> discs = IpodItem.getDiscs(ipod);
         if (discs.isEmpty()) return true; // Ctrl was held: nothing to open either
         discRemoved(discs.get(discs.size() - 1));
-        net.neoforged.neoforge.network.PacketDistributor.sendToServer(
+        ClientNet.send(
                 new net.foxglove.icraft.net.EjectDiscPayload(hand == net.minecraft.world.InteractionHand.OFF_HAND));
         return true;
     }

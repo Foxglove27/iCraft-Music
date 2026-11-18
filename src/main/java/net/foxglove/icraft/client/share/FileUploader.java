@@ -9,7 +9,6 @@ import net.foxglove.icraft.net.FileStatusPayload;
 import net.foxglove.icraft.net.share.QueueEntry;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
-import net.neoforged.neoforge.network.PacketDistributor;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -48,6 +47,11 @@ public final class FileUploader {
     private static boolean noticeShown;
 
     private FileUploader() {}
+
+    /** Forgets the list (leaving a world, a lost connection). */
+    public static void reset() {
+        reset(List.of());
+    }
 
     /** A new list was started: these are the files in it. */
     public static void reset(List<Item> items) {
@@ -119,6 +123,10 @@ public final class FileUploader {
 
     /** Every client tick, while the owner plays a list of shared files at {@code dock}. */
     public static void tick(DockBlockEntity dock) {
+        if (!net.foxglove.icraft.client.ClientNet.connected()) { // left the world or the server stopped
+            if (!ITEMS.isEmpty() || sending != null) reset();
+            return;
+        }
         if (!ServerConfig.sharingEnabled() || ITEMS.isEmpty()) return;
 
         if (sending != null) {
@@ -127,7 +135,7 @@ public final class FileUploader {
                     ByteBuffer buf = ByteBuffer.allocate((int) Math.min(FileChunkPayload.MAX_CHUNK, sending.size() - sent));
                     int n = channel.read(buf, sent);
                     if (n <= 0) throw new IOException("The file ended early");
-                    PacketDistributor.sendToServer(new FileChunkPayload(sending.hash(), sent, java.util.Arrays.copyOf(buf.array(), n)));
+                    net.foxglove.icraft.client.ClientNet.send(new FileChunkPayload(sending.hash(), sent, java.util.Arrays.copyOf(buf.array(), n)));
                     sent += n;
                     if (sent >= sending.size()) { // all sent: the server verifies it and answers HAVE
                         closeChannel();
@@ -164,7 +172,7 @@ public final class FileUploader {
             if (item == null || DONE.contains(item.hash()) || REFUSED.contains(item.hash())) continue;
             offered = item.hash();
             offeredAt = System.currentTimeMillis();
-            PacketDistributor.sendToServer(new FileOfferPayload(item.hash(), item.size(), item.ext()));
+            net.foxglove.icraft.client.ClientNet.send(new FileOfferPayload(item.hash(), item.size(), item.ext()));
             return;
         }
     }

@@ -61,6 +61,18 @@ ipod/
 
 A single speaker carries about 32 blocks; a wall of 2 wide x 4 tall speakers facing the same way carries about 64 and counts as one speaker for the dock.
 
+## File sharing (beta, 0.1.0)
+
+On the `beta` branch (version 0.1.0) the player who docked an iPod can play their **own** music, audiobooks and podcasts (also from a NAS folder) for everybody near the dock. The files are copied to the server, and the other players download them automatically and hear them at the right position. Music discs work without this.
+
+**For server operators, please read:**
+- It is **off by default**. Switch it on with `allowFileSharing=true` in the world's `serverconfig/icraft_music-server.toml` (stop the server first).
+- It is meant for **private use** (your own server, the people you live with). With `privateNetworkOnly=true` (the default) only players connecting from a private address (192.168.x.x, 10.x.x.x, 172.16-31.x.x, localhost and the IPv6 private ranges) can share. A connection through a tunnel or reverse proxy can look like a private address, so do not rely on this setting on a public server.
+- **The server stores and relays the music files of its players.** The operator is responsible for the licences of what is shared.
+- Limits (all in the same file): files up to 512 MB (`maxFileSizeMb`), 2 GB cache in total (`maxCacheSizeMb`), 512 MB per player (`perPlayerQuotaMb`), unused files are deleted after 7 days (`cacheDays`), 100 tracks per list (`maxQueueItems`). The least recently used files go first, files of a list that is playing are kept. Existing config files keep their old values; delete a line to get the new default.
+- Everybody in range of the dock can hear it. Every listener can silence a dock for themselves (key `\` or a double-click on the middle wheel button) and can switch the download off with `downloadSharedFiles=false` in `config/icraft_music-client.toml`.
+- Where files go: `<world>/icraft_music/shared` on the server, `icraft_music-shared` in the game folder of a listener (at most 1 GB, the oldest files are removed), and the checksums of the owner's files are remembered in `icraft_music-hashes.json`.
+
 ## License
 
 The code is under the MIT License. The artwork (everything in `src/main/resources/assets/`) is all rights reserved. See [LICENSE.md](LICENSE.md). Bundled libraries (JLayer, JAAD, an ALAC decoder) are listed in [THIRD_PARTY.md](THIRD_PARTY.md). See the [changelog](CHANGELOG.md) for what changed in each version.

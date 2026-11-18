@@ -848,6 +848,22 @@ public class IpodPlayer {
         return sound == current || extras.contains(sound);
     }
 
+    // Closing the Esc menu makes the game resume every sound channel, including a paused song of ours; our own pause
+    // from the sound's tick comes up to 50 ms later. So for a few frames after a screen closed, pause it again every frame.
+    private static boolean screenWasOpen;
+    private static int recheckFrames;
+
+    /** Called every render frame (see ClientEvents). */
+    public static void keepPaused() {
+        boolean open = Minecraft.getInstance().screen != null;
+        if (screenWasOpen && !open) recheckFrames = 4;
+        screenWasOpen = open;
+        if (recheckFrames > 0) {
+            recheckFrames--;
+            if (paused && current != null) setChannelPaused(true);
+        }
+    }
+
     // Pauses or unpauses the real audio channel that our sound is playing on.
     // This reaches into the sound engine, which is why we needed the access transformer.
     private static void setChannelPaused(boolean pause) {

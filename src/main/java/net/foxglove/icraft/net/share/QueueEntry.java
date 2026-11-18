@@ -14,6 +14,14 @@ public record QueueEntry(String hash, String ext, String title, String album, in
     public static final int MAX_LENGTH_TICKS = 12 * 3600 * 20; // 12 hours
     public static final int MAX_TEXT = 48;
 
+    /**
+     * True if the hash and extension can be used to build a file name: 64 lower-case hex digits and a known audio
+     * extension. Clients check this too, because a queue entry can come from a server that is not trusted.
+     */
+    public static boolean isSafe(String hash, String ext) {
+        return hash != null && ext != null && hash.matches("[0-9a-f]{64}") && EXTENSIONS.contains(ext);
+    }
+
     /** The entry with sane values, or empty if it cannot be trusted (bad hash or extension). */
     public static Optional<QueueEntry> validated(String hash, String ext, String title, String album,
                                                  int startTicks, int endTicks, int lengthTicks) {

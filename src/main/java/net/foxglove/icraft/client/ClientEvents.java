@@ -18,6 +18,9 @@ public class ClientEvents {
     @SubscribeEvent
     public static void onLoggingIn(ClientPlayerNetworkEvent.LoggingIn event) {
         net.foxglove.icraft.client.audio.LibraryCache.refreshAsync();
+        net.foxglove.icraft.client.share.SharedFiles.reset();
+        net.foxglove.icraft.client.share.FileUploader.reset();
+        DockControl.forgetWorld();
     }
 
     @SubscribeEvent
@@ -25,6 +28,9 @@ public class ClientEvents {
         IpodPlayer.stop();
         DockClientPlayer.stopAll();
         net.foxglove.icraft.client.audio.CoverArt.clear();
+        net.foxglove.icraft.client.share.SharedFiles.reset();
+        net.foxglove.icraft.client.share.FileUploader.reset();
+        DockControl.forgetWorld();
     }
 
     // While iCraft music plays for the player, the game's own background music (source MUSIC) is not started.
@@ -45,6 +51,12 @@ public class ClientEvents {
         } catch (IllegalStateException e) {
             return false; // the config is not loaded yet
         }
+    }
+
+    // Every frame: right after the Esc menu closes, a paused song is paused again at once (see IpodPlayer.keepPaused)
+    @SubscribeEvent
+    public static void onRenderFrame(net.neoforged.neoforge.client.event.RenderFrameEvent.Pre event) {
+        IpodPlayer.keepPaused();
     }
 
     // Once per client tick: notices when a track has finished so the next one can start

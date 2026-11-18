@@ -115,7 +115,7 @@ public final class ShareServer {
         UploadSession old = UPLOADS.remove(player.getUUID());
         if (old != null) old.abort();
         try {
-            ChunkAssembler assembler = new ChunkAssembler(cache.partFile(hash), offer.size(), hash);
+            ChunkAssembler assembler = new ChunkAssembler(cache.partFile(hash, player.getUUID()), offer.size(), hash);
             UPLOADS.put(player.getUUID(), new UploadSession(player.getUUID(), hash, offer.ext(), offer.size(), assembler));
             LOGGER.info("File sharing: {} uploads {} ({} bytes, .{})", player.getGameProfile().getName(),
                     hash.substring(0, 12), offer.size(), offer.ext());

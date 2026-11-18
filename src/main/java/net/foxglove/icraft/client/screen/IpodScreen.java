@@ -264,8 +264,12 @@ public class IpodScreen extends Screen {
         for (LocalMusic.Album album : snapshot.nas()) {
             List<Track> tracks = new ArrayList<>();
             for (Path file : album.files()) {
+                // NAS songs can be shared at a dock like local ones (read-only; nothing is written into the share)
                 tracks.add(new Track(Component.literal(LocalMusic.displayName(file)),
-                        () -> IpodPlayer.playFile(file, ipod)));
+                        () -> IpodPlayer.playFile(file, ipod),
+                        null,
+                        new DockControl.FileItem(file, Component.literal(LocalMusic.displayName(file)), album.name(),
+                                album.cover(), 0, -1, null, LocalMusic.key(file), null)));
             }
             nas.add(new AlbumView(album.name(), album.cover(), null, tracks));
         }
