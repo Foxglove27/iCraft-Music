@@ -20,6 +20,13 @@ public class ClientHooks {
         openScreen(ipod, null, true);
     }
 
+    /** Opens the iCraft Manual: the vanilla book screen with pages from our lang files. */
+    public static void openManual() {
+        Minecraft.getInstance().setScreen(new net.minecraft.client.gui.screens.inventory.BookViewScreen(
+                new net.minecraft.client.gui.screens.inventory.BookViewScreen.BookAccess(
+                        net.foxglove.icraft.client.screen.ManualPages.build())));
+    }
+
     /**
      * Ctrl + right-click with an iPod in hand: takes its last disc out (the server does it, told by a message;
      * a disc that is playing stops here). Returns false when Ctrl is not held or there is no disc.

@@ -4,6 +4,18 @@ All notable changes to iCraft, newest version first, following
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The top section is the version in `gradle.properties`;
 new changes go there until the next version bump.
 
+## [0.2.0]
+
+### Added
+- **iCraft Manual**: a book that explains the mod (the click wheel, your music folders, discs, the dock and speakers,
+  keys, file sharing, settings). Craft it from a book and a redstone dust, right-click to read it. Every player gets
+  one the first time they join a world; the server can switch that off with `giveManualOnFirstJoin` in
+  `serverconfig/icraft_music-server.toml`. The pages are in English and German.
+
+### Fixed
+- The time on the playing chapter or episode counts up while the iPod screen is open (it used to change only after
+  closing and reopening the screen).
+
 ## [0.1.0]
 
 ### Added

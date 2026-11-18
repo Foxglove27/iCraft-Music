@@ -25,6 +25,10 @@ public class ModItems {
     // The plain white iPod, used for the creative tab icon and the now-playing icon
     public static final DeferredItem<IpodItem> IPOD = IPODS.get(IpodColor.WHITE);
 
+    // The book that explains the mod
+    public static final DeferredItem<ManualItem> MANUAL = ITEMS.register("manual",
+            () -> new ManualItem(new Item.Properties().stacksTo(1)));
+
     public static void register(IEventBus eventBus) {
         ITEMS.register(eventBus);
     }

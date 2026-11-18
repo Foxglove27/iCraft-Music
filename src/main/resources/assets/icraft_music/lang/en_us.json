@@ -81,5 +81,19 @@
   "message.icraft_music.share.refused.bad_data": "The file transfer failed: %s",
   "message.icraft_music.share.refused.bad_hash": "The file was damaged in transfer: %s",
   "message.icraft_music.share.refused.not_here": "You are not near a dock playing this file.",
-  "message.icraft_music.share.refused.error": "The server could not handle this file: %s"
+  "message.icraft_music.share.refused.error": "The server could not handle this file: %s",
+  "item.icraft_music.manual": "iCraft Manual",
+  "manual.icraft_music.1.1": "§liCraft Manual§r\n\nCraft an iPod: iron ingots, glass and a redstone dust.\n\nRight-click it to open it. Right-click with an empty hand on a docked iPod to open that one.",
+  "manual.icraft_music.1.2": "§lThe click wheel§r\n\nTop: Menu (back)\nLeft / right: previous / next. Hold to skip 10 seconds.\nBottom: play / pause\nMiddle: select. Double-click: stop.\n\nScroll over the display to move through lists, over the wheel to change the volume.",
+  "manual.icraft_music.2.1": "§lYour music§r\n\nPut your files in the ipod folder of your game directory:\n\nipod/music/<album>\nipod/audiobooks/<book>\nipod/podcasts/<show>\n\nLoose files in ipod/music are listed as Singles.",
+  "manual.icraft_music.2.2": "§lFormats§r\n\nOGG, MP3, FLAC, WAV and M4A / M4B (AAC or Apple Lossless).\n\nA cover.png or folder.jpg in an album folder is its cover. A .m4b shows its chapters, and audiobooks and podcasts remember where you stopped.",
+  "manual.icraft_music.2.3": "§lA big library§r\n\nExtra folders (for example a NAS share) can be added in config/icraft_music-client.toml: extraMusicFolders, extraAudiobookFolders, extraPodcastFolders. They appear under NAS in the menu.\n\nSandboxed launchers (Flatpak) need access to that folder.",
+  "manual.icraft_music.3.1": "§lMusic discs§r\n\nRight-click the iPod in your inventory with a music disc on your cursor to load it. An iPod holds 32 discs.\n\nRight-click it with an empty cursor, or Ctrl + right-click it in your hand, to take the last disc out.",
+  "manual.icraft_music.4.1": "§lDocking station§r\n\nRight-click a dock with an iPod to dock it. Sneak + empty hand takes it out again.\n\nOnly the player who docked it controls the music; everybody near the dock can listen.",
+  "manual.icraft_music.4.2": "§lSpeakers§r\n\nSneak + right-click the dock with the iPod to link it. Then right-click speakers with that iPod to add or remove them: up to 4, within 32 blocks.\n\nA speaker carries about 32 blocks.",
+  "manual.icraft_music.4.3": "§lSpeaker wall§r\n\nSpeakers in a block of 2 wide and 4 tall, all facing the same way, make a wall. It carries twice as far (about 64 blocks) and counts as one speaker for the dock.\n\nNotes rise from the speakers that play.",
+  "manual.icraft_music.5.1": "§lKeys§r\n\nP: play / pause\n]: next\n[: previous\n\\: stop a dock's music for me (only you)\n\nAll can be changed in the controls, under iCraft.",
+  "manual.icraft_music.6.1": "§lSharing files§r\n\nThe server owner can switch on allowFileSharing. Then the player who docked the iPod can play their own files for everybody near the dock.\n\nYou can turn downloads off with downloadSharedFiles in the client config.",
+  "manual.icraft_music.7.1": "§lSettings§r\n\nShuffle and repeat (off / list / one) are in the iPod's Settings.\n\nVolume is also kept in config/icraft_music-client.toml.",
+  "manual.icraft_music.7.2": "§lColours§r\n\nCraft an iPod with a dye to change its colour. Its discs, link and name stay."
 }

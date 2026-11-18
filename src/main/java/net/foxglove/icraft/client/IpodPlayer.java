@@ -492,6 +492,16 @@ public class IpodPlayer {
         return 0;
     }
 
+    /**
+     * How far into its own chapter the item with this progress key is, or -1 if that item is not the one playing
+     * here. Used by the iPod screen so the time on the playing row counts up while it is open.
+     */
+    public static double itemSeconds(String itemKey) {
+        ProgressTarget target = currentProgress;
+        if (target == null || !started || !target.itemKey().equals(itemKey)) return -1;
+        return Math.max(0, positionSeconds() - target.itemStartSeconds());
+    }
+
     // Asks the sound engine's thread where playback is and remembers it. Cheap; called a few times a second.
     private static void refreshPosition() {
         if (!(current instanceof IpodSoundInstance sound) || !sound.isFile()) return;

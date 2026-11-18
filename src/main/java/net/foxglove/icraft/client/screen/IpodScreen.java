@@ -601,9 +601,14 @@ public class IpodScreen extends Screen {
                 case TRACKS, CHAPTERS -> {
                     Track track = open.tracks().get(index);
                     name = track.name();
-                    if (track.detail() != null) { // the saved time, right-aligned in grey
-                        int detailW = this.font.width(track.detail());
-                        g.drawString(this.font, track.detail(), right - detailW, rowY + 2,
+                    String detail = track.detail(); // the saved time; the playing row shows the live one
+                    if (track.item() != null) {
+                        double live = IpodPlayer.itemSeconds(track.item().progressKey());
+                        if (live >= 1) detail = formatTime(live);
+                    }
+                    if (detail != null) { // right-aligned in grey
+                        int detailW = this.font.width(detail);
+                        g.drawString(this.font, detail, right - detailW, rowY + 2,
                                 isSelected ? 0xFFFFFFFF : 0xFFAAAAAA, false);
                         right2 = right - detailW - 3;
                     }

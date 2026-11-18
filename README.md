@@ -18,6 +18,7 @@
 - **Music, audiobooks and podcasts**: separate menus. Audiobooks and podcasts remember where you stopped.
 - **Music discs**: load up to 32 discs (also from other mods) into an iPod and play them like an album, with shuffle and repeat.
 - **Docking station and speakers**: dock your iPod, link up to four speakers (or 2x4 speaker walls) and the music plays from the blocks.
+- **Manual**: the iCraft Manual (a book and a redstone dust) explains everything in the game; new players get one on their first join.
 - **Multiplayer**: players near a dock hear its music discs and only the owner controls it. Your own files are only ever heard by you.
 - **Big libraries and NAS**: add extra folders (for example a mounted network share).
 

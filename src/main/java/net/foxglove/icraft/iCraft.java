@@ -2,6 +2,7 @@ package net.foxglove.icraft;
 
 import net.foxglove.icraft.block.ModBlockEntities;
 import net.foxglove.icraft.block.ModBlocks;
+import net.foxglove.icraft.item.ModAttachments;
 import net.foxglove.icraft.item.ModCreativeModeTabs;
 import net.foxglove.icraft.item.ModDataComponents;
 import net.foxglove.icraft.item.ModItems;
@@ -28,6 +29,7 @@ public class iCraft {
         ModBlocks.register(modEventBus);
         ModBlockEntities.register(modEventBus);
         ModDataComponents.register(modEventBus);
+        ModAttachments.register(modEventBus);
         ModRecipes.register(modEventBus);
 
         // Add the iPod and speaker to the vanilla creative tabs (the custom iCraft tab is built in ModCreativeModeTabs)

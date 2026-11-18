@@ -46,6 +46,10 @@ public class ServerConfig {
             .comment("How many tracks a dock queue may hold (a list is sent in one message, so at most 100)")
             .defineInRange("maxQueueItems", 100, 1, 100);
 
+    public static final ModConfigSpec.BooleanValue GIVE_MANUAL = BUILDER
+            .comment("Give every player one iCraft Manual (a book that explains the mod) the first time they join this world")
+            .define("giveManualOnFirstJoin", true);
+
     public static final ModConfigSpec SPEC = BUILDER.build();
 
     private ServerConfig() {}

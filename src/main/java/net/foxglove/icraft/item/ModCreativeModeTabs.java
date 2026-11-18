@@ -25,6 +25,7 @@ public class ModCreativeModeTabs {
                         }
                         output.accept(ModBlocks.SPEAKER);
                         output.accept(ModBlocks.DOCK);
+                        output.accept(ModItems.MANUAL);
                     }).build());
 
     public static void register(IEventBus eventbus){
