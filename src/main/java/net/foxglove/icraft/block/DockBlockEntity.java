@@ -130,6 +130,15 @@ public class DockBlockEntity extends BlockEntity {
     }
 
     /**
+     * True if this player may take the docked iPod out or break the dock: only the owner (by UUID, so a name change
+     * never locks them out), with no exception for creative players or operators; anybody while the dock has no
+     * owner yet. An admin can still clear a dock with /setblock or an explosion.
+     */
+    public boolean canManage(Player player) {
+        return owner == null || isOwner(player);
+    }
+
+    /**
      * A dock that holds an iPod but has no owner (it was docked by an older version) belongs to the first
      * player who uses it. Server side.
      */

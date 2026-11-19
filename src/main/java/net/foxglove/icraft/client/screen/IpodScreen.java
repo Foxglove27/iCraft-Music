@@ -1,7 +1,7 @@
 package net.foxglove.icraft.client.screen;
 
 import com.mojang.math.Axis;
-import net.foxglove.icraft.client.DockClientPlayer;
+import net.foxglove.icraft.client.IpodMute;
 import net.foxglove.icraft.client.DockControl;
 import net.foxglove.icraft.client.IpodPlayer;
 import net.foxglove.icraft.client.IpodSettings;
@@ -72,7 +72,7 @@ public class IpodScreen extends Screen {
     private static final long ANIM_MS = 280;
 
     // Two clicks on the middle button closer together than this count as a double-click
-    private static final long DOUBLE_CLICK_MS = 300;
+    private static final long DOUBLE_CLICK_MS = 350;
 
     // When a single click on the middle button is waiting to see if a second one follows,
     // this is the time (in milliseconds) when we give up waiting. -1 means nothing is waiting.
@@ -106,6 +106,7 @@ public class IpodScreen extends Screen {
     private static final int MENU_NAS = 4;
     // the entries of the NAS submenu
     private static final int MENU_SEARCH = 8;
+    private static final int MENU_MANUAL = 9; // opens the iCraft Manual
     private static final int NAS_MUSIC = 5;
     private static final int NAS_BOOKS = 6;
     private static final int NAS_PODCASTS = 7;
@@ -154,8 +155,8 @@ public class IpodScreen extends Screen {
             if (LocalMusic.hasNasFolders(LocalMusic.Section.PODCASTS)) ids.add(NAS_PODCASTS);
             return ids;
         }
-        return nasEnabled ? List.of(MENU_MUSIC, MENU_NAS, MENU_BOOKS, MENU_PODCASTS, MENU_SEARCH, MENU_SETTINGS)
-                : List.of(MENU_MUSIC, MENU_BOOKS, MENU_PODCASTS, MENU_SEARCH, MENU_SETTINGS);
+        return nasEnabled ? List.of(MENU_MUSIC, MENU_NAS, MENU_BOOKS, MENU_PODCASTS, MENU_SEARCH, MENU_SETTINGS, MENU_MANUAL)
+                : List.of(MENU_MUSIC, MENU_BOOKS, MENU_PODCASTS, MENU_SEARCH, MENU_SETTINGS, MENU_MANUAL);
     }
 
     private int menuRowOf(int id) {
@@ -555,9 +556,16 @@ public class IpodScreen extends Screen {
                     : searchQuery + ((Util.getMillis() / 500) % 2 == 0 ? "_" : " "));
             case TRACKS, CHAPTERS -> open.name();
         };
+        // while this iPod is muted for the player, "Muted" stands next to the status symbol
+        String muted = IpodMute.silences(ipodId)
+                ? Component.translatable("screen.icraft_music.ipod.muted").getString() : "";
+        int titleRoom = right - left - 10 - (muted.isEmpty() ? 0 : this.font.width(muted) + 4);
         String shownTitle = page == Page.SEARCH && !searchQuery.isEmpty()
-                ? this.font.plainSubstrByWidth(title.getString(), right - left - 10, true) // the end of a long query
-                : fit(title.getString(), right - left - 10);
+                ? this.font.plainSubstrByWidth(title.getString(), titleRoom, true) // the end of a long query
+                : fit(title.getString(), titleRoom);
+        if (!muted.isEmpty()) {
+            g.drawString(this.font, muted, right - 8 - this.font.width(muted), DISPLAY_Y + (HEADER_H - 8) / 2, 0xFF0A2A66, false);
+        }
         g.drawString(this.font, shownTitle, left, DISPLAY_Y + (HEADER_H - 8) / 2, 0xFF0A2A66, false);
         if (LibraryCache.get().scanning() && page != Page.TRACKS && page != Page.CHAPTERS && page != Page.SETTINGS) {
             // a library scan is running: animated dots after the title
@@ -742,6 +750,7 @@ public class IpodScreen extends Screen {
             case MENU_MUSIC -> "screen.icraft_music.ipod.music";
             case MENU_NAS -> "screen.icraft_music.ipod.nas";
             case MENU_SEARCH -> "screen.icraft_music.ipod.search";
+            case MENU_MANUAL -> "screen.icraft_music.ipod.manual";
             case NAS_MUSIC -> "screen.icraft_music.ipod.music";
             case NAS_BOOKS -> "screen.icraft_music.ipod.audiobooks";
             case NAS_PODCASTS -> "screen.icraft_music.ipod.podcasts";
@@ -793,6 +802,10 @@ public class IpodScreen extends Screen {
         switch (page) {
             case MENU -> {
                 int id = menuIds().get(selected);
+                if (id == MENU_MANUAL) { // the full manual; Esc there comes back to this menu
+                    this.minecraft.setScreen(new ManualScreen(this));
+                    return;
+                }
                 if (id == MENU_NAS) { // open the NAS submenu
                     inNas = true;
                     goTo(Page.MENU, 0);
@@ -977,19 +990,13 @@ public class IpodScreen extends Screen {
         return super.mouseClicked(mouseX, mouseY, button);
     }
 
-    // The middle button: one click opens/plays (after a short wait), two quick clicks stop
+    // The middle button: one click opens/plays (after a short wait), two quick clicks mute or unmute
     private void onMiddleClick() {
         if (pendingActivateAt >= 0) {
             // A click was already waiting, so this is the second one: a double-click
             pendingActivateAt = -1;
-            if (dock != null && !dockOwner && DockClientPlayer.stopForMe(dock.pos())) {
-                return; // not their dock: the double-click stops the music for them only
-            }
-            if (IpodPlayer.isPlaying()) {
-                DockControl.stop(); // a dock that plays discs stops too
-                IpodPlayer.stop();
-            } else {
-                activate(); // nothing to stop, so treat it as a normal click
+            if (!IpodMute.toggleIpod(ipodId)) { // only for this player: this iPod goes silent and keeps running
+                activate(); // nothing plays, so treat it as a normal click
             }
         } else {
             // First click: don't act yet, wait to see whether a second one follows

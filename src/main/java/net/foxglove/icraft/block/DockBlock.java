@@ -149,11 +149,11 @@ public class DockBlock extends BaseEntityBlock {
         dock.claimIfUnowned(player); // a dock filled by an older version belongs to whoever uses it first
 
         if (player.isShiftKeyDown()) {
-            if (level.isClientSide() && (dock.isOwner(player) || player.hasPermissions(2))) {
+            if (level.isClientSide() && dock.canManage(player)) {
                 ClientHooks.ipodTakenFromDock(dock); // what the dock plays carries on for this player
             }
             if (!level.isClientSide()) {
-                if (dock.isOwner(player) || player.hasPermissions(2)) { // the owner, or an operator / creative
+                if (dock.canManage(player)) { // only the owner
                     player.getInventory().placeItemBackInInventory(dock.takeIpod());
                     player.displayClientMessage(Component.translatable("message.icraft_music.dock.taken"), true);
                 } else {
@@ -164,6 +164,43 @@ public class DockBlock extends BaseEntityBlock {
             ClientHooks.openDockScreen(dock);
         }
         return InteractionResult.sidedSuccess(level.isClientSide());
+    }
+
+    // Another player cannot break a dock that holds someone else's iPod: in survival it does not crack at all. This
+    // runs on the client and on the server (which checks the progress itself). An empty dock and the owner break it
+    // as usual; explosions and /setblock still remove it (the iPod drops).
+    @Override
+    protected float getDestroyProgress(BlockState state, Player player, BlockGetter level, BlockPos pos) {
+        if (isProtectedFrom(level, pos, player)) return 0.0F;
+        return super.getDestroyProgress(state, player, level, pos);
+    }
+
+    // Left-clicking such a dock says whose iPod it is (server side, once per click)
+    @Override
+    protected void attack(BlockState state, Level level, BlockPos pos, Player player) {
+        if (!level.isClientSide() && isProtectedFrom(level, pos, player)
+                && level.getBlockEntity(pos) instanceof DockBlockEntity dock) {
+            player.displayClientMessage(Component.translatable("message.icraft_music.dock.not_yours", dock.getOwnerName()), true);
+        }
+        super.attack(state, level, pos, player);
+    }
+
+    // The last step of breaking by a player, on the client and the server, in survival and creative. Creative players
+    // break blocks at once without any progress, so this is what stops them; false = the block stays.
+    @Override
+    public boolean onDestroyedByPlayer(BlockState state, Level level, BlockPos pos, Player player, boolean willHarvest,
+                                       net.minecraft.world.level.material.FluidState fluid) {
+        if (isProtectedFrom(level, pos, player)) {
+            if (!level.isClientSide() && level.getBlockEntity(pos) instanceof DockBlockEntity dock) {
+                player.displayClientMessage(Component.translatable("message.icraft_music.dock.not_yours", dock.getOwnerName()), true);
+            }
+            return false;
+        }
+        return super.onDestroyedByPlayer(state, level, pos, player, willHarvest, fluid);
+    }
+
+    private static boolean isProtectedFrom(BlockGetter level, BlockPos pos, Player player) {
+        return level.getBlockEntity(pos) instanceof DockBlockEntity dock && dock.hasIpod() && !dock.canManage(player);
     }
 
     // Breaking the dock gives the iPod back

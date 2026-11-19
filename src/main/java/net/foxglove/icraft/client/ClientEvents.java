@@ -17,6 +17,7 @@ public class ClientEvents {
     // Scan the library in the background as soon as the player is in a world, so the iPod opens with it ready
     @SubscribeEvent
     public static void onLoggingIn(ClientPlayerNetworkEvent.LoggingIn event) {
+        IpodMute.reset();
         net.foxglove.icraft.client.audio.LibraryCache.refreshAsync();
         net.foxglove.icraft.client.share.SharedFiles.reset();
         net.foxglove.icraft.client.share.FileUploader.reset();
@@ -27,6 +28,7 @@ public class ClientEvents {
     public static void onLoggingOut(ClientPlayerNetworkEvent.LoggingOut event) {
         IpodPlayer.stop();
         DockClientPlayer.stopAll();
+        IpodMute.reset();
         net.foxglove.icraft.client.audio.CoverArt.clear();
         net.foxglove.icraft.client.share.SharedFiles.reset();
         net.foxglove.icraft.client.share.FileUploader.reset();

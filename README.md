@@ -18,7 +18,7 @@
 - **Music, audiobooks and podcasts**: separate menus. Audiobooks and podcasts remember where you stopped.
 - **Music discs**: load up to 32 discs (also from other mods) into an iPod and play them like an album, with shuffle and repeat.
 - **Docking station and speakers**: dock your iPod, link up to four speakers (or 2x4 speaker walls) and the music plays from the blocks.
-- **Manual**: the iCraft Manual (a book and a redstone dust) explains everything in the game; new players get one on their first join.
+- **Manual**: the iCraft Manual (a book and a redstone dust) explains everything in the game, with a contents list, recipes and pictures; new players get one on their first join. The iPod's menu has a **Manual** row that opens it too.
 - **Multiplayer**: players near a dock hear its music discs and only the owner controls it. Your own files are only ever heard by you.
 - **Big libraries and NAS**: add extra folders (for example a mounted network share).
 
@@ -46,12 +46,19 @@ ipod/
 
 `config/icraft_music-client.toml` has three lists, `extraMusicFolders`, `extraAudiobookFolders` and `extraPodcastFolders`. Add absolute paths (for example `/mnt/nas/music`); they are merged with the local folders and show up under a separate **NAS** menu. Mount the share in your operating system first; `smb://` addresses do not work. If your launcher is a Flatpak (for example Prism on Linux), give it access to the folder as well, e.g. `flatpak override --user --filesystem=/mnt/nas/music:ro org.prismlauncher.PrismLauncher`.
 
+### Config files
+
+Most players never need these; the in-game manual leaves them out.
+
+- `config/icraft_music-client.toml` (your own game): `volume`, `shuffle`, `repeat` (`OFF`, `LIST`, `ONE`) and `bassBoost` (`OFF`, `LOW`, `MEDIUM`, `HIGH`) are also set in the iPod; `stereoSpeakers` (speakers left and right of a dock play the left and right channel, default on), `silenceBackgroundMusic` (the game's own music stops while iCraft plays for you, default on), `downloadSharedFiles` (see File sharing) and the extra folders above.
+- `serverconfig/icraft_music-server.toml` (in the world folder, set by the server owner): `giveManualOnFirstJoin` (default on) and the file sharing settings below.
+
 ## Controls
 
 | What | How |
 | --- | --- |
 | Open the iPod | Right-click with it in your hand, or with an empty hand on a docked iPod |
-| Click wheel | Top = back, left / right = previous / next, bottom = play / pause, middle = select, **double-click middle = stop** |
+| Click wheel | Top = back, left / right = previous / next, bottom = play / pause, middle = select, **double-click middle = mute / unmute this iPod** (key `\` = everything) |
 | Skip inside a track | Hold left or right on the wheel (10 seconds per step) |
 | Volume | Scroll the mouse wheel over the click wheel |
 | Move through lists | Scroll over the display, or the arrow keys, Enter and Backspace ||
@@ -60,7 +67,7 @@ ipod/
 | Dock it | Right-click a dock with the iPod; sneak + empty hand takes it out again |
 | Link a dock | Sneak + right-click the dock with the iPod, then right-click speakers with that iPod to add or remove them |
 
-A single speaker carries about 32 blocks; a wall of 2 wide x 4 tall speakers facing the same way carries about 64 and counts as one speaker for the dock.
+A single speaker carries about 32 blocks; a wall of 2 wide x 4 tall speakers facing the same way carries about 64 and counts as one speaker for the dock. Tip: for the best stereo, turn on **Directional Audio** in Options > Music & Sounds and wear headphones.
 
 ## File sharing
 
@@ -71,7 +78,7 @@ Since version 0.1.0 the player who docked an iPod can play their **own** music, 
 - It is meant for **private use** (your own server, the people you live with). With `privateNetworkOnly=true` (the default) only players connecting from a private address (192.168.x.x, 10.x.x.x, 172.16-31.x.x, localhost and the IPv6 private ranges) can share. A connection through a tunnel or reverse proxy can look like a private address, so do not rely on this setting on a public server.
 - **The server stores and relays the music files of its players.** The operator is responsible for the licences of what is shared.
 - Limits (all in the same file): files up to 512 MB (`maxFileSizeMb`), 2 GB cache in total (`maxCacheSizeMb`), 512 MB per player (`perPlayerQuotaMb`), unused files are deleted after 7 days (`cacheDays`), 100 tracks per list (`maxQueueItems`). The least recently used files go first, files of a list that is playing are kept. Existing config files keep their old values; delete a line to get the new default.
-- Everybody in range of the dock can hear it. Every listener can silence a dock for themselves (key `\` or a double-click on the middle wheel button) and can switch the download off with `downloadSharedFiles=false` in `config/icraft_music-client.toml`.
+- Everybody in range of the dock can hear it. Every listener can mute a dock for themselves (double-click the middle wheel button in its screen, or key `\` for everything) and can switch the download off with `downloadSharedFiles=false` in `config/icraft_music-client.toml`.
 - Where files go: `<world>/icraft_music/shared` on the server, `icraft_music-shared` in the game folder of a listener (at most 1 GB, the oldest files are removed), and the checksums of the owner's files are remembered in `icraft_music-hashes.json`.
 
 ## License

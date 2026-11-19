@@ -51,6 +51,8 @@ public class IpodSoundInstance extends AbstractTickableSoundInstance {
     private volatile boolean released;      // stopped by us: a stream that finishes opening later is closed at once
     @Nullable
     private volatile StartGroup group;      // the sounds of one track on several speakers that start together
+    @Nullable
+    private volatile java.util.UUID ipod;   // the iPod this sound belongs to (for the player's own mute)
     private volatile boolean enginePlayed;  // the sound engine has started this sound's OpenAL source
 
     /** Waits until a number of sounds have all arrived (at most a second, so a stuck one cannot hold up the rest). */
@@ -299,8 +301,14 @@ public class IpodSoundInstance extends AbstractTickableSoundInstance {
         IpodPlayer.tick(this);
     }
 
+    /** Which iPod this sound belongs to (the held one, or the one in the dock), so a mute of that iPod silences it. */
+    public void setIpod(@Nullable java.util.UUID ipod) {
+        this.ipod = ipod;
+    }
+
     @Override
     public float getVolume() {
+        if (net.foxglove.icraft.client.IpodMute.silences(ipod)) return 0.0F; // keeps playing, silently (the engine reads this every tick)
         return super.getVolume() * IpodVolume.get();
     }
     // Without this, the game refuses to start a sound whose volume is 0

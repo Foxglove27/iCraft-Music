@@ -20,7 +20,7 @@ public class ModKeyMappings {
 
     public static final KeyMapping PLAY_PAUSE = new KeyMapping("key.icraft_music.play_pause",
             KeyConflictContext.IN_GAME, InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_WORLD_1, CATEGORY);
-    public static final KeyMapping STOP_FOR_ME = new KeyMapping("key.icraft_music.stop_for_me",
+    public static final KeyMapping MUTE_FOR_ME = new KeyMapping("key.icraft_music.stop_for_me",
             KeyConflictContext.IN_GAME, InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_BACKSLASH, CATEGORY);
     public static final KeyMapping NEXT = new KeyMapping("key.icraft_music.next",
             KeyConflictContext.IN_GAME, InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_PERIOD, CATEGORY);
@@ -32,7 +32,7 @@ public class ModKeyMappings {
         event.register(PLAY_PAUSE);
         event.register(NEXT);
         event.register(PREVIOUS);
-        event.register(STOP_FOR_ME);
+        event.register(MUTE_FOR_ME);
     }
 
     /** Called every client tick: runs the actions for the keys pressed since the last tick. */
@@ -41,8 +41,8 @@ public class ModKeyMappings {
         while (PLAY_PAUSE.consumeClick()) {
             if (active) IpodPlayer.togglePause();
         }
-        while (STOP_FOR_ME.consumeClick()) {
-            if (!screenOpen) DockClientPlayer.stopForMe();
+        while (MUTE_FOR_ME.consumeClick()) {
+            if (!screenOpen) IpodMute.toggleAll();
         }
         while (NEXT.consumeClick()) {
             if (active) IpodPlayer.next();

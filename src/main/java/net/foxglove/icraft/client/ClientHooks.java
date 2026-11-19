@@ -20,11 +20,9 @@ public class ClientHooks {
         openScreen(ipod, null, true);
     }
 
-    /** Opens the iCraft Manual: the vanilla book screen with pages from our lang files. */
+    /** Opens the iCraft Manual (our own screen; the content is in ManualContent). Esc goes back into the game. */
     public static void openManual() {
-        Minecraft.getInstance().setScreen(new net.minecraft.client.gui.screens.inventory.BookViewScreen(
-                new net.minecraft.client.gui.screens.inventory.BookViewScreen.BookAccess(
-                        net.foxglove.icraft.client.screen.ManualPages.build())));
+        Minecraft.getInstance().setScreen(new net.foxglove.icraft.client.screen.ManualScreen(null));
     }
 
     /**

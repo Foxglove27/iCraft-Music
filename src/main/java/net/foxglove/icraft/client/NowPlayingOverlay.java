@@ -7,6 +7,7 @@ import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.api.distmarker.Dist;
@@ -52,8 +53,13 @@ public class NowPlayingOverlay {
         int maxWidth = W - (textX - x) - 16;
         g.drawString(font, fit(font, IpodPlayer.getNowPlaying().getString(), maxWidth),
                 textX, y + 7, 0xFFFFFFFF, true);
-        g.drawString(font, fit(font, IpodPlayer.getNowPlayingSubtitle().getString(), maxWidth),
-                textX, y + 19, 0xFFAAAAAA, false);
+        if (IpodMute.silences(IpodPlayer.playingIpod())) { // muted: say so instead of the album
+            g.drawString(font, fit(font, Component.translatable("screen.icraft_music.ipod.muted").getString(), maxWidth),
+                    textX, y + 19, 0xFFFF8080, false);
+        } else {
+            g.drawString(font, fit(font, IpodPlayer.getNowPlayingSubtitle().getString(), maxWidth),
+                    textX, y + 19, 0xFFAAAAAA, false);
+        }
 
         // play or pause symbol in the top-right corner of the panel
         drawStatusIcon(g, x + W - 11, y + 7);

@@ -589,6 +589,9 @@ public class IpodPlayer {
         retiring.addAll(extras);
         endCurrent(); // ends any current sound, but keeps the track list
         mc.getMusicManager().stopPlaying();
+        for (SoundInstance instance : instances) {
+            if (instance instanceof IpodSoundInstance ours) ours.setIpod(ipod); // so a mute of this iPod silences it
+        }
         current = instances.get(0);
         extras = new ArrayList<>(instances.subList(1, instances.size()));
         currentDisc = disc;
@@ -857,6 +860,14 @@ public class IpodPlayer {
     /** True while a track is playing for this player (in their ears or on speakers), not paused. */
     public static boolean isListening() {
         return current != null && !paused;
+    }
+
+    /** The iPod whose music plays now: the one the player started a song with, or the iPod in the dock that plays a disc. */
+    @Nullable
+    public static UUID playingIpod() {
+        if (current != null) return currentIpod;
+        DockBlockEntity dock = DockControl.active();
+        return dock != null ? dock.getIpod().get(ModDataComponents.IPOD_ID.get()) : null;
     }
 
     public static boolean hasTrack() {

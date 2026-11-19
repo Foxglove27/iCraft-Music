@@ -8,7 +8,7 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 
-/** The iCraft Manual: right-click opens a book that explains the mod. The pages are lang keys (see ManualPages). */
+/** The iCraft Manual: right-click opens a screen that explains the mod (ManualScreen, content in ManualContent). */
 public class ManualItem extends Item {
     public ManualItem(Properties properties) {
         super(properties);

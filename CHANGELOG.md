@@ -7,15 +7,28 @@ new changes go there until the next version bump.
 ## [0.2.0]
 
 ### Added
-- **iCraft Manual**: a book that explains the mod (the click wheel, your music folders, discs, the dock and speakers,
-  keys, file sharing, settings). Craft it from a book and a redstone dust, right-click to read it. Every player gets
-  one the first time they join a world; the server can switch that off with `giveManualOnFirstJoin` in
+- **iCraft Manual**: a book that explains the mod in short chapters (getting started, your music, discs, dock and
+  speakers, multiplayer, keys and settings), with a contents list to jump around, the real crafting recipes, a picture
+  of the click wheel and of the speaker wall, and the keys you have actually bound. Craft it from a book and a
+  redstone dust, right-click to read it; it reopens on the page you were reading. Every player gets one the first
+  time they join a world; the server can switch that off with `giveManualOnFirstJoin` in
   `serverconfig/icraft_music-server.toml`. The pages are in English and German.
+- **Manual** row in the iPod's menu: opens the manual right on the iPod (Esc goes back to the iPod).
 - **Bass Boost** in the iPod's Settings: Off, Low, Medium or High. It only changes what you hear (also from a dock),
   takes effect at once and is saved as `bassBoost` in `icraft_music-client.toml`.
 - **Stereo speakers**: seen from the front of a dock, speakers on its left play the left channel and speakers on its
   right the right channel (speakers near the middle, a single speaker, or speakers all on one side play both
   channels mixed, as before). Turn it off with `stereoSpeakers` in `icraft_music-client.toml`.
+
+### Changed
+- Only you can take your iPod out of a dock or break a dock that holds it, also against players in creative mode and
+  operators (they see whose iPod it is). An empty dock breaks for anyone as before; explosions still drop the iPod.
+  Operators can no longer take other players' iPods out of a dock.
+- **Stop is now mute**: the double-click on the middle wheel button no longer stops anything; it mutes and unmutes
+  that iPod just for you (its music on you, or the dock it sits in). The key `\` mutes and unmutes everything iCraft
+  you hear. The music keeps running, so unmuting continues where it is now. "Muted" shows in the iPod screen and the
+  HUD; a mute ends when you unmute or leave the world. Pause still pauses.
+- The middle button waits a little longer for a second click (350 ms), so double-clicks are easier.
 
 ### Fixed
 - The time on the playing chapter or episode counts up while the iPod screen is open (it used to change only after
