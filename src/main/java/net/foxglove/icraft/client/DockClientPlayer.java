@@ -4,6 +4,7 @@ import com.mojang.logging.LogUtils;
 import net.foxglove.icraft.block.DockBlockEntity;
 import net.foxglove.icraft.block.DockPlayback;
 import net.foxglove.icraft.client.audio.AudioDecoders;
+import net.foxglove.icraft.client.audio.ChannelMode;
 import net.foxglove.icraft.client.audio.DiscAudio;
 import net.foxglove.icraft.client.share.SharedFiles;
 import net.foxglove.icraft.net.share.QueueEntry;
@@ -309,16 +310,16 @@ public final class DockClientPlayer {
         java.util.function.DoubleSupplier start = () -> pb.positionTicks(level.getGameTime()) / 20.0;
         Minecraft mc = Minecraft.getInstance();
         if (s.outputs.isEmpty()) { // no speaker: straight into the owner's ears
-            IpodSoundInstance sound = IpodSoundInstance.forDock(downmix -> DiscAudio.open(path, downmix),
-                    path.toString(), null, 1.0F, start);
+            IpodSoundInstance sound = IpodSoundInstance.forDock(mode -> DiscAudio.open(path, mode),
+                    path.toString(), null, 1.0F, ChannelMode.STEREO, start);
             s.sounds.add(sound);
             mc.getSoundManager().play(sound);
             return;
         }
         List<IpodSoundInstance> speakers = new ArrayList<>();
         for (DockOutputs.Output o : s.outputs) {
-            IpodSoundInstance sound = IpodSoundInstance.forDock(downmix -> DiscAudio.open(path, downmix),
-                    path.toString(), o.pos(), o.volume(), start);
+            IpodSoundInstance sound = IpodSoundInstance.forDock(mode -> DiscAudio.open(path, mode),
+                    path.toString(), o.pos(), o.volume(), o.channel(), start);
             s.sounds.add(sound);
             speakers.add(sound);
         }
@@ -350,14 +351,16 @@ public final class DockClientPlayer {
         Minecraft mc = Minecraft.getInstance();
         String label = entry.title();
         if (s.outputs.isEmpty()) {
-            IpodSoundInstance sound = IpodSoundInstance.forDock(d -> AudioDecoders.open(file, d), label, null, 1.0F, start, end);
+            IpodSoundInstance sound = IpodSoundInstance.forDock(mode -> AudioDecoders.open(file, mode), label, null, 1.0F,
+                    ChannelMode.STEREO, start, end);
             s.sounds.add(sound);
             mc.getSoundManager().play(sound);
             return;
         }
         List<IpodSoundInstance> speakers = new ArrayList<>();
         for (DockOutputs.Output o : s.outputs) {
-            IpodSoundInstance sound = IpodSoundInstance.forDock(d -> AudioDecoders.open(file, d), label, o.pos(), o.volume(), start, end);
+            IpodSoundInstance sound = IpodSoundInstance.forDock(mode -> AudioDecoders.open(file, mode), label, o.pos(), o.volume(),
+                    o.channel(), start, end);
             s.sounds.add(sound);
             speakers.add(sound);
         }

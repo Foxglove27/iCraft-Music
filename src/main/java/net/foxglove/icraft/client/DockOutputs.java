@@ -1,10 +1,15 @@
 package net.foxglove.icraft.client;
 
+import net.foxglove.icraft.ClientConfig;
+import net.foxglove.icraft.block.DockBlock;
 import net.foxglove.icraft.block.DockBlockEntity;
 import net.foxglove.icraft.block.ModBlocks;
 import net.foxglove.icraft.block.Multiblock;
+import net.foxglove.icraft.client.audio.ChannelMode;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.Vec3;
 
 import java.util.ArrayList;
@@ -18,11 +23,21 @@ public final class DockOutputs {
      */
     public static final float SPEAKER_VOLUME = 2.0F;
 
-    /** One place the sound comes from: a single speaker or a multiblock. 'top' is where the music notes rise. */
-    public record Output(BlockPos anchor, boolean multiblock, Vec3 pos, Vec3 top, float volume) {
+    /** A speaker counts as left or right of the dock when it is more than this many blocks to the side. */
+    private static final double SIDE_THRESHOLD = 1.0;
+
+    /**
+     * One place the sound comes from: a single speaker or a multiblock. 'top' is where the music notes rise.
+     * 'channel' is the part of a stereo track it plays (left, right or both mixed).
+     */
+    public record Output(BlockPos anchor, boolean multiblock, Vec3 pos, Vec3 top, float volume, ChannelMode channel) {
         /** How far (in blocks) this speaker can be heard. */
         public double range() {
             return Math.max(volume, 1.0F) * 16.0;
+        }
+
+        Output withChannel(ChannelMode newChannel) {
+            return new Output(anchor, multiblock, pos, top, volume, newChannel);
         }
     }
 
@@ -53,13 +68,54 @@ public final class DockOutputs {
             if (slot.multiblock()) {
                 Multiblock.Result big = Multiblock.find(level, anchor);
                 if (big != null && big.anchor().equals(anchor)) {
-                    outputs.add(new Output(anchor, true, big.center(), big.top(), SPEAKER_VOLUME * 2));
+                    outputs.add(new Output(anchor, true, big.center(), big.top(), SPEAKER_VOLUME * 2, ChannelMode.MIX));
                 }
             } else if (level.getBlockState(anchor).is(ModBlocks.SPEAKER.get())) {
                 Vec3 center = Vec3.atCenterOf(anchor);
-                outputs.add(new Output(anchor, false, center, center.add(0, 0.5, 0), SPEAKER_VOLUME));
+                outputs.add(new Output(anchor, false, center, center.add(0, 0.5, 0), SPEAKER_VOLUME, ChannelMode.MIX));
             }
         }
-        return outputs;
+        return assignChannels(dock, outputs);
+    }
+
+    /**
+     * Gives every speaker its side of the music. Picture a listener standing in front of the dock, looking at it:
+     * a speaker more than {@link #SIDE_THRESHOLD} blocks to their left plays the left channel, one to their right
+     * the right channel, one near the middle line both mixed. Stereo is only used when there is at least one
+     * speaker on each side; otherwise (one speaker, or all on the same side) every speaker plays the mix, so no
+     * part of the music goes missing.
+     */
+    private static List<Output> assignChannels(DockBlockEntity dock, List<Output> outputs) {
+        if (outputs.size() < 2 || !stereoEnabled()) return outputs;
+        BlockState state = dock.getBlockState();
+        if (!state.hasProperty(DockBlock.FACING)) return outputs;
+        // the dock's front faces the listener, so the listener's right hand points to the dock's left
+        Direction right = state.getValue(DockBlock.FACING).getCounterClockWise();
+        Vec3 dockCenter = Vec3.atCenterOf(dock.getBlockPos());
+
+        List<ChannelMode> sides = new ArrayList<>();
+        boolean anyLeft = false, anyRight = false;
+        for (Output o : outputs) {
+            Vec3 offset = o.pos().subtract(dockCenter);
+            double side = offset.x * right.getStepX() + offset.z * right.getStepZ();
+            ChannelMode mode = side > SIDE_THRESHOLD ? ChannelMode.RIGHT
+                    : side < -SIDE_THRESHOLD ? ChannelMode.LEFT : ChannelMode.MIX;
+            anyLeft |= mode == ChannelMode.LEFT;
+            anyRight |= mode == ChannelMode.RIGHT;
+            sides.add(mode);
+        }
+        if (!anyLeft || !anyRight) return outputs; // all MIX already
+
+        List<Output> result = new ArrayList<>(outputs.size());
+        for (int i = 0; i < outputs.size(); i++) result.add(outputs.get(i).withChannel(sides.get(i)));
+        return result;
+    }
+
+    private static boolean stereoEnabled() {
+        try {
+            return ClientConfig.STEREO_SPEAKERS.get();
+        } catch (IllegalStateException e) {
+            return true; // the config is not loaded yet: the default
+        }
     }
 }

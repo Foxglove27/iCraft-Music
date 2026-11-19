@@ -14,6 +14,7 @@ import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.Nullable;
+import org.lwjgl.openal.AL10;
 import org.slf4j.Logger;
 import net.foxglove.icraft.client.IpodPlayer;
 
@@ -28,17 +29,20 @@ import java.util.function.DoubleSupplier;
 
 public class IpodSoundInstance extends AbstractTickableSoundInstance {
     private static final Logger LOGGER = LogUtils.getLogger();
+    /** The engine queues 4 buffers of 1 s when it starts a stream (Channel.attachBufferStream). */
+    private static final int PRELOAD_SECONDS = 4;
 
-    /** Opens the audio of a track. {@code downmixToMono} is true for sounds that come from a speaker. */
+    /** Opens the audio of a track with the given channels (a speaker gets one mono channel). */
     @FunctionalInterface
     public interface Opener {
-        PcmAudioStream open(boolean downmixToMono) throws IOException;
+        PcmAudioStream open(ChannelMode mode) throws IOException;
     }
 
     @Nullable
     private final Opener opener;   // null means "a normal sound event" (a music disc from a held iPod)
     private final String label;    // for log messages
     private final boolean positional;
+    private final ChannelMode channel; // STEREO in the player's ears, a mono mode from a speaker
     private final boolean managed; // controlled by IpodPlayer (false for the sounds a dock plays for everyone)
     private final DoubleSupplier startSeconds; // where in the file to begin (0 = the start); read when it opens
     private final double endSeconds;           // where to stop (-1 = the end of the file)
@@ -47,22 +51,99 @@ public class IpodSoundInstance extends AbstractTickableSoundInstance {
     private volatile boolean released;      // stopped by us: a stream that finishes opening later is closed at once
     @Nullable
     private volatile StartGroup group;      // the sounds of one track on several speakers that start together
+    private volatile boolean enginePlayed;  // the sound engine has started this sound's OpenAL source
 
-    /**
-     * Sounds that belong together (one track on several speakers). Each waits, once its own file is open, until
-     * all of them are open, so the speakers start at the same moment instead of a few tens of ms apart.
-     */
-    private static final class StartGroup {
+    /** Waits until a number of sounds have all arrived (at most a second, so a stuck one cannot hold up the rest). */
+    private static final class Barrier {
         private final int size;
-        private final AtomicInteger opened = new AtomicInteger();
-        private final CompletableFuture<Void> allOpened = new CompletableFuture<>();
+        private final AtomicInteger arrived = new AtomicInteger();
+        private final CompletableFuture<Void> all = new CompletableFuture<>();
 
-        StartGroup(int size) {
+        Barrier(int size) {
             this.size = size;
         }
 
         void arrive() {
-            if (opened.incrementAndGet() >= size) allOpened.complete(null);
+            if (arrived.incrementAndGet() >= size) all.complete(null);
+        }
+
+        /** Completes when everybody arrived, or after one second. Never fails. */
+        CompletableFuture<Void> await() {
+            return all.copy().orTimeout(1, TimeUnit.SECONDS).exceptionally(e -> null);
+        }
+    }
+
+    /**
+     * Sounds that belong together (one track on several speakers). They start in two steps: first every sound
+     * opens its file; when all are open, the start position is read <b>once</b> for all of them, every sound
+     * seeks there, and when all have seeked they are handed to the engine together. So the speakers play the
+     * same moment of the song, even if one file opened much more slowly than another.
+     */
+    private static final class StartGroup {
+        /** How long the first speaker waits for the others at the engine before the ones that are there start anyway. */
+        private static final long PLAY_TIMEOUT_MS = 500;
+
+        private final Barrier opened;
+        private final Barrier seeked;
+        private boolean startKnown;
+        private double start;
+        // the last step: the engine has started a member's OpenAL source; it is held at its first sample until all are there
+        private int expected;      // members that will still reach the engine
+        private final List<IpodSoundInstance> waiting = new java.util.ArrayList<>();
+        private final List<Integer> sources = new java.util.ArrayList<>();
+        private boolean started;
+
+        StartGroup(int size) {
+            this.opened = new Barrier(size);
+            this.seeked = new Barrier(size);
+            this.expected = size;
+        }
+
+        /**
+         * The engine has just started this member (on the sound thread). Its source is put back to its very first
+         * sample and held there; when the last member arrives, all of them start with one OpenAL call, so they play
+         * the same sample at the same moment. A member that comes after the group started just plays.
+         */
+        synchronized void enginePlayed(IpodSoundInstance sound, int source) {
+            if (started) return;
+            AL10.alSourceRewind(source);
+            waiting.add(sound);
+            sources.add(source);
+            if (waiting.size() == 1) {
+                CompletableFuture.delayedExecutor(PLAY_TIMEOUT_MS, TimeUnit.MILLISECONDS).execute(this::timeout);
+            }
+            if (waiting.size() >= expected) startAll(false);
+        }
+
+        /** A member was stopped before the engine ever started it: nobody waits for it any more. */
+        synchronized void memberGone() {
+            expected--;
+            if (!started && !waiting.isEmpty() && waiting.size() >= expected) startAll(false);
+        }
+
+        // a member never reached the engine (for example the engine had no free channel): start the ones that did
+        private synchronized void timeout() {
+            if (!started) startAll(true);
+        }
+
+        private void startAll(boolean late) {
+            started = true;
+            int[] live = new int[sources.size()];
+            int n = 0;
+            for (int i = 0; i < waiting.size(); i++) {
+                if (!waiting.get(i).released) live[n++] = sources.get(i); // a stopped one may already be another sound's
+            }
+            if (n > 0) AL10.alSourcePlayv(java.util.Arrays.copyOf(live, n));
+            LOGGER.info("{} speakers started together{}", n, late ? " (not all of them were ready)" : "");
+        }
+
+        /** The start position of the whole group: the first sound to ask reads it, the others get the same value. */
+        synchronized double start(DoubleSupplier position) {
+            if (!startKnown) {
+                start = position.getAsDouble();
+                startKnown = true;
+            }
+            return start;
         }
     }
 
@@ -81,8 +162,21 @@ public class IpodSoundInstance extends AbstractTickableSoundInstance {
      * never attached (it was stopped first) is closed after a moment. Closing twice does nothing.
      */
     public void release() {
+        boolean first = !released; // release can be called more than once; the group must hear it only once
         released = true;
+        StartGroup together = group;
+        if (first && together != null && !enginePlayed) together.memberGone();
         CompletableFuture.runAsync(this::closeStream, CompletableFuture.delayedExecutor(2, TimeUnit.SECONDS));
+    }
+
+    /**
+     * Called by {@link SpeakerSync} on the sound thread right after the engine started this sound's OpenAL source.
+     * A sound in a start group is held there until the whole group can start at once.
+     */
+    void onEnginePlay(int source) {
+        enginePlayed = true;
+        StartGroup together = group;
+        if (together != null) together.enginePlayed(this, source);
     }
 
     private void closeStream() {
@@ -97,7 +191,7 @@ public class IpodSoundInstance extends AbstractTickableSoundInstance {
 
     // A vanilla music disc sound
     public static IpodSoundInstance forDisc(SoundEvent sound, @Nullable Vec3 pos, float volume) {
-        return new IpodSoundInstance(sound, null, "disc", true, pos, volume, () -> 0, -1);
+        return new IpodSoundInstance(sound, null, "disc", true, pos, volume, ChannelMode.MIX, () -> 0, -1);
     }
 
     /**
@@ -106,28 +200,30 @@ public class IpodSoundInstance extends AbstractTickableSoundInstance {
      */
     public static IpodSoundInstance forDiscAt(Opener opener, String label, @Nullable Vec3 pos, float volume,
                                               double startSeconds) {
-        return new IpodSoundInstance(borrowedEvent(), opener, label, true, pos, volume, () -> startSeconds, -1);
+        return new IpodSoundInstance(borrowedEvent(), opener, label, true, pos, volume, ChannelMode.MIX, () -> startSeconds, -1);
     }
 
     /**
      * A sound a dock plays (not controlled by IpodPlayer): a disc decoded by us so it can start anywhere.
      * {@code startSeconds} is asked when the stream opens, so the time spent loading is not lost.
+     * {@code channel} is the speaker's side (ignored without a position: the player's ears get stereo).
      */
-    public static IpodSoundInstance forDock(Opener opener, String label, @Nullable Vec3 pos, float volume, DoubleSupplier startSeconds) {
-        return forDock(opener, label, pos, volume, startSeconds, -1);
+    public static IpodSoundInstance forDock(Opener opener, String label, @Nullable Vec3 pos, float volume,
+                                            ChannelMode channel, DoubleSupplier startSeconds) {
+        return forDock(opener, label, pos, volume, channel, startSeconds, -1);
     }
 
     /** Like above, ending at {@code endSeconds} of the file (a chapter inside a longer file); -1 = the end of the file. */
     public static IpodSoundInstance forDock(Opener opener, String label, @Nullable Vec3 pos, float volume,
-                                            DoubleSupplier startSeconds, double endSeconds) {
-        return new IpodSoundInstance(borrowedEvent(), opener, label, false, pos, volume, startSeconds, endSeconds);
+                                            ChannelMode channel, DoubleSupplier startSeconds, double endSeconds) {
+        return new IpodSoundInstance(borrowedEvent(), opener, label, false, pos, volume, channel, startSeconds, endSeconds);
     }
 
-    // A file from the ipod_music folder
-    public static IpodSoundInstance forFile(Path file, @Nullable Vec3 pos, float volume,
+    /** A file from the library, from a speaker ({@code pos}, playing {@code channel}) or in the player's ears (null). */
+    public static IpodSoundInstance forFile(Path file, @Nullable Vec3 pos, float volume, ChannelMode channel,
                                             double startSeconds, double endSeconds) {
-        return new IpodSoundInstance(borrowedEvent(), downmix -> AudioDecoders.open(file, downmix),
-                file.toString(), true, pos, volume, () -> startSeconds, endSeconds);
+        return new IpodSoundInstance(borrowedEvent(), mode -> AudioDecoders.open(file, mode),
+                file.toString(), true, pos, volume, channel, () -> startSeconds, endSeconds);
     }
 
     // borrow a vanilla streamed sound so the engine takes its streaming path;
@@ -137,7 +233,8 @@ public class IpodSoundInstance extends AbstractTickableSoundInstance {
     }
 
     private IpodSoundInstance(SoundEvent sound, @Nullable Opener opener, String label, boolean managed,
-                              @Nullable Vec3 pos, float volume, DoubleSupplier startSeconds, double endSeconds) {
+                              @Nullable Vec3 pos, float volume, ChannelMode channel,
+                              DoubleSupplier startSeconds, double endSeconds) {
         super(sound, SoundSource.RECORDS, SoundInstance.createUnseededRandom());
         this.opener = opener;
         this.label = label;
@@ -145,6 +242,8 @@ public class IpodSoundInstance extends AbstractTickableSoundInstance {
         this.startSeconds = startSeconds;
         this.endSeconds = endSeconds;
         this.positional = pos != null;
+        // a sound in the world must be mono to fade with distance; one in the player's ears keeps its stereo
+        this.channel = positional ? (channel.isMono() ? channel : ChannelMode.MIX) : ChannelMode.STEREO;
 
         if (pos != null) {
             // coming from a speaker block: fixed position, fades with distance
@@ -213,45 +312,35 @@ public class IpodSoundInstance extends AbstractTickableSoundInstance {
     @Override
     public CompletableFuture<AudioStream> getStream(SoundBufferLibrary soundBuffers, Sound sound, boolean looping) {
         CompletableFuture<AudioStream> future;
+        StartGroup together = group;
         if (opener == null) {
             // a normal disc: let the game load its own audio file as usual
             future = super.getStream(soundBuffers, sound, looping);
+        } else if (together == null) {
+            // a file or a disc that we decode ourselves, streaming: open, go to the start position, play
+            future = CompletableFuture.supplyAsync(() -> prepare(openFile(), startSeconds.getAsDouble()),
+                    Util.backgroundExecutor());
         } else {
-            // a file or a disc that we decode ourselves, streaming
-            future = CompletableFuture.supplyAsync(() -> {
-                try {
-                    PcmAudioStream opened = opener.open(positional);
-                    double start = startSeconds.getAsDouble();
-                    if (start > 0) {
+            // one of several speakers: open, wait for the others, all go to the same position, wait, play together.
+            // A sound whose file fails to open still arrives at both steps, so nobody waits for it.
+            future = CompletableFuture.supplyAsync(this::openFile, Util.backgroundExecutor())
+                    .whenComplete((opened, error) -> {
+                        together.opened.arrive();
+                        if (error != null) together.seeked.arrive();
+                    })
+                    .thenCompose(opened -> together.opened.await().thenApplyAsync(ignored -> {
                         try {
-                            opened.seekToFrame(Math.round(start * opened.sampleRate()));
-                        } catch (IOException e) {
-                            // the position is unusable after a failed seek: start again from the beginning
-                            LOGGER.warn("Could not seek to {} s in {}; playing from the start", start, label, e);
-                            opened.close();
-                            opened = opener.open(positional);
+                            return prepare(opened, together.start(startSeconds));
+                        } finally {
+                            together.seeked.arrive();
                         }
-                    }
-                    if (endSeconds >= 0) opened.limitToFrame(Math.round(endSeconds * opened.sampleRate()));
-                    if (!managed) {
-                        LOGGER.info("Dock sound {} opened: {} Hz, {} s in, {}", label, opened.sampleRate(), start,
-                                positional ? "from a speaker" : "in the player's ears");
-                    }
-                    if (released) { // stopped while it was opening: nobody will play it
-                        opened.close();
-                        return new SilentAudioStream();
-                    }
-                    stream = opened;
-                    return opened;
-                } catch (IOException e) {
-                    throw new CompletionException(e);
-                }
-            }, Util.backgroundExecutor());
+                    }, Util.backgroundExecutor()))
+                    .thenCompose(ready -> together.seeked.await().thenApply(ignored -> ready));
         }
 
         // If loading fails, tell the player (back on the main thread) and give the engine a short
         // silent stream instead of a failed one, so it releases the sound channel (see SilentAudioStream)
-        CompletableFuture<AudioStream> handled = future.handle((stream, error) -> {
+        return future.handle((stream, error) -> {
             if (error == null) return stream;
             if (managed) {
                 Minecraft.getInstance().execute(() -> IpodPlayer.onLoadFailed(this, error));
@@ -260,13 +349,53 @@ public class IpodSoundInstance extends AbstractTickableSoundInstance {
             }
             return new SilentAudioStream();
         });
+    }
 
-        // Speakers of one track: every sound waits until all of them are open (at most a second), so they start together
-        StartGroup together = group;
-        if (together == null || opener == null) return handled;
-        return handled.thenCompose(ready -> {
-            together.arrive();
-            return together.allOpened.orTimeout(1, TimeUnit.SECONDS).handle((done, error) -> ready);
-        });
+    // Opens the file with this sound's channels (runs on a background thread)
+    private PcmAudioStream openFile() {
+        try {
+            return opener.open(channel);
+        } catch (IOException e) {
+            throw new CompletionException(e);
+        }
+    }
+
+    // Moves an opened stream to its start position and end, and makes it this sound's stream (background thread)
+    private AudioStream prepare(PcmAudioStream opened, double start) {
+        try {
+            if (start > 0) {
+                try {
+                    opened.seekToFrame(Math.round(start * opened.sampleRate()));
+                } catch (IOException e) {
+                    // the position is unusable after a failed seek: start again from the beginning
+                    LOGGER.warn("Could not seek to {} s in {}; playing from the start", start, label, e);
+                    opened.close();
+                    opened = opener.open(channel);
+                }
+            }
+            if (endSeconds >= 0) opened.limitToFrame(Math.round(endSeconds * opened.sampleRate()));
+            opened.preload(PRELOAD_SECONDS); // so the engine does not decode on its own thread right before it starts
+            if (!managed) {
+                LOGGER.info("Dock sound {} opened: {} Hz, {} s in, {}", label, opened.sampleRate(), start,
+                        positional ? "from a speaker (" + channel + ")" : "in the player's ears");
+            }
+            if (released) { // stopped while it was opening: nobody will play it
+                opened.close();
+                return new SilentAudioStream();
+            }
+            stream = opened;
+            return opened;
+        } catch (IOException e) {
+            closeQuietly(opened);
+            throw new CompletionException(e);
+        }
+    }
+
+    private static void closeQuietly(PcmAudioStream s) {
+        try {
+            s.close();
+        } catch (IOException ignored) {
+            // nothing more to do
+        }
     }
 }

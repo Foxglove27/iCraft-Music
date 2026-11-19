@@ -50,6 +50,11 @@ public class ClientConfig {
             .comment("Stop the game's own background music while an iPod or a dock plays music for you")
             .define("silenceBackgroundMusic", true);
 
+    public static final ModConfigSpec.BooleanValue STEREO_SPEAKERS = BUILDER
+            .comment("Speakers on the left and right of a docking station (seen from its front) play the left and",
+                    "right channel. Off: every speaker plays both channels mixed together.")
+            .define("stereoSpeakers", true);
+
     // The full spec, handed to {@code ModContainer.registerConfig(...)} in the mod constructor.
     public static final ModConfigSpec SPEC = BUILDER.build();
 }

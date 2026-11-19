@@ -17,7 +17,7 @@ import java.util.Locale;
 public final class AudioDecoders {
     private AudioDecoders() {}
 
-    public static PcmAudioStream open(Path file, boolean downmixToMono) throws IOException {
+    public static PcmAudioStream open(Path file, ChannelMode mode) throws IOException {
         String name = file.getFileName().toString().toLowerCase(Locale.ROOT);
         String ext = name.substring(name.lastIndexOf('.') + 1);
         PcmSource source = switch (ext) {
@@ -28,12 +28,12 @@ public final class AudioDecoders {
             case "m4a", "m4b" -> openMp4(file);
             default -> throw new IOException("Unsupported audio format: " + file.getFileName());
         };
-        return new PcmAudioStream(source, downmixToMono);
+        return new PcmAudioStream(source, mode);
     }
 
     /** How long a file plays, in seconds; 0 if the format does not tell. Opens the file briefly. */
     public static double durationSeconds(Path file) throws IOException {
-        PcmAudioStream stream = open(file, false);
+        PcmAudioStream stream = open(file, ChannelMode.STEREO);
         try {
             long frames = stream.lengthFrames();
             return frames > 0 ? (double) frames / stream.sampleRate() : 0;

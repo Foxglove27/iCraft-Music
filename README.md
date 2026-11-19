@@ -2,7 +2,7 @@
 <h1 align="center">iCraft - Music Player<br>
 	<img src="https://img.shields.io/badge/Minecraft-1.21.1-5B8731?style=flat" alt="Minecraft 1.21.1">
 	<img src="https://img.shields.io/badge/NeoForge-21.1.233-E68C37?style=flat" alt="NeoForge 21.1">
-	<img src="https://img.shields.io/badge/status-alpha-orange?style=flat" alt="Status: alpha">
+	<img src="https://img.shields.io/badge/status-beta-yellow?style=flat" alt="Status: beta">
 	<img src="https://img.shields.io/badge/code-MIT-blue?style=flat" alt="Code: MIT">
 	<br><br>
 </h1>
@@ -62,9 +62,9 @@ ipod/
 
 A single speaker carries about 32 blocks; a wall of 2 wide x 4 tall speakers facing the same way carries about 64 and counts as one speaker for the dock.
 
-## File sharing (beta, 0.1.0)
+## File sharing
 
-On the `beta` branch (version 0.1.0) the player who docked an iPod can play their **own** music, audiobooks and podcasts (also from a NAS folder) for everybody near the dock. The files are copied to the server, and the other players download them automatically and hear them at the right position. Music discs work without this.
+Since version 0.1.0 the player who docked an iPod can play their **own** music, audiobooks and podcasts (also from a NAS folder) for everybody near the dock. The files are copied to the server, and the other players download them automatically and hear them at the right position. Music discs work without this.
 
 **For server operators, please read:**
 - It is **off by default**. Switch it on with `allowFileSharing=true` in the world's `serverconfig/icraft_music-server.toml` (stop the server first).

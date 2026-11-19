@@ -6,6 +6,7 @@ import net.foxglove.icraft.RepeatMode;
 import net.foxglove.icraft.block.DockBlockEntity;
 import net.foxglove.icraft.block.ModBlocks;
 import net.foxglove.icraft.block.Multiblock;
+import net.foxglove.icraft.client.audio.ChannelMode;
 import net.foxglove.icraft.client.audio.AudiobookProgress;
 import net.foxglove.icraft.client.audio.IpodSoundInstance;
 import net.foxglove.icraft.client.audio.PcmAudioStream;
@@ -375,7 +376,7 @@ public class IpodPlayer {
             return;
         }
         queueDock = null;
-        IpodSoundInstance sound = IpodSoundInstance.forDiscAt(downmix -> DiscAudio.open(path, downmix),
+        IpodSoundInstance sound = IpodSoundInstance.forDiscAt(mode -> DiscAudio.open(path, mode),
                 path.toString(), null, 1.0F, startSeconds);
         start(List.of(sound), disc.copy(), List.of(), song.get().value().description(),
                 Component.translatable("screen.icraft_music.ipod.discs"), null, ipod);
@@ -462,10 +463,11 @@ public class IpodPlayer {
 
         List<SoundInstance> sounds = new ArrayList<>();
         if (outputs.isEmpty()) {
-            sounds.add(IpodSoundInstance.forFile(file, null, DockOutputs.SPEAKER_VOLUME, startSeconds, endSeconds));
+            sounds.add(IpodSoundInstance.forFile(file, null, DockOutputs.SPEAKER_VOLUME, ChannelMode.STEREO,
+                    startSeconds, endSeconds));
         } else {
             for (DockOutputs.Output o : outputs) {
-                sounds.add(IpodSoundInstance.forFile(file, o.pos(), o.volume(), startSeconds, endSeconds));
+                sounds.add(IpodSoundInstance.forFile(file, o.pos(), o.volume(), o.channel(), startSeconds, endSeconds));
             }
         }
         // the speakers in earshot start together (a far one that the engine skips is not waited for)

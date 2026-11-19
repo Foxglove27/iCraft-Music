@@ -11,7 +11,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 
-/** Feeds a {@link PcmSource} to the game's sound engine, optionally mixing stereo down to mono. */
+/** Feeds a {@link PcmSource} to the game's sound engine, as stereo or as one mono channel (see {@link ChannelMode}). */
 public class PcmAudioStream implements AudioStream {
     private static final Logger LOGGER = LogUtils.getLogger();
 
@@ -24,13 +24,19 @@ public class PcmAudioStream implements AudioStream {
     private final PcmSource source;
     private final int channels;     // channels in the file
     private final int outChannels;  // channels we hand to OpenAL
+    private final ChannelMode mode;
     private final AudioFormat format;
     private short[] scratch = new short[0];
+    // the first seconds, decoded in advance by preload(); handed out before anything new is decoded
+    private final java.util.Queue<ByteBuffer> preloaded = new java.util.concurrent.ConcurrentLinkedQueue<>();
+    @org.jetbrains.annotations.Nullable
+    private volatile IOException preloadError; // reading failed while preloading: thrown when the engine gets there
 
-    public PcmAudioStream(PcmSource source, boolean downmixToMono) {
+    public PcmAudioStream(PcmSource source, ChannelMode mode) {
         this.source = source;
+        this.mode = mode;
         this.channels = source.channels();
-        this.outChannels = (downmixToMono && channels == 2) ? 1 : channels;
+        this.outChannels = (mode.isMono() && channels == 2) ? 1 : channels;
         this.format = new AudioFormat(source.sampleRate(), 16, outChannels, true, false);
     }
 
@@ -41,6 +47,38 @@ public class PcmAudioStream implements AudioStream {
 
     @Override
     public ByteBuffer read(int size) throws IOException {
+        ByteBuffer ready = preloaded.poll();
+        if (ready != null) return ready;
+        IOException error = preloadError;
+        if (error != null) {
+            preloadError = null;
+            throw error;
+        }
+        return decode(size);
+    }
+
+    /**
+     * Decodes the first {@code seconds} of audio now (call on a background thread, after the seek). The game's sound
+     * engine reads the first 4 seconds of a stream on its own sound thread right before it starts the sound; with
+     * several speakers that means each speaker starts only after the one before it has decoded its 4 seconds, so
+     * they are milliseconds apart and sound thin. Decoded in advance, those reads only copy memory.
+     */
+    public void preload(int seconds) {
+        int size = sampleRate() * outChannels * 2; // one second, the same size the engine asks for
+        try {
+            for (int i = 0; i < seconds; i++) {
+                ByteBuffer chunk = decode(size);
+                preloaded.add(chunk);
+                if (!chunk.hasRemaining()) break; // the end of the file
+            }
+        } catch (IOException e) {
+            preloadError = e; // already logged by decode
+        } catch (RuntimeException e) {
+            preloadError = new IOException(e);
+        }
+    }
+
+    private ByteBuffer decode(int size) throws IOException {
         int frames = Math.max(1, size / (2 * outChannels));
         if (endFrame >= 0) {
             long left = endFrame - (startFrame + framesRead);
@@ -67,7 +105,11 @@ public class PcmAudioStream implements AudioStream {
         ByteBuffer out = BufferUtils.createByteBuffer(got * outChannels * 2).order(ByteOrder.LITTLE_ENDIAN);
         if (outChannels == channels) {
             for (int i = 0; i < got * channels; i++) out.putShort(scratch[i]);
-        } else { // stereo -> mono
+        } else if (mode == ChannelMode.LEFT) { // stereo -> its left side
+            for (int i = 0; i < got; i++) out.putShort(scratch[2 * i]);
+        } else if (mode == ChannelMode.RIGHT) { // stereo -> its right side
+            for (int i = 0; i < got; i++) out.putShort(scratch[2 * i + 1]);
+        } else { // stereo -> mono mix
             for (int i = 0; i < got; i++) out.putShort((short) ((scratch[2 * i] + scratch[2 * i + 1]) / 2));
         }
         out.flip();

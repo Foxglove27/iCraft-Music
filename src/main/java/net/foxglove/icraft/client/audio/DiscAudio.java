@@ -36,7 +36,7 @@ public final class DiscAudio {
     }
 
     /** Opens the audio file found by {@link #resolve}. Can run on any thread. */
-    public static PcmAudioStream open(ResourceLocation path, boolean downmixToMono) throws IOException {
+    public static PcmAudioStream open(ResourceLocation path, ChannelMode mode) throws IOException {
         Resource resource = Minecraft.getInstance().getResourceManager().getResource(path)
                 .orElseThrow(() -> new IOException("Sound file not found: " + path));
         byte[] data;
@@ -45,6 +45,6 @@ public final class DiscAudio {
         }
         ByteBuffer direct = BufferUtils.createByteBuffer(data.length);
         direct.put(data).flip();
-        return new PcmAudioStream(new OggSource(direct, path.toString()), downmixToMono);
+        return new PcmAudioStream(new OggSource(direct, path.toString()), mode);
     }
 }
