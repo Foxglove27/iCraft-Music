@@ -111,7 +111,8 @@ public class IpodScreen extends Screen {
     private static final int NAS_PODCASTS = 7;
     private static final int SETTING_SHUFFLE = 0;
     private static final int SETTING_REPEAT = 1;
-    private static final int SETTING_ROWS = 2;
+    private static final int SETTING_BASS = 2;
+    private static final int SETTING_ROWS = 3;
 
     private Page page = Page.MENU;
 
@@ -757,6 +758,11 @@ public class IpodScreen extends Screen {
                     Component.translatable("screen.icraft_music.ipod.shuffle"),
                     Component.translatable(IpodSettings.shuffle() ? "screen.icraft_music.ipod.on" : "screen.icraft_music.ipod.off"));
         }
+        if (index == SETTING_BASS) {
+            return Component.translatable("screen.icraft_music.ipod.setting",
+                    Component.translatable("screen.icraft_music.ipod.bass"),
+                    Component.translatable("screen.icraft_music.ipod.bass." + IpodSettings.bassBoost().name().toLowerCase(Locale.ROOT)));
+        }
         return Component.translatable("screen.icraft_music.ipod.setting",
                 Component.translatable("screen.icraft_music.ipod.repeat"),
                 Component.translatable("screen.icraft_music.ipod.repeat." + IpodSettings.repeat().name().toLowerCase(Locale.ROOT)));
@@ -837,6 +843,8 @@ public class IpodScreen extends Screen {
             case SETTINGS -> {
                 if (selected == SETTING_SHUFFLE) {
                     IpodSettings.toggleShuffle();
+                } else if (selected == SETTING_BASS) {
+                    IpodSettings.cycleBassBoost();
                 } else {
                     IpodSettings.cycleRepeat();
                 }

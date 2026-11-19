@@ -27,6 +27,8 @@ public class PcmAudioStream implements AudioStream {
     private final ChannelMode mode;
     private final AudioFormat format;
     private short[] scratch = new short[0];
+    @org.jetbrains.annotations.Nullable
+    private net.foxglove.icraft.client.audio.decode.BassFilter bass; // null = no bass boost
     // the first seconds, decoded in advance by preload(); handed out before anything new is decoded
     private final java.util.Queue<ByteBuffer> preloaded = new java.util.concurrent.ConcurrentLinkedQueue<>();
     @org.jetbrains.annotations.Nullable
@@ -101,6 +103,7 @@ public class PcmAudioStream implements AudioStream {
             }
             throw e;
         }
+        if (bass != null && got > 0) bass.process(scratch, got); // before picking a channel, so every speaker gets it
 
         ByteBuffer out = BufferUtils.createByteBuffer(got * outChannels * 2).order(ByteOrder.LITTLE_ENDIAN);
         if (outChannels == channels) {
@@ -128,9 +131,15 @@ public class PcmAudioStream implements AudioStream {
         return failed;
     }
 
+    /** Turns up the bass by {@code db} decibels (0 = off). Call before the first read. */
+    public void setBassBoost(double db) {
+        bass = db > 0 ? new net.foxglove.icraft.client.audio.decode.BassFilter(db, source.sampleRate(), channels) : null;
+    }
+
     /** Jumps to a sample frame of the file. Call before the first read (or when restarting). */
     public void seekToFrame(long frame) throws IOException {
         source.seek(frame);
+        if (bass != null) bass.reset();
         startFrame = frame;
         framesRead = 0;
     }

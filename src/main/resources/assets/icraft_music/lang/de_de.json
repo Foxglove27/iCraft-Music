@@ -27,6 +27,11 @@
   "screen.icraft_music.ipod.repeat.off": "Aus",
   "screen.icraft_music.ipod.repeat.list": "Liste",
   "screen.icraft_music.ipod.repeat.one": "Titel",
+  "screen.icraft_music.ipod.bass": "Bass",
+  "screen.icraft_music.ipod.bass.off": "Aus",
+  "screen.icraft_music.ipod.bass.low": "Leicht",
+  "screen.icraft_music.ipod.bass.medium": "Mittel",
+  "screen.icraft_music.ipod.bass.high": "Stark",
   "screen.icraft_music.ipod.audiobooks": "Hörbücher",
   "screen.icraft_music.ipod.books": "Hörbücher",
   "screen.icraft_music.ipod.no_books": "Keine Hörbücher gefunden. Lege pro Buch einen Ordner in ipod/audiobooks (mp3, ogg, flac, wav, m4a oder m4b).",
@@ -95,6 +100,6 @@
   "manual.icraft_music.4.4": "§lStereo§r\n\nVon vorne gesehen spielen Lautsprecher links der Dockingstation den linken Kanal, rechts davon den rechten. Lautsprecher in der Mitte spielen beide.\n\nAus: stereoSpeakers in der Client-Konfiguration.",
   "manual.icraft_music.5.1": "§lTasten§r\n\nP: Wiedergabe / Pause\n]: weiter\n[: zurück\n\\: Musik einer Dockingstation nur für mich stoppen\n\nAlle lassen sich in den Steuerungseinstellungen unter iCraft ändern.",
   "manual.icraft_music.6.1": "§lDateien teilen§r\n\nDer Serverbetreiber kann allowFileSharing einschalten. Dann kann, wer den iPod angedockt hat, eigene Dateien für alle in der Nähe der Dockingstation abspielen.\n\nDownloads schaltest du mit downloadSharedFiles in der Client-Konfiguration aus.",
-  "manual.icraft_music.7.1": "§lEinstellungen§r\n\nZufallswiedergabe und Wiederholen (aus / Liste / Titel) findest du in den Einstellungen des iPods.\n\nDie Lautstärke steht auch in config/icraft_music-client.toml.",
+  "manual.icraft_music.7.1": "§lEinstellungen§r\n\nZufallswiedergabe, Wiederholen (aus / Liste / Titel) und Bass findest du in den Einstellungen des iPods. Bass ändert nur, was du hörst.\n\nLautstärke: config/icraft_music-client.toml.",
   "manual.icraft_music.7.2": "§lFarben§r\n\nBaue einen iPod mit einem Farbstoff, um seine Farbe zu ändern. Platten, Verbindung und Name bleiben erhalten."
 }

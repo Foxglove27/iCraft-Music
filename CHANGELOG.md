@@ -11,6 +11,8 @@ new changes go there until the next version bump.
   keys, file sharing, settings). Craft it from a book and a redstone dust, right-click to read it. Every player gets
   one the first time they join a world; the server can switch that off with `giveManualOnFirstJoin` in
   `serverconfig/icraft_music-server.toml`. The pages are in English and German.
+- **Bass Boost** in the iPod's Settings: Off, Low, Medium or High. It only changes what you hear (also from a dock),
+  takes effect at once and is saved as `bassBoost` in `icraft_music-client.toml`.
 - **Stereo speakers**: seen from the front of a dock, speakers on its left play the left channel and speakers on its
   right the right channel (speakers near the middle, a single speaker, or speakers all on one side play both
   channels mixed, as before). Turn it off with `stereoSpeakers` in `icraft_music-client.toml`.

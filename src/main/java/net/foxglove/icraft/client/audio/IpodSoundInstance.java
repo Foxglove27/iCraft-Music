@@ -374,6 +374,7 @@ public class IpodSoundInstance extends AbstractTickableSoundInstance {
                 }
             }
             if (endSeconds >= 0) opened.limitToFrame(Math.round(endSeconds * opened.sampleRate()));
+            opened.setBassBoost(net.foxglove.icraft.client.IpodSettings.bassBoost().db()); // the listener's own setting
             opened.preload(PRELOAD_SECONDS); // so the engine does not decode on its own thread right before it starts
             if (!managed) {
                 LOGGER.info("Dock sound {} opened: {} Hz, {} s in, {}", label, opened.sampleRate(), start,

@@ -27,6 +27,11 @@
   "screen.icraft_music.ipod.repeat.off": "Off",
   "screen.icraft_music.ipod.repeat.list": "List",
   "screen.icraft_music.ipod.repeat.one": "One",
+  "screen.icraft_music.ipod.bass": "Bass Boost",
+  "screen.icraft_music.ipod.bass.off": "Off",
+  "screen.icraft_music.ipod.bass.low": "Low",
+  "screen.icraft_music.ipod.bass.medium": "Medium",
+  "screen.icraft_music.ipod.bass.high": "High",
   "screen.icraft_music.ipod.audiobooks": "Audiobooks",
   "screen.icraft_music.ipod.books": "Audiobooks",
   "screen.icraft_music.ipod.no_books": "No audiobooks found. Put one folder per book in ipod/audiobooks (mp3, ogg, flac, wav, m4a or m4b).",
@@ -95,6 +100,6 @@
   "manual.icraft_music.4.4": "§lStereo§r\n\nSeen from the front of the dock, speakers on its left play the left channel and speakers on its right the right channel. Speakers near the middle play both.\n\nOff: stereoSpeakers in the client config.",
   "manual.icraft_music.5.1": "§lKeys§r\n\nP: play / pause\n]: next\n[: previous\n\\: stop a dock's music for me (only you)\n\nAll can be changed in the controls, under iCraft.",
   "manual.icraft_music.6.1": "§lSharing files§r\n\nThe server owner can switch on allowFileSharing. Then the player who docked the iPod can play their own files for everybody near the dock.\n\nYou can turn downloads off with downloadSharedFiles in the client config.",
-  "manual.icraft_music.7.1": "§lSettings§r\n\nShuffle and repeat (off / list / one) are in the iPod's Settings.\n\nVolume is also kept in config/icraft_music-client.toml.",
+  "manual.icraft_music.7.1": "§lSettings§r\n\nShuffle, repeat (off / list / one) and bass boost are in the iPod's Settings. Bass boost only changes what you hear.\n\nVolume is also kept in config/icraft_music-client.toml.",
   "manual.icraft_music.7.2": "§lColours§r\n\nCraft an iPod with a dye to change its colour. Its discs, link and name stay."
 }

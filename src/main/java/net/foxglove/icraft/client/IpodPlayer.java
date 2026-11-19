@@ -217,6 +217,15 @@ public class IpodPlayer {
     private static int reviveWait;
 
     // Starts the current track again where it is, on whatever outputs it works out now (speakers or the player's ears)
+    /**
+     * A setting that changes the sound itself (bass boost) was changed: the playing track starts again at the same
+     * second, because the engine has a few seconds of the old sound queued. Only for tracks we decode; not while paused.
+     */
+    public static void audioSettingsChanged() {
+        if (paused || !(current instanceof IpodSoundInstance sound) || !sound.isFile()) return;
+        restartAtSamePlace();
+    }
+
     private static void restartAtSamePlace() {
         if (queueIndex < 0 || queueIndex >= order.length) return;
         if (current instanceof IpodSoundInstance sound && sound.isFile()) {

@@ -24,6 +24,10 @@ public class ClientConfig {
             .comment("What happens when a track ends: OFF (stop after the last), LIST (start over) or ONE (same track again)")
             .defineEnum("repeat", RepeatMode.OFF);
 
+    public static final ModConfigSpec.EnumValue<BassBoost> BASS_BOOST = BUILDER
+            .comment("How much the bass is turned up in what you hear: OFF, LOW, MEDIUM or HIGH (also in the iPod's Settings)")
+            .defineEnum("bassBoost", BassBoost.OFF);
+
     public static final ModConfigSpec.BooleanValue DOWNLOAD_SHARED_FILES = BUILDER
             .comment("Download the music files that other players share at a docking station on a server (private",
                     "servers only), so you can hear them. Switch off to only see the music notes.")

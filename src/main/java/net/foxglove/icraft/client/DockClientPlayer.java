@@ -393,6 +393,13 @@ public final class DockClientPlayer {
         }
     }
 
+    /** Starts the sounds of every dock that plays here again at the current position (an audio setting changed). */
+    public static void restartAll() {
+        for (State s : ALL) {
+            if (s.isPlaying()) s.sequence = -1; // the next tick sees a "new" sequence and starts the sounds again
+        }
+    }
+
     /** Stops every dock sound (leaving the world). */
     public static void stopAll() {
         for (State s : new ArrayList<>(ALL)) stopSounds(s);

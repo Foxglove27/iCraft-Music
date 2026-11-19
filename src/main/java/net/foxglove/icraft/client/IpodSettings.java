@@ -1,12 +1,14 @@
 package net.foxglove.icraft.client;
 
+import net.foxglove.icraft.BassBoost;
 import net.foxglove.icraft.ClientConfig;
 import net.foxglove.icraft.RepeatMode;
 
-/** Shuffle and repeat. Global (not per iPod); read from the config once and saved when the screen closes. */
+/** Shuffle, repeat and bass boost. Global (not per iPod); read from the config once and saved when the screen closes. */
 public class IpodSettings {
     private static boolean shuffle;
     private static RepeatMode repeat = RepeatMode.OFF;
+    private static BassBoost bassBoost = BassBoost.OFF;
     private static boolean loaded = false;
     private static boolean changed = false;
 
@@ -14,6 +16,7 @@ public class IpodSettings {
         if (loaded) return;
         shuffle = ClientConfig.SHUFFLE.get();
         repeat = ClientConfig.REPEAT.get();
+        bassBoost = ClientConfig.BASS_BOOST.get();
         loaded = true;
     }
 
@@ -36,6 +39,26 @@ public class IpodSettings {
         IpodPlayer.shuffleChanged();
     }
 
+    /** The bass boost of what this player hears. Read when a sound opens its file (can be a background thread). */
+    public static BassBoost bassBoost() {
+        try {
+            load();
+        } catch (IllegalStateException e) {
+            return BassBoost.OFF; // the config is not loaded yet
+        }
+        return bassBoost;
+    }
+
+    /** Next bass level; what is playing restarts at the same second so the change is heard at once. */
+    public static void cycleBassBoost() {
+        load();
+        bassBoost = bassBoost.next();
+        changed = true;
+        save();
+        IpodPlayer.audioSettingsChanged();
+        DockClientPlayer.restartAll();
+    }
+
     public static void cycleRepeat() {
         load();
         repeat = repeat.next();
@@ -49,6 +72,7 @@ public class IpodSettings {
         if (!changed) return;
         ClientConfig.SHUFFLE.set(shuffle);
         ClientConfig.REPEAT.set(repeat);
+        ClientConfig.BASS_BOOST.set(bassBoost);
         ClientConfig.SPEC.save();
         changed = false;
     }
