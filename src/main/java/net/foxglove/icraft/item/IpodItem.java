@@ -5,7 +5,7 @@ import net.foxglove.icraft.block.ModBlocks;
 import net.foxglove.icraft.block.Multiblock;
 import net.foxglove.icraft.client.ClientHooks;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.GlobalPos;
+import net.minecraft.ChatFormatting;
 import net.minecraft.core.GlobalPos;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.network.chat.Component;
@@ -19,6 +19,7 @@ import net.minecraft.world.inventory.ClickAction;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.TooltipFlag;
 import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
@@ -48,6 +49,18 @@ public class IpodItem extends Item {
             discs.add(stored.copy());
         }
         return discs;
+    }
+
+    /** How many discs this iPod holds (no copies made). */
+    public static int discCount(ItemStack ipod) {
+        return ipod.getOrDefault(ModDataComponents.DISCS.get(), IpodDiscs.EMPTY).discs().size();
+    }
+
+    /** "Discs: 12/32" under the name, so players see how full an iPod is (and that it has a limit). */
+    @Override
+    public void appendHoverText(ItemStack stack, TooltipContext context, List<Component> tooltip, TooltipFlag flag) {
+        tooltip.add(Component.translatable("item.icraft_music.ipod.discs", discCount(stack), MAX_DISCS)
+                .withStyle(ChatFormatting.GRAY));
     }
 
     // True if this iPod holds a disc equal to the given one. Unlike getDiscs, it makes no copies,
@@ -84,10 +97,49 @@ public class IpodItem extends Item {
         ItemStack stack = player.getItemInHand(hand);
 
         if (level.isClientSide()) {
-            // Ctrl + right-click takes the last disc out (only the client knows about Ctrl, so the server is told)
-            if (!ClientHooks.ejectDiscWithCtrl(stack, hand)) ClientHooks.openIpodScreen(stack);
+            // Shift + right-click loads all discs (the server does it, it knows about sneaking), so nothing opens.
+            // Ctrl + right-click takes the last disc out (only the client knows about Ctrl, so the server is told).
+            if (!player.isShiftKeyDown() && !ClientHooks.ejectDiscWithCtrl(stack, hand)) ClientHooks.openIpodScreen(stack);
+        } else if (player.isShiftKeyDown()) {
+            loadAllDiscs(player, stack);
         }
         return InteractionResultHolder.sidedSuccess(stack, level.isClientSide());
+    }
+
+    /**
+     * Server side: moves every music disc from the player's inventory (main inventory in slot order, then the off
+     * hand; backpacks do not count) into {@code ipod}, one by one, until it holds {@link #MAX_DISCS}. Discs that do
+     * not fit stay where they are. The action bar says how many were loaded.
+     */
+    public static void loadAllDiscs(Player player, ItemStack ipod) {
+        List<ItemStack> discs = getDiscs(ipod);
+        if (discs.size() >= MAX_DISCS) {
+            player.displayClientMessage(Component.translatable("message.icraft_music.ipod.ipod_full", MAX_DISCS), true);
+            return;
+        }
+        List<ItemStack> sources = new ArrayList<>(player.getInventory().items);
+        sources.addAll(player.getInventory().offhand);
+        int loaded = 0;
+        boolean left = false; // a disc stayed behind because the iPod is full
+        for (ItemStack stack : sources) {
+            if (stack == ipod || !stack.has(DataComponents.JUKEBOX_PLAYABLE)) continue;
+            while (!stack.isEmpty()) {
+                if (discs.size() >= MAX_DISCS) {
+                    left = true;
+                    break;
+                }
+                discs.add(stack.split(1));
+                loaded++;
+            }
+        }
+        if (loaded == 0) {
+            player.displayClientMessage(Component.translatable("message.icraft_music.ipod.no_discs"), true);
+            return;
+        }
+        setDiscs(ipod, discs);
+        player.displayClientMessage(Component.translatable(left
+                ? "message.icraft_music.ipod.discs_loaded_full" : "message.icraft_music.ipod.discs_loaded",
+                loaded, discs.size(), MAX_DISCS), true);
     }
 
     /** Server side: takes the last disc out of {@code ipod} and gives it to the player. */

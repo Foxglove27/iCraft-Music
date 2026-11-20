@@ -1,16 +1,27 @@
 # Changelog
 
-All notable changes to iCraft, newest version first, following
-[Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The top section is the version in `gradle.properties`;
-new changes go there until the next version bump.
-
 ## [0.3.0]
 
 ### Added
 - **World sounds** in the iPod's Settings: while music plays on yourself (a held iPod, or a dock without speakers),
   blocks, steps, mobs, weather and ambience get quieter with a short fade, like wearing headphones: Normal, Quieter
-  (default), Quiet or Very quiet. Dock speakers, jukeboxes, the game's music and menu clicks are not changed. Saved
-  as `worldSounds` in `icraft_music-client.toml`.
+  (default), Quiet or Very quiet. Jukeboxes and other docks' speakers get quieter too; the music on you, the game's
+  music and menu clicks are not changed. Saved as `worldSounds` in `icraft_music-client.toml`.
+- **Disc count**: the iPod's tooltip shows how many discs it holds ("Discs: 12/32"), and so does the Music Discs row
+  in the iPod screen.
+- **Load all discs**: Shift + right-click with the iPod in your hand loads every music disc from your inventory at once
+  (up to 32; what does not fit stays where it is). The action bar says how many were loaded.
+- The playing song shows how far it is on its row in the iPod screen (it counts up while the screen is open), like
+  audiobook chapters and podcast episodes already do.
+- **More Settings rows**: Stereo speakers, Mute game music and Shared downloads can now be switched in the iPod's
+  Settings (until now only in `icraft_music-client.toml`). The last row, **Reset to defaults**, asks on a confirmation
+  page and then sets every setting back (the volume stays).
+
+### Changed
+- The iPod sits more in the middle of the dock.
+
+### Fixed
+- The saved time on audiobook and podcast rows no longer jumps back while the iPod screen is open.
 
 ## [0.2.0]
 

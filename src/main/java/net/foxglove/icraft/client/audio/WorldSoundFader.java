@@ -23,8 +23,10 @@ import java.util.Set;
 /**
  * Makes the world quieter while iCraft music plays on the player (a held iPod, or a dock without speakers in the
  * owner's ears), like wearing headphones: blocks, steps, mobs, weather and ambience go down to the level chosen in the
- * iPod's Settings ({@link IpodSettings#worldSounds()}), with a short fade. Music, jukeboxes, voice, UI clicks and our
- * own sounds are never touched, and nothing goes to the server.
+ * iPod's Settings ({@link IpodSettings#worldSounds()}), with a short fade. Jukeboxes and docks' speakers too. The
+ * game's music, voice, UI clicks and the music in the player's own ears are never touched, and nothing goes to the
+ * server. The factor is applied to the channel after the engine's volume (which is clamped to 1), because a speaker's
+ * volume of 2 or 4 only sets how far it carries: scaling that number would change nothing audible.
  *
  * <p>Two places set the volume: a sound that starts is turned down right away on the sound thread (the events below
  * come right after the engine started it), and every client tick the sounds that are already playing are set again
@@ -33,13 +35,15 @@ import java.util.Set;
 @EventBusSubscriber(modid = iCraft.MOD_ID, value = Dist.CLIENT)
 public final class WorldSoundFader {
     private static final Set<SoundSource> WORLD = EnumSet.of(SoundSource.BLOCKS, SoundSource.PLAYERS,
-            SoundSource.NEUTRAL, SoundSource.HOSTILE, SoundSource.AMBIENT, SoundSource.WEATHER);
+            SoundSource.NEUTRAL, SoundSource.HOSTILE, SoundSource.AMBIENT, SoundSource.WEATHER,
+            SoundSource.RECORDS); // jukeboxes; our own sounds are RECORDS too, affects() decides for them
     private static final float STEP = 0.05F; // per tick: from full to 30 % in about 0.7 s
 
     private static volatile float factor = 1.0F; // read on the sound thread
     private static boolean applied;              // the playing sounds still carry a factor below 1
 
     private WorldSoundFader() {}
+
 
     /** Once per client tick: moves the factor toward its target and sets the volume of the sounds that play. */
     public static void tick() {
@@ -79,6 +83,8 @@ public final class WorldSoundFader {
     }
 
     private static boolean affects(SoundInstance sound) {
-        return !(sound instanceof IpodSoundInstance) && WORLD.contains(sound.getSource());
+        // our own sounds: only the ones from a speaker (docks); the music in the player's ears stays as it is
+        if (sound instanceof IpodSoundInstance ipod) return ipod.isPositional();
+        return WORLD.contains(sound.getSource());
     }
 }

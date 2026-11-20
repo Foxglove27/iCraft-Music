@@ -87,16 +87,21 @@ public class IpodScreen extends Screen {
     }
 
     // An album or a book. 'startRow' is the row to highlight when it is opened (a book's last chapter).
+    // 'detail' is a small grey text on the right of the row (the disc count "12/32" on the Music Discs row)
     private record AlbumView(Component name, @Nullable Path cover, @Nullable ItemStack icon, List<Track> tracks,
-                             int startRow) {
+                             int startRow, @Nullable String detail) {
         AlbumView(Component name, @Nullable Path cover, @Nullable ItemStack icon, List<Track> tracks) {
-            this(name, cover, icon, tracks, 0);
+            this(name, cover, icon, tracks, 0, null);
+        }
+
+        AlbumView(Component name, @Nullable Path cover, @Nullable ItemStack icon, List<Track> tracks, int startRow) {
+            this(name, cover, icon, tracks, startRow, null);
         }
     }
 
     // Which list the display is showing. Menu goes up one level: TRACKS -> ALBUMS -> MENU,
     // CHAPTERS -> BOOKS -> MENU, SETTINGS -> MENU.
-    private enum Page { MENU, ALBUMS, TRACKS, BOOKS, CHAPTERS, SETTINGS, SEARCH }
+    private enum Page { MENU, ALBUMS, TRACKS, BOOKS, CHAPTERS, SETTINGS, SEARCH, CONFIRM_RESET }
 
     // ids of the menu entries (the rows are Music, NAS (only with extra folders), Audiobooks, Podcasts, Settings)
     private static final int MENU_MUSIC = 0;
@@ -114,7 +119,14 @@ public class IpodScreen extends Screen {
     private static final int SETTING_REPEAT = 1;
     private static final int SETTING_BASS = 2;
     private static final int SETTING_WORLD = 3;
-    private static final int SETTING_ROWS = 4;
+    private static final int SETTING_STEREO = 4;
+    private static final int SETTING_GAME_MUSIC = 5;
+    private static final int SETTING_DOWNLOADS = 6;
+    private static final int SETTING_RESET = 7; // opens the confirmation page
+    private static final int SETTING_ROWS = 8;
+    // the confirmation page for the reset: Cancel first, so a hasty click changes nothing
+    private static final int CONFIRM_CANCEL = 0;
+    private static final int CONFIRM_RESET_ROW = 1;
 
     private Page page = Page.MENU;
 
@@ -249,7 +261,8 @@ public class IpodScreen extends Screen {
                 tracks.add(new Track(discName(disc), () -> IpodPlayer.play(disc, ipod)));
             }
             albums.add(new AlbumView(Component.translatable("screen.icraft_music.ipod.discs"),
-                    null, new ItemStack(Items.MUSIC_DISC_CAT), tracks));
+                    null, new ItemStack(Items.MUSIC_DISC_CAT), tracks, 0,
+                    discs.size() + "/" + net.foxglove.icraft.item.IpodItem.MAX_DISCS));
         }
 
         for (LocalMusic.Album album : snapshot.albums()) {
@@ -553,6 +566,7 @@ public class IpodScreen extends Screen {
             case BOOKS -> Component.translatable(isPodcastSection()
                     ? "screen.icraft_music.ipod.podcast_list" : "screen.icraft_music.ipod.books");
             case SETTINGS -> Component.translatable("screen.icraft_music.ipod.settings");
+            case CONFIRM_RESET -> Component.translatable("screen.icraft_music.ipod.reset_title");
             case SEARCH -> Component.literal(searchQuery.isEmpty() ? Component.translatable("screen.icraft_music.ipod.search").getString()
                     : searchQuery + ((Util.getMillis() / 500) % 2 == 0 ? "_" : " "));
             case TRACKS, CHAPTERS -> open.name();
@@ -568,7 +582,8 @@ public class IpodScreen extends Screen {
             g.drawString(this.font, muted, right - 8 - this.font.width(muted), DISPLAY_Y + (HEADER_H - 8) / 2, 0xFF0A2A66, false);
         }
         g.drawString(this.font, shownTitle, left, DISPLAY_Y + (HEADER_H - 8) / 2, 0xFF0A2A66, false);
-        if (LibraryCache.get().scanning() && page != Page.TRACKS && page != Page.CHAPTERS && page != Page.SETTINGS) {
+        if (LibraryCache.get().scanning() && page != Page.TRACKS && page != Page.CHAPTERS && page != Page.SETTINGS
+                && page != Page.CONFIRM_RESET) {
             // a library scan is running: animated dots after the title
             String dots = ".".repeat(1 + (int) ((Util.getMillis() / 400) % 3));
             g.drawString(this.font, dots, left + this.font.width(shownTitle) + 2, DISPLAY_Y + (HEADER_H - 8) / 2, 0xFF0A2A66, false);
@@ -607,11 +622,22 @@ public class IpodScreen extends Screen {
                     drawCover(g, album, left, rowY + 1, THUMB);
                     textX = left + THUMB + 3;
                     name = album.name();
+                    if (album.detail() != null) { // right-aligned in grey, like a track's time
+                        int detailW = this.font.width(album.detail());
+                        g.drawString(this.font, album.detail(), right - detailW, rowY + 2,
+                                isSelected ? 0xFFFFFFFF : 0xFFAAAAAA, false);
+                        right2 = right - detailW - 3;
+                    }
                 }
                 case TRACKS, CHAPTERS -> {
                     Track track = open.tracks().get(index);
                     name = track.name();
                     String detail = track.detail(); // the saved time; the playing row shows the live one
+                    if (track.item() != null && track.item().progressBook() != null) {
+                        // read the saved time now, not when the list was built, so it never shows an old value
+                        double saved = AudiobookProgress.get(track.item().progressBook(), track.item().progressKey());
+                        detail = saved >= 1 ? formatTime(saved) : null;
+                    }
                     if (track.item() != null) {
                         double live = IpodPlayer.itemSeconds(track.item().progressKey());
                         if (live >= 1) detail = formatTime(live);
@@ -624,6 +650,8 @@ public class IpodScreen extends Screen {
                     }
                 }
                 case SETTINGS -> name = settingRow(index);
+                case CONFIRM_RESET -> name = Component.translatable(index == CONFIRM_CANCEL
+                        ? "screen.icraft_music.ipod.reset_cancel" : "screen.icraft_music.ipod.reset_do");
                 case SEARCH -> {
                     SearchEntry entry = results.get(index);
                     name = Component.literal(entry.label());
@@ -739,6 +767,7 @@ public class IpodScreen extends Screen {
         return switch (page) {
             case MENU -> menuIds().size();
             case SETTINGS -> SETTING_ROWS;
+            case CONFIRM_RESET -> 2;
             case SEARCH -> results.size();
             case ALBUMS -> shownAlbums().size();
             case BOOKS -> shownBooks().size();
@@ -773,6 +802,15 @@ public class IpodScreen extends Screen {
                     Component.translatable("screen.icraft_music.ipod.bass"),
                     Component.translatable("screen.icraft_music.ipod.bass." + IpodSettings.bassBoost().name().toLowerCase(Locale.ROOT)));
         }
+        if (index == SETTING_STEREO || index == SETTING_GAME_MUSIC || index == SETTING_DOWNLOADS) {
+            boolean on = index == SETTING_STEREO ? IpodSettings.stereoSpeakers()
+                    : index == SETTING_GAME_MUSIC ? IpodSettings.silenceBackgroundMusic() : IpodSettings.downloadSharedFiles();
+            return Component.translatable("screen.icraft_music.ipod.setting",
+                    Component.translatable(index == SETTING_STEREO ? "screen.icraft_music.ipod.stereo"
+                            : index == SETTING_GAME_MUSIC ? "screen.icraft_music.ipod.game_music" : "screen.icraft_music.ipod.downloads"),
+                    Component.translatable(on ? "screen.icraft_music.ipod.on" : "screen.icraft_music.ipod.off"));
+        }
+        if (index == SETTING_RESET) return Component.translatable("screen.icraft_music.ipod.reset");
         if (index == SETTING_WORLD) {
             return Component.translatable("screen.icraft_music.ipod.setting",
                     Component.translatable("screen.icraft_music.ipod.world"),
@@ -866,9 +904,21 @@ public class IpodScreen extends Screen {
                     IpodSettings.cycleBassBoost();
                 } else if (selected == SETTING_WORLD) {
                     IpodSettings.cycleWorldSounds();
+                } else if (selected == SETTING_STEREO) {
+                    IpodSettings.toggleStereoSpeakers();
+                } else if (selected == SETTING_GAME_MUSIC) {
+                    IpodSettings.toggleSilenceBackgroundMusic();
+                } else if (selected == SETTING_DOWNLOADS) {
+                    IpodSettings.toggleDownloadSharedFiles();
+                } else if (selected == SETTING_RESET) {
+                    goTo(Page.CONFIRM_RESET, CONFIRM_CANCEL); // ask first
                 } else {
                     IpodSettings.cycleRepeat();
                 }
+            }
+            case CONFIRM_RESET -> {
+                if (selected == CONFIRM_RESET_ROW) IpodSettings.resetToDefaults();
+                goTo(Page.SETTINGS, SETTING_RESET);
             }
         }
     }
@@ -924,6 +974,7 @@ public class IpodScreen extends Screen {
                 }));
             }
             case SETTINGS -> goTo(Page.MENU, menuRowOf(MENU_SETTINGS));
+            case CONFIRM_RESET -> goTo(Page.SETTINGS, SETTING_RESET); // the Menu button cancels
             case MENU -> {
                 if (inNas) { // back from the NAS submenu to the main menu
                     inNas = false;

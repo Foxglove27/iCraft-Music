@@ -311,6 +311,11 @@ public class IpodSoundInstance extends AbstractTickableSoundInstance {
         if (net.foxglove.icraft.client.IpodMute.silences(ipod)) return 0.0F; // keeps playing, silently (the engine reads this every tick)
         return super.getVolume() * IpodVolume.get();
     }
+    /** True for a sound coming out of a speaker block; false for one in the player's own ears. */
+    public boolean isPositional() {
+        return positional;
+    }
+
     // Without this, the game refuses to start a sound whose volume is 0
     @Override
     public boolean canStartSilent() {

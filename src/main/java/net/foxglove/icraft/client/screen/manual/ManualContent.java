@@ -59,7 +59,7 @@ public final class ManualContent {
         list.add(chapter("discs",
                 page("discs", "load", new ManualBlock.Items(() -> List.of(new ItemStack(Items.MUSIC_DISC_CAT),
                         new ItemStack(Items.MUSIC_DISC_13), new ItemStack(Items.MUSIC_DISC_PIGSTEP))),
-                        text("discs.load.1"), text("discs.load.2"))));
+                        text("discs.load.1"), text("discs.load.3"), text("discs.load.2"))));
 
         list.add(chapter("dock",
                 page("dock", "dock", new ManualBlock.Recipe("dock"), text("dock.dock.1")),
@@ -80,7 +80,7 @@ public final class ManualContent {
                         ModKeyMappings.PLAY_PAUSE.getTranslatedKeyMessage(), ModKeyMappings.NEXT.getTranslatedKeyMessage(),
                         ModKeyMappings.PREVIOUS.getTranslatedKeyMessage(), ModKeyMappings.MUTE_FOR_ME.getTranslatedKeyMessage()}),
                         text("settings.keys.2")),
-                page("settings", "ipod", text("settings.ipod.1")),
+                page("settings", "ipod", text("settings.ipod.1"), text("settings.ipod.2")),
                 page("settings", "colours", new ManualBlock.Items(() -> Arrays.stream(IpodColor.values())
                         .map(c -> new ItemStack(ModItems.IPODS.get(c).get())).toList()), text("settings.colours.1"))));
 

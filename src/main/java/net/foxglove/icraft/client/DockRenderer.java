@@ -26,11 +26,11 @@ public class DockRenderer implements BlockEntityRenderer<DockBlockEntity> {
         if (ipod.isEmpty()) return;
 
         pose.pushPose();
-        pose.translate(0.5, 0.0, 0.5);
+        pose.translate(0.5, -0.05, 0.5);
         // turn with the dock so the iPod faces the front (the block model faces north)
         pose.mulPose(Axis.YP.rotationDegrees(-dock.getBlockState().getValue(DockBlock.FACING).toYRot() + 180));
-        pose.translate(0.0, 0.5, 0.16);              // above the base, in front of the back rest
-        pose.mulPose(Axis.XP.rotationDegrees(-12));  // leans back a little
+        pose.translate(0.0, 0.5, 0.06);              // above the base, near the middle, top resting on the back rest
+        pose.mulPose(Axis.XP.rotationDegrees(12));  // leans back a little
         pose.scale(0.62F, 0.62F, 0.62F);
         context.getItemRenderer().renderStatic(ipod, ItemDisplayContext.FIXED, light, OverlayTexture.NO_OVERLAY,
                 pose, buffers, dock.getLevel(), (int) dock.getBlockPos().asLong());

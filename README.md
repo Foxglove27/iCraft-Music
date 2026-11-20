@@ -50,7 +50,7 @@ ipod/
 
 Most players never need these; the in-game manual leaves them out.
 
-- `config/icraft_music-client.toml` (your own game): `volume`, `shuffle`, `repeat` (`OFF`, `LIST`, `ONE`) `bassBoost` (`OFF`, `LOW`, `MEDIUM`, `HIGH`) and `worldSounds` (`NORMAL`, `QUIETER`, `QUIET`, `VERY_QUIET`: how loud the world stays while music plays on you) are also set in the iPod; `stereoSpeakers` (speakers left and right of a dock play the left and right channel, default on), `silenceBackgroundMusic` (the game's own music stops while iCraft plays for you, default on), `downloadSharedFiles` (see File sharing) and the extra folders above.
+- `config/icraft_music-client.toml` (your own game): `volume`, `shuffle`, `repeat` (`OFF`, `LIST`, `ONE`) `bassBoost` (`OFF`, `LOW`, `MEDIUM`, `HIGH`) and `worldSounds` (`NORMAL`, `QUIETER`, `QUIET`, `VERY_QUIET`: how loud the world stays while music plays on you) `stereoSpeakers` (speakers left and right of a dock play the left and right channel, default on), `silenceBackgroundMusic` (the game's own music stops while iCraft plays for you, default on) and `downloadSharedFiles` (see File sharing) are all also set in the iPod's Settings, which has a "Reset to defaults" row (everything except the volume). The extra folders above are only in the file.
 - `serverconfig/icraft_music-server.toml` (in the world folder, set by the server owner): `giveManualOnFirstJoin` (default on) and the file sharing settings below.
 
 ## Controls
@@ -63,6 +63,7 @@ Most players never need these; the in-game manual leaves them out.
 | Volume | Scroll the mouse wheel over the click wheel |
 | Move through lists | Scroll over the display, or the arrow keys, Enter and Backspace ||
 | Load a disc | Right-click the iPod in your inventory with a music disc on the cursor |
+| Load all discs | **Shift + right-click** with the iPod in your hand: every music disc in your inventory goes in (up to 32) |
 | Take the last disc out | Right-click the iPod in your inventory with an empty cursor, or **Ctrl + right-click** with it in your hand |
 | Dock it | Right-click a dock with the iPod; sneak + empty hand takes it out again |
 | Link a dock | Sneak + right-click the dock with the iPod, then right-click speakers with that iPod to add or remove them |

@@ -87,6 +87,8 @@ public class IpodPlayer {
     private record ProgressTarget(String bookKey, String itemKey, double itemStartSeconds, @Nullable String nextKey) {}
     @Nullable
     private static ProgressTarget currentProgress;
+    @Nullable
+    private static String currentItemKey; // the playing file's key (a song or a chapter), for the live time on its row
     private static double currentItemStart = 0;   // the item's start and end inside the file (end -1 = file end)
     private static double currentItemEnd = -1;
     private static boolean chapterFinished = false; // it ended on its own: its progress was cleared, do not save again
@@ -489,6 +491,7 @@ public class IpodPlayer {
         }
         start(sounds, ItemStack.EMPTY, outputs, name, subtitle, cover, ipod);
         currentProgress = target; // after start(), which clears the previous one
+        currentItemKey = chapter != null ? chapter.key() : LocalMusic.key(file);
         currentItemStart = itemStart;
         currentItemEnd = endSeconds;
         lastPositionSeconds = startSeconds;
@@ -508,9 +511,9 @@ public class IpodPlayer {
      * here. Used by the iPod screen so the time on the playing row counts up while it is open.
      */
     public static double itemSeconds(String itemKey) {
-        ProgressTarget target = currentProgress;
-        if (target == null || !started || !target.itemKey().equals(itemKey)) return -1;
-        return Math.max(0, positionSeconds() - target.itemStartSeconds());
+        String key = currentItemKey;
+        if (key == null || !started || !key.equals(itemKey)) return -1; // also discs: they have no key
+        return Math.max(0, positionSeconds() - currentItemStart);
     }
 
     // Asks the sound engine's thread where playback is and remembers it. Cheap; called a few times a second.
@@ -633,6 +636,7 @@ public class IpodPlayer {
         refreshPosition();
         saveProgress(); // an audiobook chapter remembers where it was left
         currentProgress = null;
+        currentItemKey = null;
         chapterFinished = false;
         if (current != null) {
             Minecraft.getInstance().getSoundManager().stop(current);
