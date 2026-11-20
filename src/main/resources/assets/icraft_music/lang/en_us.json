@@ -32,6 +32,11 @@
   "screen.icraft_music.ipod.bass.low": "Low",
   "screen.icraft_music.ipod.bass.medium": "Medium",
   "screen.icraft_music.ipod.bass.high": "High",
+  "screen.icraft_music.ipod.world": "World sounds",
+  "screen.icraft_music.ipod.world.normal": "Normal",
+  "screen.icraft_music.ipod.world.quieter": "Quieter",
+  "screen.icraft_music.ipod.world.quiet": "Quiet",
+  "screen.icraft_music.ipod.world.very_quiet": "Very quiet",
   "screen.icraft_music.ipod.audiobooks": "Audiobooks",
   "screen.icraft_music.ipod.books": "Audiobooks",
   "screen.icraft_music.ipod.no_books": "No audiobooks found. Put one folder per book in ipod/audiobooks (mp3, ogg, flac, wav, m4a or m4b).",
@@ -145,7 +150,7 @@
   "manual.icraft_music.settings.keys.1": "§l%s§r play / pause\n§l%s§r next\n§l%s§r previous\n§l%s§r mute / unmute everything",
   "manual.icraft_music.settings.keys.2": "They work without opening the iPod. Change them in Options > Controls, under iCraft.",
   "manual.icraft_music.settings.ipod.title": "iPod settings",
-  "manual.icraft_music.settings.ipod.1": "Menu > Settings: Shuffle, Repeat (off / list / one) and Bass Boost. Bass Boost only changes what you hear.",
+  "manual.icraft_music.settings.ipod.1": "Menu > Settings: Shuffle, Repeat (off / list / one), Bass Boost and World sounds. Bass Boost only changes what you hear. World sounds makes blocks, steps, mobs and weather quieter while music plays on yourself.",
   "manual.icraft_music.settings.colours.title": "Colours",
   "manual.icraft_music.settings.colours.1": "Craft an iPod together with a dye to change its colour. Its discs, link and name stay."
 }

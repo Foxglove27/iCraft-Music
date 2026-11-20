@@ -4,6 +4,14 @@ All notable changes to iCraft, newest version first, following
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The top section is the version in `gradle.properties`;
 new changes go there until the next version bump.
 
+## [0.3.0]
+
+### Added
+- **World sounds** in the iPod's Settings: while music plays on yourself (a held iPod, or a dock without speakers),
+  blocks, steps, mobs, weather and ambience get quieter with a short fade, like wearing headphones: Normal, Quieter
+  (default), Quiet or Very quiet. Dock speakers, jukeboxes, the game's music and menu clicks are not changed. Saved
+  as `worldSounds` in `icraft_music-client.toml`.
+
 ## [0.2.0]
 
 ### Added

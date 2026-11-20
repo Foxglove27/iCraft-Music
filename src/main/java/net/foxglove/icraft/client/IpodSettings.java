@@ -3,12 +3,14 @@ package net.foxglove.icraft.client;
 import net.foxglove.icraft.BassBoost;
 import net.foxglove.icraft.ClientConfig;
 import net.foxglove.icraft.RepeatMode;
+import net.foxglove.icraft.WorldSounds;
 
-/** Shuffle, repeat and bass boost. Global (not per iPod); read from the config once and saved when the screen closes. */
+/** Shuffle, repeat, bass boost and world sounds. Global (not per iPod); read from the config once and saved when the screen closes. */
 public class IpodSettings {
     private static boolean shuffle;
     private static RepeatMode repeat = RepeatMode.OFF;
     private static BassBoost bassBoost = BassBoost.OFF;
+    private static WorldSounds worldSounds = WorldSounds.QUIETER;
     private static boolean loaded = false;
     private static boolean changed = false;
 
@@ -17,6 +19,7 @@ public class IpodSettings {
         shuffle = ClientConfig.SHUFFLE.get();
         repeat = ClientConfig.REPEAT.get();
         bassBoost = ClientConfig.BASS_BOOST.get();
+        worldSounds = ClientConfig.WORLD_SOUNDS.get();
         loaded = true;
     }
 
@@ -59,6 +62,24 @@ public class IpodSettings {
         DockClientPlayer.restartAll();
     }
 
+    /** How loud the world stays while music plays on the player (read every tick by WorldSoundFader). */
+    public static WorldSounds worldSounds() {
+        try {
+            load();
+        } catch (IllegalStateException e) {
+            return WorldSounds.NORMAL; // the config is not loaded yet
+        }
+        return worldSounds;
+    }
+
+    /** Next world sounds level; the fader moves to it within a second. */
+    public static void cycleWorldSounds() {
+        load();
+        worldSounds = worldSounds.next();
+        changed = true;
+        save();
+    }
+
     public static void cycleRepeat() {
         load();
         repeat = repeat.next();
@@ -73,6 +94,7 @@ public class IpodSettings {
         ClientConfig.SHUFFLE.set(shuffle);
         ClientConfig.REPEAT.set(repeat);
         ClientConfig.BASS_BOOST.set(bassBoost);
+        ClientConfig.WORLD_SOUNDS.set(worldSounds);
         ClientConfig.SPEC.save();
         changed = false;
     }

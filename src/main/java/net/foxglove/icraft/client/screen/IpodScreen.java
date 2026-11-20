@@ -113,7 +113,8 @@ public class IpodScreen extends Screen {
     private static final int SETTING_SHUFFLE = 0;
     private static final int SETTING_REPEAT = 1;
     private static final int SETTING_BASS = 2;
-    private static final int SETTING_ROWS = 3;
+    private static final int SETTING_WORLD = 3;
+    private static final int SETTING_ROWS = 4;
 
     private Page page = Page.MENU;
 
@@ -772,6 +773,11 @@ public class IpodScreen extends Screen {
                     Component.translatable("screen.icraft_music.ipod.bass"),
                     Component.translatable("screen.icraft_music.ipod.bass." + IpodSettings.bassBoost().name().toLowerCase(Locale.ROOT)));
         }
+        if (index == SETTING_WORLD) {
+            return Component.translatable("screen.icraft_music.ipod.setting",
+                    Component.translatable("screen.icraft_music.ipod.world"),
+                    Component.translatable("screen.icraft_music.ipod.world." + IpodSettings.worldSounds().name().toLowerCase(Locale.ROOT)));
+        }
         return Component.translatable("screen.icraft_music.ipod.setting",
                 Component.translatable("screen.icraft_music.ipod.repeat"),
                 Component.translatable("screen.icraft_music.ipod.repeat." + IpodSettings.repeat().name().toLowerCase(Locale.ROOT)));
@@ -858,6 +864,8 @@ public class IpodScreen extends Screen {
                     IpodSettings.toggleShuffle();
                 } else if (selected == SETTING_BASS) {
                     IpodSettings.cycleBassBoost();
+                } else if (selected == SETTING_WORLD) {
+                    IpodSettings.cycleWorldSounds();
                 } else {
                     IpodSettings.cycleRepeat();
                 }

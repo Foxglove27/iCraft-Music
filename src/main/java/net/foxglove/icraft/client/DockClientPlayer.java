@@ -239,6 +239,15 @@ public final class DockClientPlayer {
     }
 
     /** True while the player hears at least one dock (its sounds are playing). */
+    /** A dock without speakers plays in this player's ears (they own it) and is not muted. */
+    public static boolean playsOnYou() {
+        for (State s : ALL) {
+            if (!s.isPlaying() || !s.outputs.isEmpty() || !s.owned || s.dock == null) continue;
+            if (!IpodMute.silences(s.dock.getIpod().get(ModDataComponents.IPOD_ID.get()))) return true;
+        }
+        return false;
+    }
+
     public static boolean hasActiveSounds() {
         for (State s : ALL) {
             if (s.isPlaying()) return true;

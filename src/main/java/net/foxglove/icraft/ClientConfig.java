@@ -28,6 +28,11 @@ public class ClientConfig {
             .comment("How much the bass is turned up in what you hear: OFF, LOW, MEDIUM or HIGH (also in the iPod's Settings)")
             .defineEnum("bassBoost", BassBoost.OFF);
 
+    public static final ModConfigSpec.EnumValue<WorldSounds> WORLD_SOUNDS = BUILDER
+            .comment("How loud blocks, steps, mobs, weather and ambience stay while iCraft music plays on you:",
+                    "NORMAL, QUIETER (70 %), QUIET (50 %) or VERY_QUIET (30 %) (also in the iPod's Settings)")
+            .defineEnum("worldSounds", WorldSounds.QUIETER);
+
     public static final ModConfigSpec.BooleanValue DOWNLOAD_SHARED_FILES = BUILDER
             .comment("Download the music files that other players share at a docking station on a server (private",
                     "servers only), so you can hear them. Switch off to only see the music notes.")

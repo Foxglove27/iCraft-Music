@@ -858,6 +858,11 @@ public class IpodPlayer {
     // True while any track is loaded (even paused or still loading), so the HUD can stay on
     // through Next/Previous transitions. Becomes false only once we stop completely.
     /** True while a track is playing for this player (in their ears or on speakers), not paused. */
+    /** Music plays on the player themselves (not through dock speakers), is not paused and not muted. */
+    public static boolean playsOnYou() {
+        return current != null && !paused && currentOutputs.isEmpty() && !IpodMute.silences(currentIpod);
+    }
+
     public static boolean isListening() {
         return current != null && !paused;
     }
