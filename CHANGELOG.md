@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.4.0]
+
+### Added
+- Long song, chapter and album names scroll in the now-playing panel instead of being cut off.
+- The now-playing panel shows the download of a shared file with a bar ("Downloading <title> n%"); a player who joins
+  while the file is still on its way sees "Waiting for the file..." until the song starts.
+- Players near someone else's dock see what it plays in the now-playing panel, with the owner's name ("Alex's dock"),
+  also while it is paused or muted. Your own iPod comes first while it plays; pausing or muting it shows the dock
+  you hear.
+
+### Changed
+- A download no longer shows in the action bar.
+
 ## [0.3.0]
 
 ### Added

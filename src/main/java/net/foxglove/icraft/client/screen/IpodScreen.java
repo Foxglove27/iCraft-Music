@@ -669,7 +669,7 @@ public class IpodScreen extends Screen {
             if (isSelected && this.font.width(full) > available) {
                 // too long: slide the whole title through the row (clipped), pausing at both ends
                 int offset = marqueeOffset(this.font.width(full) - available, index);
-                scissor(g, textX, rowY, right2, rowY + ROW_H);
+                Marquee.scissor(g, textX, rowY, right2, rowY + ROW_H);
                 g.drawString(this.font, full, textX - offset, rowY + 2, color, false);
                 g.disableScissor();
             } else {
@@ -684,19 +684,7 @@ public class IpodScreen extends Screen {
         g.fill(left, barY, left + (int) (barW * IpodVolume.get()), barY + 2, 0xFFFFFFFF);
     }
 
-    // In this Minecraft version GuiGraphics.enableScissor takes plain screen coordinates and ignores the scaling of the
-    // pose stack, while the iPod is drawn scaled: transform the rectangle ourselves.
-    private static void scissor(GuiGraphics g, int x1, int y1, int x2, int y2) {
-        org.joml.Matrix4f m = g.pose().last().pose();
-        org.joml.Vector3f a = m.transformPosition(new org.joml.Vector3f(x1, y1, 0));
-        org.joml.Vector3f b = m.transformPosition(new org.joml.Vector3f(x2, y2, 0));
-        g.enableScissor(Math.round(Math.min(a.x, b.x)), Math.round(Math.min(a.y, b.y)),
-                Math.round(Math.max(a.x, b.x)), Math.round(Math.max(a.y, b.y)));
-    }
-
     // ---- scrolling of a selected title that does not fit ----
-    private static final long MARQUEE_PAUSE_MS = 800;
-    private static final double MARQUEE_PX_PER_SECOND = 25;
     private int marqueeKey = -1;
     private long marqueeStart;
 
@@ -708,12 +696,7 @@ public class IpodScreen extends Screen {
             marqueeKey = key;
             marqueeStart = now;
         }
-        long scrollMs = (long) (overflow / MARQUEE_PX_PER_SECOND * 1000);
-        long cycle = MARQUEE_PAUSE_MS + scrollMs + MARQUEE_PAUSE_MS;
-        long t = (now - marqueeStart) % cycle;
-        if (t < MARQUEE_PAUSE_MS) return 0;
-        if (t >= MARQUEE_PAUSE_MS + scrollMs) return overflow;
-        return (int) ((t - MARQUEE_PAUSE_MS) * overflow / Math.max(1, scrollMs));
+        return Marquee.offset(marqueeStart, overflow);
     }
 
     // A small triangle while playing, two bars while paused, nothing when idle

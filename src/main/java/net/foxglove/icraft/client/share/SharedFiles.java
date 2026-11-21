@@ -43,7 +43,6 @@ public final class SharedFiles {
         ChunkAssembler assembler;
         long total = -1;
         long lastData = System.currentTimeMillis();
-        long lastMessage;
 
         Download(QueueEntry entry) {
             this.entry = entry;
@@ -56,6 +55,18 @@ public final class SharedFiles {
     private static final Map<String, Long> REFUSED_UNTIL = new HashMap<>();
 
     private SharedFiles() {}
+
+    /** The running download for the now-playing panel: its title and how far it is (-1 until the size is known). */
+    public record Progress(String title, int percent) {}
+
+    /** What is being downloaded right now, or null. Read on the client thread, where the file pieces arrive too. */
+    @Nullable
+    public static Progress progress() {
+        Download d = active;
+        if (d == null) return null;
+        int percent = d.assembler == null || d.total <= 0 ? -1 : (int) (100 * d.assembler.written() / d.total);
+        return new Progress(d.entry.title(), Math.max(-1, Math.min(100, percent)));
+    }
 
     private static Path dir() {
         return Minecraft.getInstance().gameDirectory.toPath().resolve("icraft_music-shared");
@@ -183,15 +194,7 @@ public final class SharedFiles {
             }
             active.lastData = System.currentTimeMillis();
             ChunkAssembler.Result r = active.assembler.accept(data.offset(), data.data());
-            if (r == ChunkAssembler.Result.OK) {
-                long now = System.currentTimeMillis();
-                if (now - active.lastMessage > 1000) {
-                    active.lastMessage = now;
-                    message(Component.translatable("message.icraft_music.share.downloading", active.entry.title(),
-                            (int) (100 * active.assembler.written() / active.total)));
-                }
-                return;
-            }
+            if (r == ChunkAssembler.Result.OK) return; // more to come; the now-playing panel shows progress()
             Download done = active;
             if (r == ChunkAssembler.Result.DONE && done.assembler.verify()) {
                 Path target = dir().resolve(done.entry.hash() + "." + done.entry.ext());

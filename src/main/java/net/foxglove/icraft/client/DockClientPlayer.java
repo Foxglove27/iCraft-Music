@@ -65,6 +65,8 @@ public final class DockClientPlayer {
         long startedAt;        // game time of the last start of the sounds
         long nextRevive;       // earliest game time to restart sounds the engine dropped
         int revives;           // restarts since the sounds were last all alive
+        boolean listening;     // someone else's dock plays (or is paused) and this player is in earshot: the HUD shows it
+        long seenAt = Long.MIN_VALUE / 2; // game time of the last tick (a dock in an unloaded chunk stops ticking)
 
         boolean isPlaying() {
             return !sounds.isEmpty();
@@ -118,6 +120,9 @@ public final class DockClientPlayer {
         s.owned = dock.hasIpod() && dock.isOwner(player);
         s.audible = discPlaying && heard;
         s.distSq = nearestDistSq(player, s.outputs);
+        s.seenAt = now;
+        s.listening = dock.hasIpod() && !dock.isOwner(player) && pb != null && pb.isPlaying() && !s.outputs.isEmpty()
+                && inEarshot(player, s.outputs, s.listening ? STOP_MARGIN : START_MARGIN);
         // shared files are fetched from twice the speaker range on, so they are usually here before the player is in earshot
         boolean nearForDownload = dock.isFilesMode() && dock.hasIpod() && pb != null && pb.isPlaying() && !pb.isPaused()
                 && !s.outputs.isEmpty() && inEarshotFactor(player, s.outputs, 2.0);
@@ -246,6 +251,40 @@ public final class DockClientPlayer {
             if (!IpodMute.silences(s.dock.getIpod().get(ModDataComponents.IPOD_ID.get()))) return true;
         }
         return false;
+    }
+
+    /** What another player's dock in earshot plays, for the now-playing panel of a listener. */
+    public record Heard(Component title, Component subtitle, ItemStack disc, boolean paused, boolean muted,
+                        boolean waiting, String owner) {}
+
+    /** The nearest dock of another player that this player is in earshot of and that plays (or is paused), or null. */
+    @Nullable
+    public static Heard heard() {
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.level == null) return null;
+        long now = mc.level.getGameTime();
+        State best = null;
+        for (State s : ALL) {
+            if (!s.listening || s.dock == null || s.dock.isRemoved() || now - s.seenAt > 5) continue;
+            if (best == null || s.distSq < best.distSq) best = s;
+        }
+        if (best == null) return null;
+        DockBlockEntity dock = best.dock;
+        DockPlayback pb = dock.getPlayback();
+        if (pb == null) return null;
+        int index = pb.currentDisc();
+        boolean muted = IpodMute.silences(dock.getIpod().get(ModDataComponents.IPOD_ID.get()));
+        if (dock.isFilesMode()) {
+            List<QueueEntry> queue = dock.getQueue();
+            if (index < 0 || index >= queue.size()) return null;
+            QueueEntry entry = queue.get(index);
+            return new Heard(Component.literal(entry.title()), Component.literal(entry.album()), ItemStack.EMPTY,
+                    pb.isPaused(), muted, SharedFiles.pathFor(entry) == null, dock.getOwnerName());
+        }
+        List<ItemStack> discs = IpodItem.getDiscs(dock.getIpod());
+        ItemStack disc = index >= 0 && index < discs.size() ? discs.get(index) : ItemStack.EMPTY;
+        return new Heard(DockControl.discName(disc), Component.translatable("screen.icraft_music.ipod.discs"), disc,
+                pb.isPaused(), muted, false, dock.getOwnerName());
     }
 
     public static boolean hasActiveSounds() {

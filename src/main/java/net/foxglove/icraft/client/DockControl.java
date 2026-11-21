@@ -294,7 +294,11 @@ public final class DockControl {
     public static Component currentName() {
         FileItem item = currentItem();
         if (item != null) return item.title();
-        ItemStack disc = currentDiscStack();
+        return discName(currentDiscStack());
+    }
+
+    /** The song name of a music disc (its jukebox description), or the item's name; empty for no disc. */
+    public static Component discName(ItemStack disc) {
         Minecraft mc = Minecraft.getInstance();
         if (disc.isEmpty() || mc.level == null) return Component.empty();
         return JukeboxSong.fromStack(mc.level.registryAccess(), disc)
