@@ -38,6 +38,10 @@ public class ClientConfig {
                     "servers only), so you can hear them. Switch off to only see the music notes.")
             .define("downloadSharedFiles", true);
 
+    public static final ModConfigSpec.BooleanValue DOCK_DISPLAY = BUILDER
+            .comment("Show what a playing docking station plays in a small label above it (also in the iPod's Settings)")
+            .define("dockDisplay", true);
+
     public static final ModConfigSpec.ConfigValue<java.util.List<? extends String>> EXTRA_MUSIC_FOLDERS = BUILDER
             .comment("Extra folders to read music from, in addition to <game folder>/ipod/music (for example a mounted",
                     "network share). Absolute paths, or relative to the game folder. A share must be mounted first",

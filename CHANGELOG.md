@@ -10,8 +10,26 @@
   also while it is paused or muted. Your own iPod comes first while it plays; pausing or muting it shows the dock
   you hear.
 
+- **Dock display**: a playing dock shows a small label above it that turns to you, with the title, the album (or
+  "Music Discs") and whose dock it is, for everybody within 16 blocks; "(paused)" while paused. The owner's own files
+  without file sharing show other players only "<name> is listening to their own music", never the title (the owner
+  sees the title). Switch it off in the
+  iPod's Settings (Dock display) or with `dockDisplay` in `icraft_music-client.toml`. Long titles scroll on it too.
+
 ### Changed
 - A download no longer shows in the action bar.
+- Other players only see the album folder's own name of a shared file ("Album"), not the folders above it.
+
+### Fixed
+- The owner of a dock can pause, skip and see the music of their dock again after logging out and back in.
+- When the server limits how many tracks a dock queue may hold (`maxQueueItems`), the dock now plays the track you
+  picked; before, it played an earlier track of the list.
+- Next, Previous and the end of a track keep walking through the whole album at a dock even when the server limits
+  the queue (`maxQueueItems`): the list slides on to the next tracks. Shuffle and "repeat list" then work over the
+  whole album too. This also works after logging out and back in (until the game is closed).
+- The playing song's time counts up on its row again when the song plays through a dock (file sharing on).
+- Starting another track or list at a dock always restarts the music; before, the dock could keep playing the old song
+  (Next with a limited queue, or clicking a track again).
 
 ## [0.3.0]
 

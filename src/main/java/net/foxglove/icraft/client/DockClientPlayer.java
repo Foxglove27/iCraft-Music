@@ -118,6 +118,9 @@ public final class DockClientPlayer {
         boolean heard = ownerEars || inEarshot(player, s.outputs, s.isPlaying() ? STOP_MARGIN : START_MARGIN);
         s.dock = dock;
         s.owned = dock.hasIpod() && dock.isOwner(player);
+        if (s.owned && pb != null && pb.isPlaying()) { // after a relog the owner's client has forgotten this dock
+            DockControl.adopt(net.minecraft.core.GlobalPos.of(level.dimension(), pos), dock);
+        }
         s.audible = discPlaying && heard;
         s.distSq = nearestDistSq(player, s.outputs);
         s.seenAt = now;
@@ -268,12 +271,30 @@ public final class DockClientPlayer {
             if (!s.listening || s.dock == null || s.dock.isRemoved() || now - s.seenAt > 5) continue;
             if (best == null || s.distSq < best.distSq) best = s;
         }
-        if (best == null) return null;
-        DockBlockEntity dock = best.dock;
-        DockPlayback pb = dock.getPlayback();
-        if (pb == null) return null;
-        int index = pb.currentDisc();
+        return best == null ? null : describe(best.dock);
+    }
+
+    /**
+     * What a dock plays, for the HUD of a listener and the display above the dock (also the owner's own dock), or
+     * null when it plays nothing. The owner's own local files (no sharing) have no title here: the server does not
+     * know it, and private file names stay private.
+     */
+    @Nullable
+    public static Heard describe(DockBlockEntity dock) {
+        if (!dock.hasIpod()) return null;
         boolean muted = IpodMute.silences(dock.getIpod().get(ModDataComponents.IPOD_ID.get()));
+        DockPlayback pb = dock.getPlayback();
+        if (pb == null || !pb.isPlaying()) {
+            if (!dock.isExternalPlaying()) return null;
+            Player viewer = Minecraft.getInstance().player;
+            if (viewer != null && dock.isOwner(viewer)) { // the owner's own client knows what it plays
+                return new Heard(IpodPlayer.getNowPlaying(), IpodPlayer.getNowPlayingSubtitle(), ItemStack.EMPTY,
+                        IpodPlayer.isPaused(), muted, false, dock.getOwnerName());
+            }
+            return new Heard(Component.translatable("hud.icraft_music.own_music", dock.getOwnerName()), Component.empty(),
+                    ItemStack.EMPTY, false, muted, false, dock.getOwnerName());
+        }
+        int index = pb.currentDisc();
         if (dock.isFilesMode()) {
             List<QueueEntry> queue = dock.getQueue();
             if (index < 0 || index >= queue.size()) return null;

@@ -451,6 +451,17 @@ public class LocalMusic {
     }
 
     // The album (or book) a file belongs to: its folder name (with the artist folders in front), or "Singles" for loose music files
+    /**
+     * The album name that is sent to other players when a file is shared at a dock: only the file's own folder
+     * ("Album", not "Artist - Album" or the folders above it), or "Singles" for a loose file.
+     */
+    public static String shareAlbumName(Path file) {
+        if (isDirectlyInMusicRoot(file) || file.getParent() == null || file.getParent().getFileName() == null) {
+            return albumNameFor(file).getString();
+        }
+        return file.getParent().getFileName().toString();
+    }
+
     public static Component albumNameFor(Path file) {
         if (isDirectlyInMusicRoot(file)) return Component.translatable("screen.icraft_music.ipod.singles");
         Path dir = file.getParent();

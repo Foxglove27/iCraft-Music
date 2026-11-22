@@ -40,6 +40,28 @@ public final class Marquee {
     }
 
     /**
+     * Scrolling for text drawn in the world (the label above a dock), where drawing cannot be clipped: instead of
+     * sliding the whole text, it returns the part that is visible now, moving by whole characters. Same pause, slide,
+     * pause cycle as {@link Line}; starts over when the text changes.
+     */
+    public static final class Clip {
+        private String text = "";
+        private long start;
+
+        /** The part of {@code value} to draw now so that it fits into {@code width} pixels. */
+        public String visible(Font font, String value, int width) {
+            if (!value.equals(text)) {
+                text = value;
+                start = Util.getMillis();
+            }
+            int overflow = font.width(value) - width;
+            if (overflow <= 0) return value;
+            int skip = font.plainSubstrByWidth(value, offset(start, overflow)).length(); // characters already scrolled past
+            return font.plainSubstrByWidth(value.substring(skip), width);
+        }
+    }
+
+    /**
      * One line of text that scrolls when it does not fit. It remembers its text, so the scroll starts over when the
      * text changes (a new song).
      */

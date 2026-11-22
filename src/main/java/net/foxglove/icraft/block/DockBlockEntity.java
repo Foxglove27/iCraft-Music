@@ -43,6 +43,9 @@ public class DockBlockEntity extends BlockEntity {
     public static final int MAX_SPEAKERS = 4;
     /** A speaker has to be this close to the dock (in blocks) to be added. */
     public static final double MAX_SPEAKER_DISTANCE = 32;
+    /** When a too long list is cut to the queue limit, up to this many tracks before the picked one are kept. */
+    private static final int WINDOW_BEFORE_START = 10;
+
     /** The owner can control the dock from this far away (in blocks). */
     public static final double CONTROL_DISTANCE = 64;
 
@@ -226,8 +229,10 @@ public class DockBlockEntity extends BlockEntity {
                 // a disc carried over from a held iPod starts where it was; kept clear of the end so it cannot end at once
                 long length = discTicks(level, message.arg());
                 long startAt = length > 40 ? Math.max(0, Math.min(message.startTicks(), length - 40)) : 0;
+                DockPlayback old = playback;
                 playback = DockPlayback.start(discs, message.arg(), message.shuffle(), repeatOf(message.repeat()), now,
                         new Random(), startAt);
+                playback.continueSequenceAfter(old);
                 externalPlaying = false;
             }
             case DockControlPayload.EXTERNAL -> {
@@ -271,11 +276,24 @@ public class DockBlockEntity extends BlockEntity {
 
         List<QueueEntry> valid = new ArrayList<>();
         int max = ServerConfig.MAX_QUEUE_ITEMS.get();
-        for (QueueEntry e : message.entries()) {
-            QueueEntry.validated(e.hash(), e.ext(), e.title(), e.album(), e.startTicks(), e.endTicks(), e.lengthTicks())
-                    .ifPresent(valid::add);
-            if (valid.size() >= max) break;
+        // a list longer than the limit is cut to a window that still holds the track the owner picked
+        List<QueueEntry> sent = message.entries();
+        int startIndex = message.startIndex();
+        if (sent.size() > max) {
+            int from = Math.max(0, Math.min(startIndex, sent.size() - 1) - Math.min(WINDOW_BEFORE_START, max - 1));
+            from = Math.min(from, sent.size() - max);
+            sent = sent.subList(from, from + max);
+            startIndex -= from;
         }
+        // entries that fail validation are dropped; the start index moves down by those before it
+        int droppedBeforeStart = 0;
+        for (int i = 0; i < sent.size(); i++) {
+            QueueEntry e = sent.get(i);
+            var ok = QueueEntry.validated(e.hash(), e.ext(), e.title(), e.album(), e.startTicks(), e.endTicks(), e.lengthTicks());
+            if (ok.isPresent()) valid.add(ok.get());
+            else if (i < startIndex) droppedBeforeStart++;
+        }
+        startIndex -= droppedBeforeStart;
         if (valid.isEmpty()) return;
 
         queue.clear();
@@ -284,10 +302,12 @@ public class DockBlockEntity extends BlockEntity {
         DockQueues.set(GlobalPos.of(level.dimension(), worldPosition), queue);
 
         long now = level.getGameTime();
-        int start = Math.max(0, Math.min(message.startIndex(), valid.size() - 1));
+        int start = Math.max(0, Math.min(startIndex, valid.size() - 1));
+        DockPlayback old = playback;
         playback = DockPlayback.start(valid.size(), start, message.shuffle(), repeatOf(message.repeat()), now, new Random(), 0);
         playback.play(start, valid.size(), message.shuffle(), repeatOf(message.repeat()), now,
                 Math.max(0, Math.min(message.startOffsetTicks(), valid.get(start).playTicks() - 1)));
+        playback.continueSequenceAfter(old); // a new list must look new to the clients, even with the same track number
         externalPlaying = false;
         LOGGER.info("Dock at {}: {} started a list of {} shared files", worldPosition.toShortString(),
                 player.getGameProfile().getName(), valid.size());

@@ -511,6 +511,7 @@ public class IpodPlayer {
      * here. Used by the iPod screen so the time on the playing row counts up while it is open.
      */
     public static double itemSeconds(String itemKey) {
+        if (DockControl.isFilesActive()) return DockControl.itemSeconds(itemKey); // the dock plays it: the server clock knows
         String key = currentItemKey;
         if (key == null || !started || !key.equals(itemKey)) return -1; // also discs: they have no key
         return Math.max(0, positionSeconds() - currentItemStart);

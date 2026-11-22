@@ -63,7 +63,7 @@ public final class ManualContent {
 
         list.add(chapter("dock",
                 page("dock", "dock", new ManualBlock.Recipe("dock"), text("dock.dock.1")),
-                page("dock", "owner", text("dock.owner.1")),
+                page("dock", "owner", text("dock.owner.1"), text("dock.owner.2")),
                 page("dock", "speakers", new ManualBlock.Recipe("speaker"), text("dock.speakers.1"), text("dock.speakers.2")),
                 page("dock", "wall", new ManualBlock.Wall(key("dock.wall.1"),
                         () -> new ItemStack(ModBlocks.SPEAKER.get())), text("dock.wall.2")),

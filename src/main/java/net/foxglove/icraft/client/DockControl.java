@@ -1,5 +1,6 @@
 package net.foxglove.icraft.client;
 
+import net.foxglove.icraft.RepeatMode;
 import net.foxglove.icraft.ServerConfig;
 import net.foxglove.icraft.block.DockBlockEntity;
 import net.foxglove.icraft.client.audio.AudiobookProgress;
@@ -8,6 +9,7 @@ import net.foxglove.icraft.client.share.FileUploader;
 import net.foxglove.icraft.client.share.LocalFileIndex;
 import net.foxglove.icraft.net.DockQueuePayload;
 import net.foxglove.icraft.net.share.QueueEntry;
+import com.mojang.logging.LogUtils;
 import net.minecraft.Util;
 import net.foxglove.icraft.block.DockPlayback;
 import net.foxglove.icraft.item.IpodItem;
@@ -18,6 +20,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.JukeboxSong;
 import org.jetbrains.annotations.Nullable;
+import org.slf4j.Logger;
 
 import java.io.IOException;
 import java.nio.file.Path;
@@ -31,6 +34,8 @@ import java.util.concurrent.CompletableFuture;
  * client (screen, HUD, keys) what the dock is playing. The server does the playing; see {@link DockClientPlayer}.
  */
 public final class DockControl {
+    private static final Logger LOGGER = LogUtils.getLogger();
+
     // the dock this player last started a disc on
     @Nullable
     private static GlobalPos lastDock;
@@ -51,7 +56,13 @@ public final class DockControl {
                            double endSeconds, @Nullable String progressBook, String progressKey, @Nullable String nextKey) {}
 
     // The list this player started at a dock: the tracks (a window of the album) and where the window starts
-    private record Meta(List<FileItem> items, int offset) {}
+    // 'album' is the whole list the player picked from, 'items' only the part (window) the server holds
+    private record Meta(List<FileItem> items, int offset, List<FileItem> album, boolean book) {
+        /** True if the server's queue limit cut the album: the client then moves the window itself. */
+        boolean partial() {
+            return album.size() > items.size();
+        }
+    }
 
     @Nullable
     private static Meta meta;
@@ -63,6 +74,9 @@ public final class DockControl {
     private static double lastLength = Double.MAX_VALUE; // length of the track that was playing at the last tick, in seconds
     private static boolean lastPaused;
     private static int saveTicks;
+
+    // A partial list that was seen playing: when the server stops it (end of the window), the next album track follows
+    private static boolean slideArmed;
 
     private DockControl() {}
 
@@ -92,6 +106,17 @@ public final class DockControl {
         return dock != null && dock.isFilesMode() && meta != null ? meta.offset() + dock.getPlayback().currentDisc() : -1;
     }
 
+    /**
+     * How far into its own track the item with this progress key is, while the dock plays it from the owner's list,
+     * or -1 if that item is not the one playing. For the live time on the row (the server clock gives the position).
+     */
+    public static double itemSeconds(String itemKey) {
+        FileItem item = currentItem();
+        DockBlockEntity dock = active();
+        if (item == null || dock == null || !item.progressKey().equals(itemKey)) return -1;
+        return dock.getPlayback().positionTicks(Minecraft.getInstance().level.getGameTime()) / 20.0;
+    }
+
     public static Component currentSubtitle() {
         FileItem item = currentItem();
         return item != null ? item.album() : Component.translatable("screen.icraft_music.ipod.discs");
@@ -113,12 +138,16 @@ public final class DockControl {
         Minecraft mc = Minecraft.getInstance();
         if (mc.player != null) mc.player.displayClientMessage(Component.translatable("message.icraft_music.share.preparing"), true);
 
-        int from = Math.max(0, startIndex - WINDOW_BEFORE);
-        int to = Math.min(album.size(), from + DockQueuePayload.MAX_ENTRIES);
+        // the server keeps at most maxQueueItems tracks: size the window so the clicked track is always inside it
+        int limit = Math.max(1, Math.min(DockQueuePayload.MAX_ENTRIES, ServerConfig.MAX_QUEUE_ITEMS.get()));
+        int from = Math.max(0, startIndex - Math.min(WINDOW_BEFORE, limit - 1));
+        int to = Math.min(album.size(), from + limit);
         List<FileItem> window = new ArrayList<>(album.subList(from, to));
         int startInWindow = startIndex - from;
-        boolean shuffle = !book && IpodSettings.shuffle();
-        int repeat = book ? 0 : IpodSettings.repeat().ordinal();
+        boolean partial = album.size() > window.size();
+        // the server only sees the window, so for a partial one shuffle and list repeat are done here (see slideTarget)
+        boolean shuffle = !book && !partial && IpodSettings.shuffle();
+        int repeat = book ? 0 : serverRepeat(partial).ordinal();
 
         CompletableFuture.<Object>supplyAsync(() -> {
             // returns the entries and uploads, or the name of the file that could not be used (a String)
@@ -148,7 +177,8 @@ public final class DockControl {
                     String ext = name.substring(name.lastIndexOf('.') + 1).toLowerCase(java.util.Locale.ROOT);
                     double length = info.lengthSeconds() > 0 ? info.lengthSeconds() : info.size() * 8.0 / 128_000; // unknown: guess 128 kbit/s
                     Optional<QueueEntry> entry = QueueEntry.validated(info.hash(), ext, item.title().getString(),
-                            item.album().getString(), (int) Math.round(item.startSeconds() * 20),
+                            net.foxglove.icraft.client.audio.LocalMusic.shareAlbumName(item.file()), // only the folder's own name goes out
+                            (int) Math.round(item.startSeconds() * 20),
                             item.endSeconds() >= 0 ? (int) Math.round(item.endSeconds() * 20) : -1, (int) Math.round(length * 20));
                     if (entry.isEmpty()) return item.file().getFileName().toString();
                     entries.add(entry.get());
@@ -167,7 +197,8 @@ public final class DockControl {
             @SuppressWarnings("unchecked") List<FileUploader.Item> uploads = (List<FileUploader.Item>) ((Object[]) result)[1];
             for (int i = 0; i < window.size(); i++) LocalFileIndex.put(entries.get(i).hash(), window.get(i).file());
             FileUploader.reset(uploads);
-            meta = new Meta(window, from);
+            meta = new Meta(window, from, album, book);
+            slideArmed = false;
             lastIndex = -1;
             lastDock = dock;
             FileItem first = window.get(startInWindow);
@@ -202,6 +233,7 @@ public final class DockControl {
             return;
         }
         FileUploader.tick(dock);
+        if (meta.partial()) slideArmed = true; // seen playing: when the server stops it, the album goes on
 
         DockPlayback pb = dock.getPlayback();
         int index = pb.currentDisc();
@@ -234,6 +266,7 @@ public final class DockControl {
     /** Called every client tick. */
     static void tick() {
         tickProgress();
+        tickSlide();
         if (pendingDock == null) return;
         Minecraft mc = Minecraft.getInstance();
         if (mc.level != null && mc.player != null && pendingDock.dimension().equals(mc.level.dimension())
@@ -247,12 +280,41 @@ public final class DockControl {
         }
     }
 
-    /** The player left a world (or joined one): forget lists, docks and pending actions of the old one. */
+    /**
+     * A dock the player owns is playing but this client did not start it (the player logged out and back in, which
+     * forgets {@link #lastDock}): remember it so pause, skip and the HUD work again. Never replaces a known dock.
+     */
+    public static void adopt(GlobalPos dock, DockBlockEntity entity) {
+        if (lastDock != null) return;
+        lastDock = dock;
+        if (meta != null) { // the album of the list this player started before the relog: only if it is this dock's list
+            boolean same = metaMatches(entity);
+            LOGGER.info("Dock at {}: adopted after joining; the album of the earlier list was {}", dock.pos().toShortString(),
+                    same ? "kept" : "dropped");
+            if (!same) meta = null;
+        }
+    }
+
+    /** True if the dock's queue is exactly the window of {@link #meta} (same files, found through their hashes). */
+    private static boolean metaMatches(DockBlockEntity dock) {
+        Meta m = meta;
+        if (m == null || !dock.isFilesMode()) return false;
+        List<QueueEntry> queue = dock.getQueue();
+        if (queue.size() != m.items().size()) return false;
+        for (int i = 0; i < queue.size(); i++) {
+            Path file = LocalFileIndex.get(queue.get(i).hash());
+            if (file == null || !file.equals(m.items().get(i).file())) return false;
+        }
+        return true;
+    }
+
+    /** The player left a world (or joined one): forget docks and pending actions of the old one (the album stays, see adopt). */
     public static void forgetWorld() {
-        meta = null;
+        // 'meta' stays: after a relog the owner can go on with the same album; adopt() checks it belongs to the dock
         lastIndex = -1;
         lastDock = null;
         pendingDock = null;
+        slideArmed = false;
     }
 
     // ---- what is going on ----
@@ -308,8 +370,15 @@ public final class DockControl {
     // ---- sending ----
 
     private static void send(GlobalPos dock, int action, int arg) {
+        boolean partial = isFilesActive() && meta != null && meta.partial();
         net.foxglove.icraft.client.ClientNet.send(new DockControlPayload(dock.pos(), action, arg,
-                IpodSettings.shuffle(), IpodSettings.repeat().ordinal(), 0));
+                !partial && IpodSettings.shuffle(), serverRepeat(partial).ordinal(), 0));
+    }
+
+    /** The repeat mode the server gets: for a partial list it must not wrap inside the window, so LIST becomes OFF. */
+    private static RepeatMode serverRepeat(boolean partial) {
+        RepeatMode mode = IpodSettings.repeat();
+        return partial && mode == RepeatMode.LIST ? RepeatMode.OFF : mode;
     }
 
     /** Starts the docked iPod's disc list at disc {@code index}. Stops anything this player plays locally. */
@@ -319,6 +388,7 @@ public final class DockControl {
 
     /** Same, beginning {@code seconds} into the disc (a disc that was playing on a held iPod and was docked). */
     public static void play(GlobalPos dock, int index, double seconds) {
+        slideArmed = false;
         IpodPlayer.stop(); // a file or disc playing in the player's ears makes way
         lastDock = dock;
         net.foxglove.icraft.client.ClientNet.send(new DockControlPayload(dock.pos(), DockControlPayload.PLAY, index,
@@ -341,15 +411,78 @@ public final class DockControl {
     }
 
     public static void next() {
+        if (slideSkip(1)) return;
         sendIfActive(DockControlPayload.NEXT, 0);
     }
 
     public static void previous() {
+        if (slideSkip(-1)) return;
         sendIfActive(DockControlPayload.PREVIOUS, 0);
     }
 
     public static void stop() {
+        slideArmed = false; // we stop it ourselves: the album must not go on
         sendIfActive(DockControlPayload.STOP, 0);
+    }
+
+    // ---- a list longer than the server's queue limit ----
+
+    /**
+     * Next/Previous on a partial list: the server only knows the window, so at its edge (or with shuffle) the
+     * client sends a new window around the target track. Returns false when the server can handle the skip.
+     */
+    private static boolean slideSkip(int step) {
+        Meta m = meta;
+        DockBlockEntity dock = active();
+        if (m == null || dock == null || !dock.isFilesMode() || !m.partial()) return false;
+        int cur = currentIndexInAlbum();
+        if (cur < 0) return false;
+        int local = cur - m.offset();
+        boolean shuffled = !m.book() && IpodSettings.shuffle();
+        boolean edge = step > 0 ? local >= m.items().size() - 1 : local <= 0;
+        if (!shuffled && !edge) return false;
+        slideTo(m, slideTarget(m, cur, step, false));
+        return true;
+    }
+
+    /**
+     * The album track that follows {@code cur}: a random other one with shuffle, else the neighbour (wrapping). When
+     * a track ended by itself ({@code ended}), the album stops after the last track unless repeat is LIST; -1 = stop.
+     */
+    private static int slideTarget(Meta m, int cur, int step, boolean ended) {
+        int n = m.album().size();
+        if (!m.book() && IpodSettings.shuffle() && n > 1) {
+            int pick = java.util.concurrent.ThreadLocalRandom.current().nextInt(n - 1);
+            return pick >= cur ? pick + 1 : pick;
+        }
+        int target = cur + step;
+        if (ended && target >= n && (m.book() || IpodSettings.repeat() != RepeatMode.LIST)) return -1;
+        return Math.floorMod(target, n);
+    }
+
+    /** Starts a new window of the album at {@code target}; the position of the track that is left is saved first. */
+    private static void slideTo(Meta m, int target) {
+        if (target < 0 || lastDock == null) return;
+        if (lastIndex >= 0) {
+            saveOrFinish(lastIndex, lastSeconds, lastLength);
+            lastIndex = -1;
+        }
+        slideArmed = false;
+        LOGGER.info("Dock at {}: sliding the list to album track {} of {}", lastDock.pos().toShortString(), target + 1, m.album().size());
+        playFiles(lastDock, m.album(), target, m.book());
+    }
+
+    /** The server stopped a partial list (its window ended, or a hold-skip went past the end): go on in the album. */
+    private static void tickSlide() {
+        Minecraft mc = Minecraft.getInstance();
+        Meta m = meta;
+        if (!slideArmed || m == null || lastDock == null || mc.level == null || mc.player == null
+                || !lastDock.dimension().equals(mc.level.dimension())) return;
+        if (!(mc.level.getBlockEntity(lastDock.pos()) instanceof DockBlockEntity dock)) return;
+        DockPlayback pb = dock.getPlayback();
+        if (!dock.hasIpod() || !dock.isOwner(mc.player) || !dock.isFilesMode() || pb == null || pb.isPlaying()) return;
+        slideArmed = false;
+        slideTo(m, slideTarget(m, m.offset() + pb.currentDisc(), 1, true));
     }
 
     /** Skips within the disc by this many seconds (ignored while paused; the server clamps it). */

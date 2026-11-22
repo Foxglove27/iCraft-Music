@@ -122,8 +122,9 @@ public class IpodScreen extends Screen {
     private static final int SETTING_STEREO = 4;
     private static final int SETTING_GAME_MUSIC = 5;
     private static final int SETTING_DOWNLOADS = 6;
-    private static final int SETTING_RESET = 7; // opens the confirmation page
-    private static final int SETTING_ROWS = 8;
+    private static final int SETTING_DOCK_DISPLAY = 7;
+    private static final int SETTING_RESET = 8; // opens the confirmation page
+    private static final int SETTING_ROWS = 9;
     // the confirmation page for the reset: Cancel first, so a hasty click changes nothing
     private static final int CONFIRM_CANCEL = 0;
     private static final int CONFIRM_RESET_ROW = 1;
@@ -785,12 +786,15 @@ public class IpodScreen extends Screen {
                     Component.translatable("screen.icraft_music.ipod.bass"),
                     Component.translatable("screen.icraft_music.ipod.bass." + IpodSettings.bassBoost().name().toLowerCase(Locale.ROOT)));
         }
-        if (index == SETTING_STEREO || index == SETTING_GAME_MUSIC || index == SETTING_DOWNLOADS) {
+        if (index == SETTING_STEREO || index == SETTING_GAME_MUSIC || index == SETTING_DOWNLOADS
+                || index == SETTING_DOCK_DISPLAY) {
             boolean on = index == SETTING_STEREO ? IpodSettings.stereoSpeakers()
-                    : index == SETTING_GAME_MUSIC ? IpodSettings.silenceBackgroundMusic() : IpodSettings.downloadSharedFiles();
+                    : index == SETTING_GAME_MUSIC ? IpodSettings.silenceBackgroundMusic()
+                    : index == SETTING_DOWNLOADS ? IpodSettings.downloadSharedFiles() : IpodSettings.dockDisplay();
             return Component.translatable("screen.icraft_music.ipod.setting",
                     Component.translatable(index == SETTING_STEREO ? "screen.icraft_music.ipod.stereo"
-                            : index == SETTING_GAME_MUSIC ? "screen.icraft_music.ipod.game_music" : "screen.icraft_music.ipod.downloads"),
+                            : index == SETTING_GAME_MUSIC ? "screen.icraft_music.ipod.game_music"
+                            : index == SETTING_DOWNLOADS ? "screen.icraft_music.ipod.downloads" : "screen.icraft_music.ipod.dock_display"),
                     Component.translatable(on ? "screen.icraft_music.ipod.on" : "screen.icraft_music.ipod.off"));
         }
         if (index == SETTING_RESET) return Component.translatable("screen.icraft_music.ipod.reset");
@@ -893,6 +897,8 @@ public class IpodScreen extends Screen {
                     IpodSettings.toggleSilenceBackgroundMusic();
                 } else if (selected == SETTING_DOWNLOADS) {
                     IpodSettings.toggleDownloadSharedFiles();
+                } else if (selected == SETTING_DOCK_DISPLAY) {
+                    IpodSettings.toggleDockDisplay();
                 } else if (selected == SETTING_RESET) {
                     goTo(Page.CONFIRM_RESET, CONFIRM_CANCEL); // ask first
                 } else {

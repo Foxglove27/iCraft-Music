@@ -50,6 +50,14 @@ public final class DockPlayback {
         return p;
     }
 
+    /**
+     * A playback that replaces {@code old} must not reuse its sequence numbers: clients restart their sounds only
+     * when the number changes, so a new list that happened to carry the same number would not restart anything.
+     */
+    public void continueSequenceAfter(@org.jetbrains.annotations.Nullable DockPlayback old) {
+        if (old != null) sequence = Math.max(sequence, old.sequence + 1);
+    }
+
     /** A plain copy of the state, for saving and sending. */
     public record Snapshot(int[] order, int index, boolean shuffle, int repeat, long positionBase, long changedAt,
                            boolean paused, boolean stopped, int sequence) {}

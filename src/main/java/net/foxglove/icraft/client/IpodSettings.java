@@ -108,6 +108,15 @@ public class IpodSettings {
         flip(ClientConfig.DOWNLOAD_SHARED_FILES);
     }
 
+    /** The label above a playing dock (B14); read by DockRenderer every frame. */
+    public static boolean dockDisplay() {
+        return flag(ClientConfig.DOCK_DISPLAY);
+    }
+
+    public static void toggleDockDisplay() {
+        flip(ClientConfig.DOCK_DISPLAY);
+    }
+
     private static boolean flag(net.neoforged.neoforge.common.ModConfigSpec.BooleanValue value) {
         try {
             return value.get();
@@ -137,8 +146,9 @@ public class IpodSettings {
         ClientConfig.STEREO_SPEAKERS.set(ClientConfig.STEREO_SPEAKERS.getDefault());
         ClientConfig.SILENCE_BACKGROUND_MUSIC.set(ClientConfig.SILENCE_BACKGROUND_MUSIC.getDefault());
         ClientConfig.DOWNLOAD_SHARED_FILES.set(ClientConfig.DOWNLOAD_SHARED_FILES.getDefault());
+        ClientConfig.DOCK_DISPLAY.set(ClientConfig.DOCK_DISPLAY.getDefault());
         changed = true;
-        save(); // also writes the three switches above
+        save(); // also writes the four switches above
         if (shuffle != shuffleWas) IpodPlayer.shuffleChanged();
         if (repeat != repeatWas) DockControl.modesChanged();
         if (bassBoost != bassWas) {
