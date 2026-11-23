@@ -7,6 +7,7 @@ import net.foxglove.icraft.client.audio.AudiobookProgress;
 import net.foxglove.icraft.client.share.FileHasher;
 import net.foxglove.icraft.client.share.FileUploader;
 import net.foxglove.icraft.client.share.LocalFileIndex;
+import net.foxglove.icraft.client.share.SavedAlbums;
 import net.foxglove.icraft.net.DockQueuePayload;
 import net.foxglove.icraft.net.share.QueueEntry;
 import com.mojang.logging.LogUtils;
@@ -74,6 +75,11 @@ public final class DockControl {
     private static double lastLength = Double.MAX_VALUE; // length of the track that was playing at the last tick, in seconds
     private static boolean lastPaused;
     private static int saveTicks;
+
+    // The album tracks after the window that were last sent to FileUploader for uploading ahead of time (see prefetchAhead)
+    @Nullable
+    private static Meta prefetchMeta;
+    private static int prefetchKey = -1;
 
     // A partial list that was seen playing: when the server stops it (end of the window), the next album track follows
     private static boolean slideArmed;
@@ -207,6 +213,8 @@ public final class DockControl {
             FileUploader.reset(uploads);
             meta = new Meta(window, from, album, book);
             slideArmed = false;
+            prefetchMeta = null;
+            rememberAlbum(dock, meta);
             lastIndex = -1;
             lastDock = dock;
             FileItem first = window.get(startInWindow);
@@ -241,7 +249,10 @@ public final class DockControl {
             return;
         }
         FileUploader.tick(dock);
-        if (meta.partial()) slideArmed = true; // seen playing: when the server stops it, the album goes on
+        if (meta.partial()) {
+            slideArmed = true; // seen playing: when the server stops it, the album goes on
+            prefetchAhead(meta);
+        }
 
         DockPlayback pb = dock.getPlayback();
         assert pb != null;
@@ -302,7 +313,109 @@ public final class DockControl {
             LOGGER.info("Dock at {}: adopted after joining; the album of the earlier list was {}", dock.pos().toShortString(),
                     same ? "kept" : "dropped");
             if (!same) meta = null;
+        } else {
+            restoreAlbum(dock, entity);
         }
+    }
+
+    /** Key of a dock in the saved albums file. */
+    private static String albumKey(GlobalPos dock) {
+        return dock.dimension().location() + "|" + dock.pos().getX() + "," + dock.pos().getY() + "," + dock.pos().getZ();
+    }
+
+    /** Saves the album of a long list (or forgets it for a list that fits), so skipping survives a game restart. */
+    private static void rememberAlbum(GlobalPos dock, Meta m) {
+        String key = albumKey(dock);
+        Util.backgroundExecutor().execute(() -> {
+            if (m.partial()) SavedAlbums.save(key, m.offset(), m.book(), m.album());
+            else SavedAlbums.remove(key);
+        });
+    }
+
+    /**
+     * After a game restart: the dock plays a list of this player's files but the album is unknown. If a saved album
+     * exists whose window is exactly the dock's queue (checked through the files' hashes), take it back; else forget it.
+     */
+    private static void restoreAlbum(GlobalPos dock, DockBlockEntity entity) {
+        if (!entity.isFilesMode() || entity.getQueue().isEmpty()) return;
+        String key = albumKey(dock);
+        List<QueueEntry> queue = List.copyOf(entity.getQueue());
+        Minecraft mc = Minecraft.getInstance();
+        Util.backgroundExecutor().execute(() -> {
+            SavedAlbums.Album saved = SavedAlbums.get(key);
+            if (saved == null) return;
+            boolean ok = saved.offset() >= 0 && saved.offset() + queue.size() <= saved.items().size()
+                    && saved.items().size() > queue.size();
+            try {
+                for (int i = 0; ok && i < queue.size(); i++) {
+                    ok = FileHasher.of(saved.items().get(saved.offset() + i).file()).hash().equals(queue.get(i).hash());
+                }
+            } catch (IOException e) {
+                ok = false; // a file is gone or unreadable
+            } finally {
+                FileHasher.flush();
+            }
+            boolean matches = ok;
+            if (!matches) SavedAlbums.remove(key);
+            mc.execute(() -> {
+                if (!matches) {
+                    LOGGER.info("Dock at {}: the saved album no longer matches and was dropped", dock.pos().toShortString());
+                    return;
+                }
+                if (meta != null || !dock.equals(lastDock)) return; // something else happened meanwhile
+                List<FileItem> window = new ArrayList<>(saved.items().subList(saved.offset(), saved.offset() + queue.size()));
+                for (int i = 0; i < window.size(); i++) LocalFileIndex.put(queue.get(i).hash(), window.get(i).file());
+                meta = new Meta(window, saved.offset(), saved.items(), saved.book());
+                LOGGER.info("Dock at {}: the album of the list was restored from the saved file", dock.pos().toShortString());
+            });
+        });
+    }
+
+    /**
+     * While a long list plays, hashes the next album tracks that lie after the server's window and hands them to
+     * {@link FileUploader} to upload quietly ahead of time, so a slide to them does not wait. Not with shuffle (the next
+     * track is random then).
+     */
+    private static void prefetchAhead(Meta m) {
+        boolean shuffled = !m.book() && IpodSettings.shuffle();
+        int cur = currentIndexInAlbum();
+        if (cur < 0) return;
+        int key = cur * 8 + (shuffled ? 1 : 0) + 2 * IpodSettings.repeat().ordinal();
+        if (m == prefetchMeta && key == prefetchKey) return;
+        prefetchMeta = m;
+        prefetchKey = key;
+        if (shuffled) return;
+        int n = m.album().size();
+        List<FileItem> next = new ArrayList<>();
+        for (int k = 1; k <= 2; k++) {
+            int t = cur + k;
+            if (t >= n) {
+                if (m.book() || IpodSettings.repeat() != RepeatMode.LIST) break;
+                t = Math.floorMod(t, n);
+            }
+            if (t < m.offset() || t >= m.offset() + m.items().size()) next.add(m.album().get(t)); // inside the window the queue lookahead does it
+        }
+        if (next.isEmpty()) return;
+        Minecraft mc = Minecraft.getInstance();
+        Util.backgroundExecutor().execute(() -> {
+            List<FileUploader.Item> uploads = new ArrayList<>();
+            try {
+                for (FileItem item : next) {
+                    FileHasher.Info info = FileHasher.of(item.file());
+                    String name = item.file().getFileName().toString();
+                    String ext = name.substring(name.lastIndexOf('.') + 1).toLowerCase(java.util.Locale.ROOT);
+                    if (!QueueEntry.EXTENSIONS.contains(ext)) continue;
+                    uploads.add(new FileUploader.Item(info.hash(), item.file(), ext, info.size(), item.title().getString()));
+                }
+            } catch (IOException e) {
+                return; // not readable now: the slide itself reports it
+            } finally {
+                FileHasher.flush();
+            }
+            mc.execute(() -> {
+                if (meta == m && prefetchMeta == m && prefetchKey == key) FileUploader.addPrefetch(uploads); // the list may have changed meanwhile
+            });
+        });
     }
 
     /** True if the dock's queue is exactly the window of {@link #meta} (same files, found through their hashes). */
@@ -325,6 +438,7 @@ public final class DockControl {
         lastDock = null;
         pendingDock = null;
         slideArmed = false;
+        prefetchMeta = null;
     }
 
     // ---- what is going on ----

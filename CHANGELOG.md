@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.5.0]
+
+### Changed
+- A long album at a dock (longer than the server's `maxQueueItems`) uploads its next two tracks ahead of time while a
+  track plays, so skipping to them does not wait for the upload. Not with shuffle; if the server refuses (quota,
+  full cache) this stops quietly.
+
+### Fixed
+- After restarting the game, the owner can still skip through the whole album of a long list that keeps playing at a
+  dock, not only through the part the server holds (the album is saved in `icraft_music-albums.json` in the game
+  folder; it is dropped when its files changed).
+
 ## [0.4.0]
 
 ### Added

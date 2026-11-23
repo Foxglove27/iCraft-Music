@@ -15,6 +15,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -37,6 +38,9 @@ public final class FileUploader {
     private static final Map<String, Item> ITEMS = new HashMap<>();
     private static final Set<String> DONE = new HashSet<>();     // the server has these
     private static final Set<String> REFUSED = new HashSet<>();  // the server said no
+    private static final List<Item> PREFETCH = new ArrayList<>(); // album tracks after the window, uploaded ahead of time
+    private static final Set<String> SILENT = new HashSet<>();   // hashes of PREFETCH items: no messages for them
+    private static boolean prefetchStopped;                       // the server refused one: stop uploading ahead
 
     private static String offered;           // waiting for the server's answer
     private static long offeredAt;
@@ -59,10 +63,26 @@ public final class FileUploader {
         ITEMS.clear();
         DONE.clear();
         REFUSED.clear();
+        PREFETCH.clear();
+        SILENT.clear();
+        prefetchStopped = false;
         offered = null;
         sending = null;
         noticeShown = false;
         for (Item i : items) ITEMS.put(i.hash(), i);
+    }
+
+    /**
+     * Album tracks that come after the window the server holds: they are uploaded quietly once the window's own
+     * files are there, so a slide to them finds them ready. Items already in the list are ignored.
+     */
+    public static void addPrefetch(List<Item> items) {
+        for (Item i : items) {
+            if (ITEMS.containsKey(i.hash())) continue;
+            ITEMS.put(i.hash(), i);
+            PREFETCH.add(i);
+            SILENT.add(i.hash());
+        }
     }
 
     private static void closeChannel() {
@@ -100,7 +120,7 @@ public final class FileUploader {
                     channel = FileChannel.open(item.file(), StandardOpenOption.READ);
                     sending = item;
                     sent = 0;
-                    if (!noticeShown) {
+                    if (!noticeShown && !SILENT.contains(item.hash())) {
                         noticeShown = true;
                         message(Component.translatable("message.icraft_music.share.notice"));
                     }
@@ -115,7 +135,8 @@ public final class FileUploader {
                     closeChannel();
                     sending = null;
                 }
-                message(Component.translatable("message.icraft_music.share.refused." + status.reason(), item.title()));
+                if (SILENT.contains(item.hash())) prefetchStopped = true; // a quota or full cache: never at the window's expense
+                else message(Component.translatable("message.icraft_music.share.refused." + status.reason(), item.title()));
             }
         }
         return true;
@@ -148,7 +169,7 @@ public final class FileUploader {
                 sending = null;
             }
             long now = System.currentTimeMillis();
-            if (sending != null && now - lastMessage > 1000) {
+            if (sending != null && !SILENT.contains(sending.hash()) && now - lastMessage > 1000) {
                 lastMessage = now;
                 message(Component.translatable("message.icraft_music.share.sharing", sending.title(), (int) (100 * sent / sending.size())));
             }
@@ -170,6 +191,14 @@ public final class FileUploader {
             if (index < 0 || index >= queue.size()) continue;
             Item item = ITEMS.get(queue.get(index).hash());
             if (item == null || DONE.contains(item.hash()) || REFUSED.contains(item.hash())) continue;
+            offered = item.hash();
+            offeredAt = System.currentTimeMillis();
+            net.foxglove.icraft.client.ClientNet.send(new FileOfferPayload(item.hash(), item.size(), item.ext()));
+            return;
+        }
+        if (prefetchStopped) return;
+        for (Item item : PREFETCH) { // everything in the window is there: go on with the album's next tracks
+            if (DONE.contains(item.hash()) || REFUSED.contains(item.hash())) continue;
             offered = item.hash();
             offeredAt = System.currentTimeMillis();
             net.foxglove.icraft.client.ClientNet.send(new FileOfferPayload(item.hash(), item.size(), item.ext()));
