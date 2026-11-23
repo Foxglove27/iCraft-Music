@@ -2,6 +2,11 @@
 
 ## [0.5.0]
 
+### Added
+- Taking the iPod out of a playing dock while other players can hear it now asks first: the action bar says how many
+  are listening, and repeating the sneak + right-click within 3 seconds takes it out. Alone, paused or without speakers
+  it comes out at once.
+
 ### Changed
 - A long album at a dock (longer than the server's `maxQueueItems`) uploads its next two tracks ahead of time while a
   track plays, so skipping to them does not wait for the upload. Not with shuffle; if the server refuses (quota,

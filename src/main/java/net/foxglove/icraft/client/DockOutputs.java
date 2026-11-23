@@ -17,11 +17,8 @@ import java.util.List;
 
 /** Where the sound of a dock comes from: its speakers, worked out from what is standing in the world. */
 public final class DockOutputs {
-    /**
-     * Range of a single speaker = max(volume, 1) x 16 blocks, so 2.0 = 32 blocks. A multiblock uses twice
-     * this value (64 blocks). Loudness itself is capped at full volume by Minecraft.
-     */
-    public static final float SPEAKER_VOLUME = 2.0F;
+    /** See {@link DockBlockEntity#SPEAKER_VOLUME}; loudness itself is capped at full volume by Minecraft. */
+    public static final float SPEAKER_VOLUME = DockBlockEntity.SPEAKER_VOLUME;
 
     /** A speaker counts as left or right of the dock when it is more than this many blocks to the side. */
     private static final double SIDE_THRESHOLD = 1.0;

@@ -50,6 +50,12 @@ public class DockBlockEntity extends BlockEntity {
     /** The owner can control the dock from this far away (in blocks). */
     public static final double CONTROL_DISTANCE = 64;
 
+    /**
+     * Range of a single speaker = max(volume, 1) x 16 blocks, so 2.0 = 32 blocks. A multiblock uses twice
+     * this value (64 blocks). Shared by the client (what is heard) and the server (who counts as a listener).
+     */
+    public static final float SPEAKER_VOLUME = 2.0F;
+
     private ItemStack ipod = ItemStack.EMPTY;
     /**
      * One speaker slot: a single speaker (its position) or a multiblock (its lowest corner). The kind is fixed
@@ -329,6 +335,40 @@ public class DockBlockEntity extends BlockEntity {
     }
 
     // ---- the speakers ----
+
+    /**
+     * How many players other than {@code owner} can hear this dock right now: it plays (not paused) and they are in
+     * range of one of its speakers. Server side only; a muted listener still counts (the server cannot know).
+     * A dock without speakers plays only in the owner's ears, so it has no other listeners.
+     */
+    public int listenersOtherThan(Player owner) {
+        if (level == null || level.isClientSide() || playback == null || !playback.isPlaying() || playback.isPaused()) return 0;
+        List<Vec3> centres = new ArrayList<>();
+        List<Double> ranges = new ArrayList<>();
+        for (Slot slot : speakers) {
+            if (!level.hasChunkAt(slot.anchor())) continue;
+            if (slot.multiblock()) {
+                Multiblock.Result big = Multiblock.find(level, slot.anchor());
+                if (big == null || !big.anchor().equals(slot.anchor())) continue;
+                centres.add(big.center());
+                ranges.add(Math.max(SPEAKER_VOLUME * 2, 1.0F) * 16.0);
+            } else {
+                centres.add(Vec3.atCenterOf(slot.anchor()));
+                ranges.add(Math.max(SPEAKER_VOLUME, 1.0F) * 16.0);
+            }
+        }
+        int count = 0;
+        for (Player other : level.players()) {
+            if (other.getUUID().equals(owner.getUUID()) || other.isSpectator()) continue;
+            for (int i = 0; i < centres.size(); i++) {
+                if (other.position().distanceToSqr(centres.get(i)) <= ranges.get(i) * ranges.get(i)) {
+                    count++;
+                    break;
+                }
+            }
+        }
+        return count;
+    }
 
     /** The speaker slots (copy). */
     public List<Slot> getSpeakers() {

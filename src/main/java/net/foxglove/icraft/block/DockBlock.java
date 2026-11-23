@@ -34,6 +34,8 @@ import net.minecraft.world.phys.shapes.CollisionContext;
 import net.minecraft.world.phys.shapes.VoxelShape;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -45,6 +47,12 @@ public class DockBlock extends BaseEntityBlock {
     public static final MapCodec<DockBlock> CODEC = simpleCodec(DockBlock::new);
     public static final DirectionProperty FACING = BlockStateProperties.HORIZONTAL_FACING;
     private static final VoxelShape SHAPE = Block.box(1, 0, 1, 15, 10, 15);
+
+    /** How long (ticks) a player has to repeat the take-out click when others are listening. */
+    private static final long CONFIRM_TICKS = 60;
+    /** A take-out that was asked about: which dock, and the game time of the first click. Server thread only. */
+    private record PendingTake(BlockPos pos, long time) {}
+    private static final Map<UUID, PendingTake> PENDING_TAKE = new HashMap<>();
 
     public DockBlock(Properties properties) {
         super(properties);
@@ -154,6 +162,7 @@ public class DockBlock extends BaseEntityBlock {
             }
             if (!level.isClientSide()) {
                 if (dock.canManage(player)) { // only the owner
+                    if (askBeforeTaking(level, pos, dock, player)) return InteractionResult.sidedSuccess(false);
                     player.getInventory().placeItemBackInInventory(dock.takeIpod());
                     player.displayClientMessage(Component.translatable("message.icraft_music.dock.taken"), true);
                 } else {
@@ -164,6 +173,21 @@ public class DockBlock extends BaseEntityBlock {
             ClientHooks.openDockScreen(dock);
         }
         return InteractionResult.sidedSuccess(level.isClientSide());
+    }
+
+    /**
+     * True if taking the iPod out must wait for a second click: other players are listening to the dock. The first
+     * click only tells the owner how many; a second one on the same dock within {@link #CONFIRM_TICKS} goes through.
+     */
+    private static boolean askBeforeTaking(Level level, BlockPos pos, DockBlockEntity dock, Player player) {
+        int listeners = dock.listenersOtherThan(player);
+        PendingTake pending = PENDING_TAKE.remove(player.getUUID());
+        if (listeners == 0) return false;
+        if (pending != null && pending.pos().equals(pos) && level.getGameTime() - pending.time() <= CONFIRM_TICKS) return false;
+        PENDING_TAKE.put(player.getUUID(), new PendingTake(pos.immutable(), level.getGameTime()));
+        player.displayClientMessage(Component.translatable(listeners == 1 ? "message.icraft_music.dock.confirm_take.one"
+                : "message.icraft_music.dock.confirm_take.many", listeners), true);
+        return true;
     }
 
     // Another player cannot break a dock that holds someone else's iPod: in survival it does not crack at all. This
