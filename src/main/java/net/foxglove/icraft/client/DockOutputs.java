@@ -58,7 +58,7 @@ public final class DockOutputs {
         List<Output> outputs = new ArrayList<>();
         for (DockBlockEntity.Slot slot : dock.getSpeakers()) {
             BlockPos anchor = slot.anchor();
-            if (!level.hasChunkAt(anchor)) {
+            if (!level.isLoaded(anchor)) {
                 previous.stream().filter(o -> o.anchor().equals(anchor)).findFirst().ifPresent(outputs::add);
                 continue;
             }

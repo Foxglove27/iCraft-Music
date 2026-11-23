@@ -2,7 +2,6 @@ package net.foxglove.icraft.client;
 
 import net.foxglove.icraft.block.DockBlockEntity;
 import net.foxglove.icraft.client.audio.LibraryCache;
-import net.foxglove.icraft.client.audio.LocalMusic;
 import net.foxglove.icraft.client.screen.IpodScreen;
 import net.foxglove.icraft.item.IpodColor;
 import net.foxglove.icraft.item.IpodItem;

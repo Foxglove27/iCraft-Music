@@ -346,7 +346,7 @@ public class DockBlockEntity extends BlockEntity {
         List<Vec3> centres = new ArrayList<>();
         List<Double> ranges = new ArrayList<>();
         for (Slot slot : speakers) {
-            if (!level.hasChunkAt(slot.anchor())) continue;
+            if (!level.isLoaded(slot.anchor())) continue;
             if (slot.multiblock()) {
                 Multiblock.Result big = Multiblock.find(level, slot.anchor());
                 if (big == null || !big.anchor().equals(slot.anchor())) continue;
@@ -416,7 +416,7 @@ public class DockBlockEntity extends BlockEntity {
         if (now % 10 != 0 || dock.speakers.isEmpty()) return;
 
         int before = dock.speakers.size();
-        dock.speakers.removeIf(slot -> level.hasChunkAt(slot.anchor()) && !dock.isValid(level, slot));
+        dock.speakers.removeIf(slot -> level.isLoaded(slot.anchor()) && !dock.isValid(level, slot));
         int removed = before - dock.speakers.size();
         if (removed == 0) return;
 

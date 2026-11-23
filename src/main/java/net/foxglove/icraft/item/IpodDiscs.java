@@ -31,11 +31,13 @@ public record IpodDiscs(List<ItemStack> discs) {
     }
 
     @Override
+    @SuppressWarnings("deprecation") // only Mojang's "internal" marker; vanilla's ItemContainerContents uses the same helpers
     public boolean equals(Object other) {
         return other instanceof IpodDiscs that && ItemStack.listMatches(this.discs, that.discs);
     }
 
     @Override
+    @SuppressWarnings("deprecation") // only Mojang's "internal" marker; vanilla's ItemContainerContents uses the same helpers
     public int hashCode() {
         return ItemStack.hashStackList(this.discs);
     }

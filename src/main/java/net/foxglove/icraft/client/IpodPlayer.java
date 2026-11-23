@@ -161,7 +161,7 @@ public class IpodPlayer {
                 && ++ticksSinceOutputCheck >= OUTPUT_CHECK_TICKS) {
             ticksSinceOutputCheck = 0;
             if (mc.level != null && queueDock.dimension().equals(mc.level.dimension())
-                    && mc.level.hasChunkAt(queueDock.pos())
+                    && mc.level.isLoaded(queueDock.pos())
                     && !outputsFor(mc, currentIpod, currentOutputs).equals(currentOutputs)) {
                 if (current instanceof IpodSoundInstance sound && sound.isFile()) {
                     refreshPosition();
@@ -970,7 +970,7 @@ public class IpodPlayer {
         if (queueDock != null) {
             if (!queueDock.dimension().equals(mc.level.dimension())) {
                 stop();
-            } else if (mc.level.hasChunkAt(queueDock.pos())
+            } else if (mc.level.isLoaded(queueDock.pos())
                     && mc.level.getGameTime() - queueDockSince > DOCK_GRACE_TICKS
                     && !(mc.level.getBlockEntity(queueDock.pos()) instanceof DockBlockEntity dock
                     && dock.hasIpod()

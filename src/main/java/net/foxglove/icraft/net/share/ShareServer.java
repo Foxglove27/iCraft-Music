@@ -8,7 +8,6 @@ import net.foxglove.icraft.net.FileDataPayload;
 import net.foxglove.icraft.net.FileOfferPayload;
 import net.foxglove.icraft.net.FileRequestPayload;
 import net.foxglove.icraft.net.FileStatusPayload;
-import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.storage.LevelResource;
@@ -23,12 +22,9 @@ import org.slf4j.Logger;
 
 import java.io.IOException;
 import java.io.RandomAccessFile;
-import java.nio.file.Files;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 
 /**

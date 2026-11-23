@@ -58,6 +58,13 @@ public final class DockControl {
 
     // The list this player started at a dock: the tracks (a window of the album) and where the window starts
     // 'album' is the whole list the player picked from, 'items' only the part (window) the server holds
+    /** What hashing a list gives: the queue entries and their uploads, or {@code badFile} (no list then). */
+    private record Prepared(List<QueueEntry> entries, List<FileUploader.Item> uploads, @Nullable String badFile) {
+        static Prepared failed(Path file) {
+            return new Prepared(List.of(), List.of(), file.getFileName().toString());
+        }
+    }
+
     private record Meta(List<FileItem> items, int offset, List<FileItem> album, boolean book) {
         /** True if the server's queue limit cut the album: the client then moves the window itself. */
         boolean partial() {
@@ -163,8 +170,7 @@ public final class DockControl {
         boolean shuffle = !book && !partial && IpodSettings.shuffle();
         int repeat = book ? 0 : serverRepeat(partial).ordinal();
 
-        CompletableFuture.<Object>supplyAsync(() -> {
-            // returns the entries and uploads, or the name of the file that could not be used (a String)
+        CompletableFuture.supplyAsync(() -> {
             try {
                 List<QueueEntry> entries = new ArrayList<>();
                 List<FileUploader.Item> uploads = new ArrayList<>();
@@ -185,7 +191,7 @@ public final class DockControl {
                     try {
                         info = FileHasher.of(item.file());
                     } catch (IOException e) {
-                        return item.file().getFileName().toString(); // a file cannot be read: do not start a list that has a hole in it
+                        return Prepared.failed(item.file()); // a file cannot be read: do not start a list that has a hole in it
                     }
                     String name = item.file().getFileName().toString();
                     String ext = name.substring(name.lastIndexOf('.') + 1).toLowerCase(java.util.Locale.ROOT);
@@ -194,21 +200,21 @@ public final class DockControl {
                             net.foxglove.icraft.client.audio.LocalMusic.shareAlbumName(item.file()), // only the folder's own name goes out
                             (int) Math.round(item.startSeconds() * 20),
                             item.endSeconds() >= 0 ? (int) Math.round(item.endSeconds() * 20) : -1, (int) Math.round(length * 20));
-                    if (entry.isEmpty()) return item.file().getFileName().toString();
+                    if (entry.isEmpty()) return Prepared.failed(item.file());
                     entries.add(entry.get());
                     uploads.add(new FileUploader.Item(info.hash(), item.file(), ext, info.size(), item.title().getString()));
                 }
-                return new Object[]{entries, uploads};
+                return new Prepared(entries, uploads, null);
             } finally {
                 FileHasher.flush(); // remember the new hashes on disk
             }
         }, Util.backgroundExecutor()).thenAccept(result -> mc.execute(() -> {
-            if (result instanceof String badFile) {
-                if (mc.player != null) mc.player.displayClientMessage(Component.translatable("message.icraft_music.share.unreadable", badFile), true);
+            if (result.badFile() != null) {
+                if (mc.player != null) mc.player.displayClientMessage(Component.translatable("message.icraft_music.share.unreadable", result.badFile()), true);
                 return;
             }
-            @SuppressWarnings("unchecked") List<QueueEntry> entries = (List<QueueEntry>) ((Object[]) result)[0];
-            @SuppressWarnings("unchecked") List<FileUploader.Item> uploads = (List<FileUploader.Item>) ((Object[]) result)[1];
+            List<QueueEntry> entries = result.entries();
+            List<FileUploader.Item> uploads = result.uploads();
             for (int i = 0; i < window.size(); i++) LocalFileIndex.put(entries.get(i).hash(), window.get(i).file());
             FileUploader.reset(uploads);
             meta = new Meta(window, from, album, book);
