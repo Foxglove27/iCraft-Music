@@ -22,6 +22,13 @@ public class ClientEvents {
         net.foxglove.icraft.client.share.SharedFiles.reset();
         net.foxglove.icraft.client.share.FileUploader.reset();
         DockControl.forgetWorld();
+        HeadphonesSender.reset();
+    }
+
+    // After dying the server has forgotten that music plays on this player: send it again
+    @SubscribeEvent
+    public static void onRespawn(ClientPlayerNetworkEvent.Clone event) {
+        HeadphonesSender.reset();
     }
 
     @SubscribeEvent
@@ -29,6 +36,7 @@ public class ClientEvents {
         IpodPlayer.stop();
         DockClientPlayer.stopAll();
         IpodMute.reset();
+        HeadphonesSender.reset();
         net.foxglove.icraft.client.audio.CoverArt.clear();
         net.foxglove.icraft.client.share.SharedFiles.reset();
         net.foxglove.icraft.client.share.FileUploader.reset();
@@ -67,6 +75,7 @@ public class ClientEvents {
         IpodPlayer.clientTick();
         net.foxglove.icraft.client.audio.WorldSoundFader.tick();
         DockControl.tick();
+        HeadphonesSender.tick();
         net.foxglove.icraft.client.share.SharedFiles.tick();
         ModKeyMappings.tick(net.minecraft.client.Minecraft.getInstance().screen != null);
     }

@@ -117,6 +117,15 @@ public class IpodSettings {
         flip(ClientConfig.DOCK_DISPLAY);
     }
 
+    /** Headphones on players who listen (B18); read by HeadphonesLayer every frame. */
+    public static boolean showHeadphones() {
+        return flag(ClientConfig.SHOW_HEADPHONES);
+    }
+
+    public static void toggleShowHeadphones() {
+        flip(ClientConfig.SHOW_HEADPHONES);
+    }
+
     private static boolean flag(net.neoforged.neoforge.common.ModConfigSpec.BooleanValue value) {
         try {
             return value.get();
@@ -147,6 +156,7 @@ public class IpodSettings {
         ClientConfig.SILENCE_BACKGROUND_MUSIC.set(ClientConfig.SILENCE_BACKGROUND_MUSIC.getDefault());
         ClientConfig.DOWNLOAD_SHARED_FILES.set(ClientConfig.DOWNLOAD_SHARED_FILES.getDefault());
         ClientConfig.DOCK_DISPLAY.set(ClientConfig.DOCK_DISPLAY.getDefault());
+        ClientConfig.SHOW_HEADPHONES.set(ClientConfig.SHOW_HEADPHONES.getDefault());
         changed = true;
         save(); // also writes the four switches above
         if (shuffle != shuffleWas) IpodPlayer.shuffleChanged();

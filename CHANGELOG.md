@@ -3,6 +3,10 @@
 ## [0.5.0]
 
 ### Added
+- **Headphones**: other players see headphones on your head, in the colour of your iPod, while music plays in your own
+  ears (not paused, not muted, not through dock speakers). They show above helmets and follow your head, also when
+  sneaking. Hide everybody's headphones in the iPod's Settings (Headphones) or with `showHeadphones` in
+  `icraft_music-client.toml`.
 - Taking the iPod out of a playing dock while other players can hear it now asks first: the action bar says how many
   are listening, and repeating the sneak + right-click within 3 seconds takes it out. Alone, paused or without speakers
   it comes out at once.

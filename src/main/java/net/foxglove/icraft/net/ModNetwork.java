@@ -5,7 +5,9 @@ import net.foxglove.icraft.client.ClientHooks;
 import net.foxglove.icraft.net.share.ShareServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.foxglove.icraft.iCraft;
+import net.foxglove.icraft.item.IpodColor;
 import net.foxglove.icraft.item.IpodItem;
+import net.foxglove.icraft.item.ModAttachments;
 import net.minecraft.world.InteractionHand;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
@@ -16,13 +18,14 @@ import net.neoforged.neoforge.network.registration.PayloadRegistrar;
 /** The messages iCraft sends. Registered on the mod event bus on both sides. */
 @EventBusSubscriber(modid = iCraft.MOD_ID)
 public class ModNetwork {
-    private static final String VERSION = "2";
+    private static final String VERSION = "3";
 
     @SubscribeEvent
     public static void register(RegisterPayloadHandlersEvent event) {
         PayloadRegistrar registrar = event.registrar(VERSION);
         registrar.playToServer(DockControlPayload.TYPE, DockControlPayload.STREAM_CODEC, ModNetwork::onDockControl);
         registrar.playToServer(EjectDiscPayload.TYPE, EjectDiscPayload.STREAM_CODEC, ModNetwork::onEjectDisc);
+        registrar.playToServer(ListeningPayload.TYPE, ListeningPayload.STREAM_CODEC, ModNetwork::onListening);
 
         // file sharing
         registrar.playToServer(FileOfferPayload.TYPE, FileOfferPayload.STREAM_CODEC,
@@ -36,6 +39,14 @@ public class ModNetwork {
                 (m, c) -> c.enqueueWork(() -> ClientHooks.fileStatus(m)));
         registrar.playToClient(FileDataPayload.TYPE, FileDataPayload.STREAM_CODEC,
                 (m, c) -> c.enqueueWork(() -> ClientHooks.fileData(m)));
+    }
+
+    /** A player's client reports that music plays on them (or stops): other players then see headphones (B18). */
+    private static void onListening(ListeningPayload message, IPayloadContext context) {
+        context.enqueueWork(() -> {
+            int max = IpodColor.values().length - 1;
+            context.player().setData(ModAttachments.HEADPHONES.get(), Math.clamp(message.color(), -1, max));
+        });
     }
 
     private static void onEjectDisc(EjectDiscPayload message, IPayloadContext context) {

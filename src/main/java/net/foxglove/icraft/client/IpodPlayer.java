@@ -862,6 +862,15 @@ public class IpodPlayer {
         return current != null && !paused && currentOutputs.isEmpty() && !IpodMute.silences(currentIpod);
     }
 
+    /** The colour of the iPod that plays on the player (for the headphones others see), or null. */
+    @Nullable
+    public static net.foxglove.icraft.item.IpodColor playingColor() {
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.player == null) return null;
+        ItemStack stack = findIpod(mc.player, currentIpod);
+        return stack != null && stack.getItem() instanceof IpodItem ipod ? ipod.getColor() : null;
+    }
+
     public static boolean isListening() {
         return current != null && !paused;
     }

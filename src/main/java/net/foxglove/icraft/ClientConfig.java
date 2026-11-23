@@ -42,6 +42,10 @@ public class ClientConfig {
             .comment("Show what a playing docking station plays in a small label above it (also in the iPod's Settings)")
             .define("dockDisplay", true);
 
+    public static final ModConfigSpec.BooleanValue SHOW_HEADPHONES = BUILDER
+            .comment("Show headphones on players while music plays on them (also in the iPod's Settings)")
+            .define("showHeadphones", true);
+
     public static final ModConfigSpec.ConfigValue<java.util.List<? extends String>> EXTRA_MUSIC_FOLDERS = BUILDER
             .comment("Extra folders to read music from, in addition to <game folder>/ipod/music (for example a mounted",
                     "network share). Absolute paths, or relative to the game folder. A share must be mounted first",

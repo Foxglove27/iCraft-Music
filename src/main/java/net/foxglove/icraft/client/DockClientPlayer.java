@@ -255,6 +255,17 @@ public final class DockClientPlayer {
         return false;
     }
 
+    /** The colour of the docked iPod whose music plays in this player's ears (see {@link #playsOnYou}), or null. */
+    @Nullable
+    public static net.foxglove.icraft.item.IpodColor playingColor() {
+        for (State s : ALL) {
+            if (!s.isPlaying() || !s.outputs.isEmpty() || !s.owned || s.dock == null) continue;
+            if (!IpodMute.silences(s.dock.getIpod().get(ModDataComponents.IPOD_ID.get()))
+                    && s.dock.getIpod().getItem() instanceof net.foxglove.icraft.item.IpodItem ipod) return ipod.getColor();
+        }
+        return null;
+    }
+
     /** What another player's dock in earshot plays, for the now-playing panel of a listener. */
     public record Heard(Component title, Component subtitle, ItemStack disc, boolean paused, boolean muted,
                         boolean waiting, String owner) {}
