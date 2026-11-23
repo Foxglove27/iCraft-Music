@@ -90,6 +90,7 @@ public final class DockControl {
     private static FileItem currentItem() {
         DockBlockEntity dock = active();
         if (dock == null || !dock.isFilesMode() || meta == null) return null;
+        assert dock.getPlayback() != null;
         int i = dock.getPlayback().currentDisc();
         return i >= 0 && i < meta.items().size() ? meta.items().get(i) : null;
     }
@@ -103,7 +104,12 @@ public final class DockControl {
     /** Which track of the album (the list the player started from) is playing, or -1. */
     public static int currentIndexInAlbum() {
         DockBlockEntity dock = active();
-        return dock != null && dock.isFilesMode() && meta != null ? meta.offset() + dock.getPlayback().currentDisc() : -1;
+        if (dock != null && dock.isFilesMode() && meta != null) {
+            assert dock.getPlayback() != null;
+            return meta.offset() + dock.getPlayback().currentDisc();
+        } else {
+            return -1;
+        }
     }
 
     /**
@@ -114,6 +120,8 @@ public final class DockControl {
         FileItem item = currentItem();
         DockBlockEntity dock = active();
         if (item == null || dock == null || !item.progressKey().equals(itemKey)) return -1;
+        assert dock.getPlayback() != null;
+        assert Minecraft.getInstance().level != null;
         return dock.getPlayback().positionTicks(Minecraft.getInstance().level.getGameTime()) / 20.0;
     }
 
@@ -139,7 +147,7 @@ public final class DockControl {
         if (mc.player != null) mc.player.displayClientMessage(Component.translatable("message.icraft_music.share.preparing"), true);
 
         // the server keeps at most maxQueueItems tracks: size the window so the clicked track is always inside it
-        int limit = Math.max(1, Math.min(DockQueuePayload.MAX_ENTRIES, ServerConfig.MAX_QUEUE_ITEMS.get()));
+        int limit = Math.clamp(ServerConfig.MAX_QUEUE_ITEMS.get(), 1, DockQueuePayload.MAX_ENTRIES);
         int from = Math.max(0, startIndex - Math.min(WINDOW_BEFORE, limit - 1));
         int to = Math.min(album.size(), from + limit);
         List<FileItem> window = new ArrayList<>(album.subList(from, to));
@@ -236,7 +244,9 @@ public final class DockControl {
         if (meta.partial()) slideArmed = true; // seen playing: when the server stops it, the album goes on
 
         DockPlayback pb = dock.getPlayback();
+        assert pb != null;
         int index = pb.currentDisc();
+        assert Minecraft.getInstance().level != null;
         double seconds = pb.positionTicks(Minecraft.getInstance().level.getGameTime()) / 20.0;
         if (index != lastIndex) {
             if (lastIndex >= 0) saveOrFinish(lastIndex, lastSeconds, lastLength);
@@ -335,13 +345,20 @@ public final class DockControl {
 
     public static boolean isPaused() {
         DockBlockEntity dock = active();
-        return dock != null && dock.getPlayback().isPaused();
+        if (dock == null) return false;
+        assert dock.getPlayback() != null;
+        return dock.getPlayback().isPaused();
     }
 
     /** The index (in the iPod's disc list) of the disc that is playing, or -1. */
     public static int currentDisc() {
         DockBlockEntity dock = active();
-        return dock != null ? dock.getPlayback().currentDisc() : -1;
+        if (dock != null) {
+            assert dock.getPlayback() != null;
+            return dock.getPlayback().currentDisc();
+        } else {
+            return -1;
+        }
     }
 
     /** Where the current disc is, in seconds (for skipping). */
@@ -349,6 +366,7 @@ public final class DockControl {
         DockBlockEntity dock = active();
         if (dock == null) return ItemStack.EMPTY;
         var discs = IpodItem.getDiscs(dock.getIpod());
+        assert dock.getPlayback() != null;
         int i = dock.getPlayback().currentDisc();
         return i >= 0 && i < discs.size() ? discs.get(i) : ItemStack.EMPTY;
     }
@@ -398,6 +416,8 @@ public final class DockControl {
     public static void togglePause() {
         DockBlockEntity dock = active();
         if (dock == null) return;
+        assert Minecraft.getInstance().level != null;
+        assert dock.getPlayback() != null;
         send(GlobalPos.of(Minecraft.getInstance().level.dimension(), dock.getBlockPos()),
                 dock.getPlayback().isPaused() ? DockControlPayload.RESUME : DockControlPayload.PAUSE, 0);
     }
@@ -498,6 +518,7 @@ public final class DockControl {
     private static void sendIfActive(int action, int arg) {
         DockBlockEntity dock = active();
         if (dock == null) return;
+        assert Minecraft.getInstance().level != null;
         send(GlobalPos.of(Minecraft.getInstance().level.dimension(), dock.getBlockPos()), action, arg);
     }
 

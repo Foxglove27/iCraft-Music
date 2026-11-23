@@ -21,6 +21,7 @@ import net.minecraft.util.Mth;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.JukeboxSong;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.lwjgl.glfw.GLFW;
 
@@ -54,6 +55,7 @@ public class IpodScreen extends Screen {
     private static final int DISPLAY_W = 32 * PX;
     private static final int DISPLAY_H = 23 * PX;
     private static final int HEADER_H = 5 * PX; // the light blue strip at the top of the display
+    private static final int STATUS_ICON_Y = DISPLAY_Y + (HEADER_H - 5) / 2; // top of the play / pause symbol in the header
 
     // The click wheel
     private static final int WHEEL_X = 22 * PX; // centre of the wheel
@@ -528,7 +530,7 @@ public class IpodScreen extends Screen {
     }
 
     @Override
-    public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
+    public void render(@NotNull GuiGraphics g, int mouseX, int mouseY, float partialTick) {
         this.renderBackground(g, mouseX, mouseY, partialTick);
 
         float p = progress();
@@ -570,7 +572,10 @@ public class IpodScreen extends Screen {
             case CONFIRM_RESET -> Component.translatable("screen.icraft_music.ipod.reset_title");
             case SEARCH -> Component.literal(searchQuery.isEmpty() ? Component.translatable("screen.icraft_music.ipod.search").getString()
                     : searchQuery + ((Util.getMillis() / 500) % 2 == 0 ? "_" : " "));
-            case TRACKS, CHAPTERS -> open.name();
+            case TRACKS, CHAPTERS -> {
+                assert open != null;
+                yield open.name();
+            }
         };
         // while this iPod is muted for the player, "Muted" stands next to the status symbol
         String muted = IpodMute.silences(ipodId)
@@ -589,7 +594,7 @@ public class IpodScreen extends Screen {
             String dots = ".".repeat(1 + (int) ((Util.getMillis() / 400) % 3));
             g.drawString(this.font, dots, left + this.font.width(shownTitle) + 2, DISPLAY_Y + (HEADER_H - 8) / 2, 0xFF0A2A66, false);
         }
-        drawStatusIcon(g, right - 5, DISPLAY_Y + (HEADER_H - 5) / 2);
+        drawStatusIcon(g, right - 5);
 
         // Nothing to show (only the album and book lists can be empty)
         if (count == 0) {
@@ -620,7 +625,7 @@ public class IpodScreen extends Screen {
             switch (page) {
                 case ALBUMS, BOOKS -> {
                     AlbumView album = (page == Page.ALBUMS ? shownAlbums() : shownBooks()).get(index);
-                    drawCover(g, album, left, rowY + 1, THUMB);
+                    drawCover(g, album, left, rowY + 1);
                     textX = left + THUMB + 3;
                     name = album.name();
                     if (album.detail() != null) { // right-aligned in grey, like a track's time
@@ -631,6 +636,7 @@ public class IpodScreen extends Screen {
                     }
                 }
                 case TRACKS, CHAPTERS -> {
+                    assert open != null;
                     Track track = open.tracks().get(index);
                     name = track.name();
                     String detail = track.detail(); // the saved time; the playing row shows the live one
@@ -664,7 +670,7 @@ public class IpodScreen extends Screen {
                 default -> name = menuRow(menuIds().get(index));
             }
 
-            int color = isSelected ? 0xFFFFFFFF : 0xFFFFFFFF;
+            int color = 0xFFFFFFFF;
             String full = name.getString();
             int available = right2 - textX;
             if (isSelected && this.font.width(full) > available) {
@@ -701,30 +707,30 @@ public class IpodScreen extends Screen {
     }
 
     // A small triangle while playing, two bars while paused, nothing when idle
-    private void drawStatusIcon(GuiGraphics g, int x, int y) {
+    private void drawStatusIcon(GuiGraphics g, int x) {
         if (!IpodPlayer.isPlaying()) return;
         int color = 0xFF0A2A66;
         if (IpodPlayer.isPaused()) {
-            g.fill(x, y, x + 2, y + 5, color);
-            g.fill(x + 3, y, x + 5, y + 5, color);
+            g.fill(x, STATUS_ICON_Y, x + 2, STATUS_ICON_Y + 5, color);
+            g.fill(x + 3, STATUS_ICON_Y, x + 5, STATUS_ICON_Y + 5, color);
         } else {
             for (int i = 0; i < 5; i++) {
                 int width = Math.min(i, 4 - i) + 1;
-                g.fill(x, y + i, x + width, y + i + 1, color);
+                g.fill(x, STATUS_ICON_Y + i, x + width, STATUS_ICON_Y + i + 1, color);
             }
         }
     }
 
-    private void drawCover(GuiGraphics g, AlbumView album, int x, int y, int s) {
+    private void drawCover(GuiGraphics g, AlbumView album, int x, int y) {
         ResourceLocation texture = album.cover() != null ? CoverArt.get(album.cover()) : null;
         if (texture != null) {
-            g.blit(texture, x, y, s, s, 0, 0, CoverArt.SIZE, CoverArt.SIZE, CoverArt.SIZE, CoverArt.SIZE);
+            g.blit(texture, x, y, IpodScreen.THUMB, IpodScreen.THUMB, 0, 0, CoverArt.SIZE, CoverArt.SIZE, CoverArt.SIZE, CoverArt.SIZE);
             return;
         }
 
-        g.fill(x, y, x + s, y + s, 0xFF3A3A3A);
+        g.fill(x, y, x + IpodScreen.THUMB, y + IpodScreen.THUMB, 0xFF3A3A3A);
         if (album.icon() != null) {
-            float scale = s / 16.0F;
+            float scale = IpodScreen.THUMB / 16.0F;
             g.pose().pushPose();
             g.pose().translate(x, y, 0);
             g.pose().scale(scale, scale, 1.0F);
@@ -733,7 +739,7 @@ public class IpodScreen extends Screen {
         } else {
             String name = album.name().getString();
             String initial = name.isEmpty() ? "?" : name.substring(0, 1).toUpperCase(Locale.ROOT);
-            g.drawCenteredString(this.font, initial, x + s / 2, y + s / 2 - 4, 0xAAAAAA);
+            g.drawCenteredString(this.font, initial, x + IpodScreen.THUMB / 2, y + IpodScreen.THUMB / 2 - 4, 0xAAAAAA);
         }
     }
 
@@ -755,7 +761,10 @@ public class IpodScreen extends Screen {
             case SEARCH -> results.size();
             case ALBUMS -> shownAlbums().size();
             case BOOKS -> shownBooks().size();
-            case TRACKS, CHAPTERS -> open.tracks().size();
+            case TRACKS, CHAPTERS -> {
+                assert open != null;
+                yield open.tracks().size();
+            }
         };
     }
 
@@ -834,6 +843,7 @@ public class IpodScreen extends Screen {
             case MENU -> {
                 int id = menuIds().get(selected);
                 if (id == MENU_MANUAL) { // the full manual; Esc there comes back to this menu
+                    assert this.minecraft != null;
                     this.minecraft.setScreen(new ManualScreen(this));
                     return;
                 }
@@ -914,21 +924,27 @@ public class IpodScreen extends Screen {
 
     // Starts the open album/book from the selected row (the discs of a docked iPod go through the dock)
     private void playFromOpen() {
-        if (page == Page.TRACKS && dock != null && open.icon() != null) {
-            // the discs of a docked iPod: the dock (the server) plays them for everybody near it
-            lastPlayingSeen = selected;
-            DockControl.play(dock, selected);
-            return;
+        if (page == Page.TRACKS && dock != null) {
+            assert open != null;
+            if (open.icon() != null) {
+                // the discs of a docked iPod: the dock (the server) plays them for everybody near it
+                lastPlayingSeen = selected;
+                DockControl.play(dock, selected);
+                return;
+            }
         }
-        if (dock != null && dockOwner && DockControl.canShareFiles()
-                && open.tracks().stream().allMatch(t -> t.item() != null)) {
-            // file sharing is on: the dock plays the list for everybody near it, the files go to the server
-            playedAlbum = open;
-            playedActions = null;
-            lastPlayingSeen = selected;
-            DockControl.playFiles(dock, open.tracks().stream().map(Track::item).toList(), selected, page == Page.CHAPTERS);
-            return;
+        if (dock != null && dockOwner && DockControl.canShareFiles()) {
+            assert open != null;
+            if (open.tracks().stream().allMatch(t -> t.item() != null)) {
+                // file sharing is on: the dock plays the list for everybody near it, the files go to the server
+                playedAlbum = open;
+                playedActions = null;
+                lastPlayingSeen = selected;
+                DockControl.playFiles(dock, open.tracks().stream().map(Track::item).toList(), selected, page == Page.CHAPTERS);
+                return;
+            }
         }
+        assert open != null;
         List<Runnable> actions = open.tracks().stream().map(Track::play).toList();
         playedAlbum = open;
         playedActions = actions;

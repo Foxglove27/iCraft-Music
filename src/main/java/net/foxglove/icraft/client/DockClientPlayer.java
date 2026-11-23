@@ -128,7 +128,7 @@ public final class DockClientPlayer {
                 && inEarshot(player, s.outputs, s.listening ? STOP_MARGIN : START_MARGIN);
         // shared files are fetched from twice the speaker range on, so they are usually here before the player is in earshot
         boolean nearForDownload = dock.isFilesMode() && dock.hasIpod() && pb != null && pb.isPlaying() && !pb.isPaused()
-                && !s.outputs.isEmpty() && inEarshotFactor(player, s.outputs, 2.0);
+                && !s.outputs.isEmpty() && inEarshotFactor(player, s.outputs);
         if (nearForDownload && !s.owned) { // the owner's files are on their own computer: they never download them
             List<QueueEntry> queue = dock.getQueue();
             List<QueueEntry> wanted = new ArrayList<>();
@@ -218,9 +218,9 @@ public final class DockClientPlayer {
         LOGGER.info("Dock at {}: {}", pos.toShortString(), reason);
     }
 
-    private static boolean inEarshotFactor(Player player, List<DockOutputs.Output> outputs, double factor) {
+    private static boolean inEarshotFactor(Player player, List<DockOutputs.Output> outputs) {
         for (DockOutputs.Output o : outputs) {
-            double range = o.range() * factor;
+            double range = o.range() * 2.0;
             if (player.position().distanceToSqr(o.pos()) <= range * range) return true;
         }
         return false;
@@ -246,7 +246,6 @@ public final class DockClientPlayer {
         return false;
     }
 
-    /** True while the player hears at least one dock (its sounds are playing). */
     /** A dock without speakers plays in this player's ears (they own it) and is not muted. */
     public static boolean playsOnYou() {
         for (State s : ALL) {
@@ -388,7 +387,10 @@ public final class DockClientPlayer {
         }
         Level level = dock.getLevel();
         // asked when the stream opens, so the time spent loading is not lost
-        java.util.function.DoubleSupplier start = () -> entry.startTicks() / 20.0 + pb.positionTicks(level.getGameTime()) / 20.0;
+        java.util.function.DoubleSupplier start = () -> {
+            assert level != null;
+            return entry.startTicks() / 20.0 + pb.positionTicks(level.getGameTime()) / 20.0;
+        };
         double end = entry.endTicks() >= 0 ? entry.endTicks() / 20.0 : -1;
         Minecraft mc = Minecraft.getInstance();
         String label = entry.title();

@@ -184,7 +184,7 @@ public class LocalMusic {
                     albums.add(new Album(Component.literal(name), coverOf(dir), files)));
         }
         if (!singles.isEmpty()) {
-            albums.add(0, new Album(Component.translatable("screen.icraft_music.ipod.singles"), null, singles));
+            albums.addFirst(new Album(Component.translatable("screen.icraft_music.ipod.singles"), null, singles));
         }
         return albums;
     }
@@ -261,7 +261,7 @@ public class LocalMusic {
         Path rel = root.relativize(dir);
         StringBuilder name = new StringBuilder();
         for (Path part : rel) {
-            if (name.length() > 0) name.append(" - ");
+            if (!name.isEmpty()) name.append(" - ");
             name.append(part);
         }
         return name.toString();

@@ -18,6 +18,7 @@ import net.minecraft.world.item.ItemDisplayContext;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
+import org.jetbrains.annotations.NotNull;
 import org.joml.Matrix4f;
 
 import java.util.ArrayList;
@@ -76,7 +77,7 @@ public class DockRenderer implements BlockEntityRenderer<DockBlockEntity> {
                 && (viewer == null || !dock.isOwner(viewer));
         Component title = shown.paused()
                 ? Component.empty().append(shown.title()).append(Component.translatable("hud.icraft_music.paused"))
-                : Component.literal("\u266A ").append(shown.title());
+                : Component.literal("♪ ").append(shown.title());
         lines.add(title);
         colors.add(0xFFFFFFFF);
         if (shown.muted()) {
@@ -136,7 +137,7 @@ public class DockRenderer implements BlockEntityRenderer<DockBlockEntity> {
 
     // The label sits above the block: render while the space above it is on screen, not only the dock itself
     @Override
-    public AABB getRenderBoundingBox(DockBlockEntity dock) {
+    public @NotNull AABB getRenderBoundingBox(DockBlockEntity dock) {
         return new AABB(dock.getBlockPos()).expandTowards(0, 2, 0);
     }
 }

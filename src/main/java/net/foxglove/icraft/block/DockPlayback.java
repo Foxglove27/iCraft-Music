@@ -69,10 +69,10 @@ public final class DockPlayback {
     public static DockPlayback restore(Snapshot s, Random random) {
         DockPlayback p = new DockPlayback(random);
         p.order = s.order().clone();
-        p.index = Math.max(0, Math.min(s.index(), Math.max(0, p.order.length - 1)));
+        p.index = Math.clamp(s.index(), 0, Math.max(0, p.order.length - 1));
         p.shuffle = s.shuffle();
         RepeatMode[] modes = RepeatMode.values();
-        p.repeat = modes[Math.max(0, Math.min(s.repeat(), modes.length - 1))];
+        p.repeat = modes[Math.clamp(s.repeat(), 0, modes.length - 1)];
         p.positionBase = s.positionBase();
         p.changedAt = s.changedAt();
         p.paused = s.paused();

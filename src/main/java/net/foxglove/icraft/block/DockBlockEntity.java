@@ -27,6 +27,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.JukeboxSong;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -228,7 +229,7 @@ public class DockBlockEntity extends BlockEntity {
                 if (message.arg() >= discs) return;
                 // a disc carried over from a held iPod starts where it was; kept clear of the end so it cannot end at once
                 long length = discTicks(level, message.arg());
-                long startAt = length > 40 ? Math.max(0, Math.min(message.startTicks(), length - 40)) : 0;
+                long startAt = length > 40 ? Math.clamp(message.startTicks(), 0, length - 40) : 0;
                 DockPlayback old = playback;
                 playback = DockPlayback.start(discs, message.arg(), message.shuffle(), repeatOf(message.repeat()), now,
                         new Random(), startAt);
@@ -302,11 +303,11 @@ public class DockBlockEntity extends BlockEntity {
         DockQueues.set(GlobalPos.of(level.dimension(), worldPosition), queue);
 
         long now = level.getGameTime();
-        int start = Math.max(0, Math.min(startIndex, valid.size() - 1));
+        int start = Math.clamp(startIndex, 0, valid.size() - 1);
         DockPlayback old = playback;
         playback = DockPlayback.start(valid.size(), start, message.shuffle(), repeatOf(message.repeat()), now, new Random(), 0);
         playback.play(start, valid.size(), message.shuffle(), repeatOf(message.repeat()), now,
-                Math.max(0, Math.min(message.startOffsetTicks(), valid.get(start).playTicks() - 1)));
+                Math.clamp(message.startOffsetTicks(), 0, valid.get(start).playTicks() - 1));
         playback.continueSequenceAfter(old); // a new list must look new to the clients, even with the same track number
         externalPlaying = false;
         LOGGER.info("Dock at {}: {} started a list of {} shared files", worldPosition.toShortString(),
@@ -324,7 +325,7 @@ public class DockBlockEntity extends BlockEntity {
 
     private static RepeatMode repeatOf(int ordinal) {
         RepeatMode[] modes = RepeatMode.values();
-        return modes[Math.max(0, Math.min(ordinal, modes.length - 1))];
+        return modes[Math.clamp(ordinal, 0, modes.length - 1)];
     }
 
     // ---- the speakers ----
@@ -416,7 +417,7 @@ public class DockBlockEntity extends BlockEntity {
     // ---- saving and syncing ----
 
     @Override
-    protected void saveAdditional(CompoundTag tag, HolderLookup.Provider registries) {
+    protected void saveAdditional(@NotNull CompoundTag tag, HolderLookup.@NotNull Provider registries) {
         super.saveAdditional(tag, registries);
         if (!ipod.isEmpty()) tag.put("ipod", ipod.save(registries));
         ListTag list = new ListTag();
@@ -466,7 +467,7 @@ public class DockBlockEntity extends BlockEntity {
     }
 
     @Override
-    protected void loadAdditional(CompoundTag tag, HolderLookup.Provider registries) {
+    protected void loadAdditional(@NotNull CompoundTag tag, HolderLookup.@NotNull Provider registries) {
         super.loadAdditional(tag, registries);
         ipod = tag.contains("ipod") ? ItemStack.parse(registries, tag.getCompound("ipod")).orElse(ItemStack.EMPTY) : ItemStack.EMPTY;
         owner = tag.hasUUID("owner") ? tag.getUUID("owner") : null;
@@ -509,7 +510,7 @@ public class DockBlockEntity extends BlockEntity {
     }
 
     @Override
-    public CompoundTag getUpdateTag(HolderLookup.Provider registries) {
+    public @NotNull CompoundTag getUpdateTag(HolderLookup.@NotNull Provider registries) {
         return saveWithoutMetadata(registries);
     }
 
@@ -522,14 +523,14 @@ public class DockBlockEntity extends BlockEntity {
     }
 
     @Override
-    public void onDataPacket(net.minecraft.network.Connection net, ClientboundBlockEntityDataPacket packet,
-                             HolderLookup.Provider registries) {
+    public void onDataPacket(net.minecraft.network.@NotNull Connection net, @NotNull ClientboundBlockEntityDataPacket packet,
+                             HolderLookup.@NotNull Provider registries) {
         super.onDataPacket(net, packet, registries);
         logReceived("update");
     }
 
     @Override
-    public void handleUpdateTag(CompoundTag tag, HolderLookup.Provider registries) {
+    public void handleUpdateTag(@NotNull CompoundTag tag, HolderLookup.@NotNull Provider registries) {
         super.handleUpdateTag(tag, registries);
         logReceived("chunk");
     }

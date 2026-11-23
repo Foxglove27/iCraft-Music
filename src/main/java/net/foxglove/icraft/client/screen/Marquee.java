@@ -23,7 +23,7 @@ public final class Marquee {
         long t = (Util.getMillis() - startMs) % cycle;
         if (t < PAUSE_MS) return 0;
         if (t >= PAUSE_MS + scrollMs) return overflow;
-        return (int) ((t - PAUSE_MS) * overflow / Math.max(1, scrollMs));
+        return (int) ((t - PAUSE_MS) * overflow / scrollMs);
     }
 
     /**
