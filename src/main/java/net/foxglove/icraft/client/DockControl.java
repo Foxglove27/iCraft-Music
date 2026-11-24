@@ -424,6 +424,48 @@ public final class DockControl {
         });
     }
 
+    /**
+     * A list of this player's files that a dock plays, handed back to the player's ears when the iPod is taken out:
+     * the tracks, which one plays, where in its file (seconds from the file's start) and whether it is a book.
+     */
+    public record Handback(List<FileItem> items, int index, double fileSeconds, boolean book) {}
+
+    /**
+     * What the dock plays from this player's shared list, so it can carry on in the player's ears (taking the iPod
+     * out), or null if it is not such a list or its files are not known here. The whole album when this client
+     * started the list (or got it back after a relog); else the dock's queue, as far as the files are known.
+     */
+    @Nullable
+    public static Handback handback(DockBlockEntity dock, long gameTime) {
+        DockPlayback pb = dock.getPlayback();
+        if (!dock.isFilesMode() || pb == null || !pb.isPlaying()) return null;
+        int index = pb.currentDisc();
+        List<QueueEntry> queue = dock.getQueue();
+        if (index < 0 || index >= queue.size()) return null;
+        double seconds = pb.positionTicks(gameTime) / 20.0; // from the start of the track (a chapter: of the chapter)
+
+        Meta m = meta;
+        if (m != null && metaMatches(dock)) {
+            FileItem item = m.items().get(index);
+            return new Handback(m.album(), m.offset() + index, item.startSeconds() + seconds, m.book());
+        }
+        // no album here (e.g. a list started before a relog): the queue's files that this client knows, as songs
+        List<FileItem> items = new ArrayList<>();
+        int at = -1;
+        for (int i = 0; i < queue.size(); i++) {
+            QueueEntry entry = queue.get(i);
+            Path file = LocalFileIndex.get(entry.hash());
+            if (file == null) continue;
+            if (i == index) at = items.size();
+            items.add(new FileItem(file, Component.literal(entry.title()),
+                    net.foxglove.icraft.client.audio.LocalMusic.albumNameFor(file),
+                    net.foxglove.icraft.client.audio.LocalMusic.coverFor(file), entry.startTicks() / 20.0,
+                    entry.endTicks() >= 0 ? entry.endTicks() / 20.0 : -1, null, entry.hash(), null));
+        }
+        if (at < 0) return null;
+        return new Handback(items, at, items.get(at).startSeconds() + seconds, false);
+    }
+
     /** True if the dock's queue is exactly the window of {@link #meta} (same files, found through their hashes). */
     private static boolean metaMatches(DockBlockEntity dock) {
         Meta m = meta;

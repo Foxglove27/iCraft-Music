@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.1]
+
+### Fixed
+- Taking the iPod out of a dock that plays a list of your own files shared with the other players (multiplayer) now
+  carries the list on in your ears at the same second, like a music disc. Before, the music stopped, or one of the
+  iPod's music discs started instead (the one at the same place in the disc list).
+
 ## [0.5.0]
 
 ### Added

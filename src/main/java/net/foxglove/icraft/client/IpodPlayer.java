@@ -389,24 +389,34 @@ public class IpodPlayer {
 
     // ---- taking the iPod out of a dock: what the dock was playing carries on in the player's ears ----
 
-    private record Pickup(UUID ipod, ItemStack disc, double seconds, long deadline) {}
+    // a disc (files == null), or the dock's list of the player's own files (disc empty)
+    private record Pickup(UUID ipod, ItemStack disc, double seconds, long deadline,
+                          @Nullable DockControl.Handback files) {}
     @Nullable
     private static Pickup pickup;
 
     /**
      * The player is taking the iPod out of this dock (client side of the click). If the dock plays one of the
-     * iPod's discs right now, it is started on the player's iPod at the same position as soon as the iPod arrives.
+     * iPod's discs right now, it is started on the player's iPod at the same position as soon as the iPod arrives;
+     * a shared list of the player's own files carries on in the player's ears the same way.
      */
     public static void pickupFromDock(DockBlockEntity dock) {
         Minecraft mc = Minecraft.getInstance();
         DockPlayback pb = dock.getPlayback();
         if (mc.level == null || !dock.hasIpod() || pb == null || !pb.isPlaying() || pb.isPaused()) return;
         UUID id = dock.getIpod().get(ModDataComponents.IPOD_ID.get());
+        if (id == null) return;
+        long now = mc.level.getGameTime();
+        if (dock.isFilesMode()) {
+            // a shared list: its index counts files, not the iPod's discs (index 0 must not start disc 0)
+            DockControl.Handback files = DockControl.handback(dock, now);
+            if (files != null) pickup = new Pickup(id, ItemStack.EMPTY, files.fileSeconds(), now + 100, files);
+            return;
+        }
         List<ItemStack> discs = IpodItem.getDiscs(dock.getIpod());
         int index = pb.currentDisc();
-        if (id == null || index < 0 || index >= discs.size()) return;
-        long now = mc.level.getGameTime();
-        pickup = new Pickup(id, discs.get(index).copy(), pb.positionTicks(now) / 20.0, now + 100);
+        if (index < 0 || index >= discs.size()) return;
+        pickup = new Pickup(id, discs.get(index).copy(), pb.positionTicks(now) / 20.0, now + 100, null);
     }
 
     private static void tickPickup() {
@@ -419,8 +429,31 @@ public class IpodPlayer {
         }
         if (findIpod(mc.player, p.ipod()) != null) { // the iPod arrived in the inventory
             pickup = null;
-            play(p.disc(), p.ipod(), p.seconds());
+            if (p.files() != null) {
+                playHandback(p.files(), p.ipod());
+            } else {
+                play(p.disc(), p.ipod(), p.seconds());
+            }
         }
+    }
+
+    // The dock's list of the player's own files, now in the player's ears: the same track at the same second, and
+    // the rest of the list after it (chapters as chapters, so their progress is kept)
+    private static void playHandback(DockControl.Handback h, UUID ipod) {
+        List<Runnable> actions = new ArrayList<>();
+        for (DockControl.FileItem item : h.items()) {
+            if (item.progressBook() != null) {
+                LocalMusic.Chapter chapter = new LocalMusic.Chapter(item.file(), item.title(), item.startSeconds(),
+                        item.endSeconds(), item.progressKey());
+                actions.add(() -> playChapter(chapter, item.progressBook(), item.nextKey(), ipod));
+            } else {
+                actions.add(() -> playFileInternal(item.file(), ipod, item.title(), item.album(), item.cover(),
+                        null, null, null));
+            }
+        }
+        stop(); // whatever else was going on in the ears makes way (also forgets queueDock: this is no dock's music)
+        pendingStartSeconds = h.fileSeconds();
+        playQueue(actions, h.index(), h.book());
     }
 
     public static void playFile(Path file, @Nullable UUID ipod) {
