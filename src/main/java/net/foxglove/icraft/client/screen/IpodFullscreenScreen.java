@@ -79,8 +79,9 @@ public class IpodFullscreenScreen extends Screen {
         this.accent = readableAccent(color.tint());
     }
 
-    // A very dark colour (the black iPod) would not show on the dark background: use light grey instead
-    private static int readableAccent(int rgb) {
+    // A very dark colour (the black iPod) would not show on the dark background: use light grey instead.
+    // Also the line under the small screen's header over a wallpaper (IpodScreen, same package).
+    static int readableAccent(int rgb) {
         int r = (rgb >> 16) & 0xFF, g = (rgb >> 8) & 0xFF, b = rgb & 0xFF;
         return (r + g + b) / 3 < 0x60 ? 0xFFBBBBBB : 0xFF000000 | rgb;
     }
@@ -176,7 +177,7 @@ public class IpodFullscreenScreen extends Screen {
                     : IpodPlayer.getNowPlayingSubtitle().getString();
             g.drawCenteredString(this.font, fit(subtitle, this.width - 20), this.width / 2, textY + 20, muted ? accent : 0xFFAAAAAA);
 
-            drawTimeBar(g);
+            drawTimeBar(g, mouseX, mouseY);
             drawButtons(g, mouseX, mouseY);
         }
         drawVolume(g);
@@ -224,12 +225,23 @@ public class IpodFullscreenScreen extends Screen {
     }
 
     // only when the source knows where it is and how long the track is (not a disc on a held iPod)
-    private void drawTimeBar(GuiGraphics g) {
+    private void drawTimeBar(GuiGraphics g, int mouseX, int mouseY) {
         IpodPlayer.Timeline time = IpodPlayer.timeline();
         if (time == null) return;
         float done = (float) (time.seconds() / time.length());
         g.fill(barX, barY, barX + barW, barY + 3, 0x66FFFFFF);
         g.fill(barX, barY, barX + (int) (barW * done), barY + 3, accent);
+        if (onTimeBar(mouseX, mouseY) && IpodPlayer.canSkipSeconds() && !IpodPlayer.isPaused()) {
+            // where a click would jump to: a marker on the bar and its time under it, on a dark box over the
+            // elapsed / remaining times (above the bar is the album line)
+            int x = Mth.clamp(mouseX, barX, barX + barW - 1);
+            g.fill(x, barY - 2, x + 1, barY + 5, 0xFFFFFFFF);
+            String at = formatTime(time.length() * (x - barX) / barW);
+            int w = this.font.width(at) + 4;
+            int boxX = Mth.clamp(x - w / 2, barX, barX + barW - w);
+            g.fill(boxX, barY + 4, boxX + w, barY + 14, 0xE0101010);
+            g.drawString(this.font, at, boxX + 2, barY + 5, 0xFFFFFFFF, false);
+        }
         g.drawString(this.font, formatTime(time.seconds()), barX, barY + 5, 0xFFAAAAAA, false);
         String left = "-" + formatTime(time.length() - time.seconds());
         g.drawString(this.font, left, barX + barW - this.font.width(left), barY + 5, 0xFFAAAAAA, false);
@@ -570,6 +582,11 @@ public class IpodFullscreenScreen extends Screen {
     // Mouse and keyboard
     // =====================================================================
 
+    // the time bar and a few pixels above and below it, so the thin bar is easy to hit
+    private boolean onTimeBar(double mouseX, double mouseY) {
+        return mouseX >= barX && mouseX < barX + barW && mouseY >= barY - 3 && mouseY < barY + 6;
+    }
+
     private boolean onButton(int x, double mouseX, double mouseY) {
         return mouseX >= x && mouseX < x + buttonSize && mouseY >= buttonsY && mouseY < buttonsY + buttonSize;
     }
@@ -636,7 +653,14 @@ public class IpodFullscreenScreen extends Screen {
             }
         }
 
-        // 5) a click on the volume bar (or a little above or below it) sets the volume there
+        // 5) a click on the time bar jumps there (a file or a dock list; not while paused, like hold to skip)
+        if (IpodPlayer.hasTrack() && onTimeBar(mouseX, mouseY)) {
+            IpodPlayer.Timeline time = IpodPlayer.timeline();
+            if (time != null) IpodPlayer.seekTo(time.length() * (mouseX - barX) / barW);
+            return true;
+        }
+
+        // 6) a click on the volume bar (or a little above or below it) sets the volume there
         if (mouseX >= volumeX && mouseX <= volumeX + volumeW && mouseY >= volumeY - 4 && mouseY <= volumeY + 7) {
             IpodVolume.set((float) ((mouseX - volumeX) / volumeW));
             return true;

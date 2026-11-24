@@ -600,10 +600,8 @@ public class IpodScreen extends Screen {
             g.fill(r - PX, DISPLAY_Y, r, DISPLAY_Y + PX, frame);
             g.fill(DISPLAY_X, b - PX, DISPLAY_X + PX, b, frame);
             g.fill(r - PX, b - PX, r, b, frame);
-            // the header strip, see-through in the iPod's colour (between the corners, which stay frame-black)
-            int band = 0xA0000000 | color.tint();
-            g.fill(DISPLAY_X + PX, DISPLAY_Y, r - PX, DISPLAY_Y + PX, band);
-            g.fill(DISPLAY_X, DISPLAY_Y + PX, r, LIST_Y, band);
+            // the picture goes on behind the header; a thin line in the iPod's colour marks where the header ends
+            g.fill(DISPLAY_X, LIST_Y - 1, r, LIST_Y, IpodFullscreenScreen.readableAccent(color.tint()));
         }
         int headerText = headerTextColor();
 
@@ -631,14 +629,14 @@ public class IpodScreen extends Screen {
                 ? this.font.plainSubstrByWidth(title.getString(), titleRoom, true) // the end of a long query
                 : fit(title.getString(), titleRoom);
         if (!muted.isEmpty()) {
-            g.drawString(this.font, muted, right - 8 - this.font.width(muted), DISPLAY_Y + (HEADER_H - 8) / 2, headerText, false);
+            g.drawString(this.font, muted, right - 8 - this.font.width(muted), DISPLAY_Y + (HEADER_H - 8) / 2, headerText, wallpaperShown);
         }
-        g.drawString(this.font, shownTitle, left, DISPLAY_Y + (HEADER_H - 8) / 2, headerText, false);
+        g.drawString(this.font, shownTitle, left, DISPLAY_Y + (HEADER_H - 8) / 2, headerText, wallpaperShown);
         if (LibraryCache.get().scanning() && page != Page.TRACKS && page != Page.CHAPTERS && page != Page.SETTINGS
                 && page != Page.CONFIRM_RESET) {
             // a library scan is running: animated dots after the title
             String dots = ".".repeat(1 + (int) ((Util.getMillis() / 400) % 3));
-            g.drawString(this.font, dots, left + this.font.width(shownTitle) + 2, DISPLAY_Y + (HEADER_H - 8) / 2, headerText, false);
+            g.drawString(this.font, dots, left + this.font.width(shownTitle) + 2, DISPLAY_Y + (HEADER_H - 8) / 2, headerText, wallpaperShown);
         }
         drawStatusIcon(g, right - 5);
 
@@ -755,14 +753,18 @@ public class IpodScreen extends Screen {
     // A small triangle while playing, two bars while paused, nothing when idle
     private void drawStatusIcon(GuiGraphics g, int x) {
         if (!IpodPlayer.isPlaying()) return;
-        int color = headerTextColor();
+        if (wallpaperShown) drawStatusShape(g, x + 1, STATUS_ICON_Y + 1, 0xFF3F3F3F); // a shadow, like the text's
+        drawStatusShape(g, x, STATUS_ICON_Y, headerTextColor());
+    }
+
+    private void drawStatusShape(GuiGraphics g, int x, int y, int color) {
         if (IpodPlayer.isPaused()) {
-            g.fill(x, STATUS_ICON_Y, x + 2, STATUS_ICON_Y + 5, color);
-            g.fill(x + 3, STATUS_ICON_Y, x + 5, STATUS_ICON_Y + 5, color);
+            g.fill(x, y, x + 2, y + 5, color);
+            g.fill(x + 3, y, x + 5, y + 5, color);
         } else {
             for (int i = 0; i < 5; i++) {
                 int width = Math.min(i, 4 - i) + 1;
-                g.fill(x, STATUS_ICON_Y + i, x + width, STATUS_ICON_Y + i + 1, color);
+                g.fill(x, y + i, x + width, y + i + 1, color);
             }
         }
     }
@@ -789,12 +791,9 @@ public class IpodScreen extends Screen {
         }
     }
 
-    // The header's text colour: the artwork's dark blue, or white on the strip of a dark iPod over a wallpaper
+    // The header's text colour: the artwork's dark blue, or white (drawn with a shadow) over a wallpaper
     private int headerTextColor() {
-        if (!wallpaperShown) return 0xFF0A2A66;
-        int rgb = color.tint();
-        int r = (rgb >> 16) & 0xFF, gr = (rgb >> 8) & 0xFF, b = rgb & 0xFF;
-        return (r * 299 + gr * 587 + b * 114) / 1000 < 140 ? 0xFFFFFFFF : 0xFF0A2A66; // perceived brightness
+        return wallpaperShown ? 0xFFFFFFFF : 0xFF0A2A66;
     }
 
     // Cuts text short with "..." so it fits in the given width

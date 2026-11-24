@@ -116,15 +116,42 @@ public class IpodPlayer {
     @Nullable
     public static Timeline timeline() {
         if (DockControl.isActive()) return DockControl.timeline(); // the dock plays: the server's clock knows
-        if (!started || !(current instanceof IpodSoundInstance sound) || !sound.isFile()) return null;
+        if (!(current instanceof IpodSoundInstance sound) || !sound.isFile()) return null;
         double end = currentItemEnd; // a chapter inside a longer file ends here; -1 = at the end of the file
         PcmAudioStream stream = sound.stream();
         if (end < 0 && stream != null && stream.lengthFrames() > 0) {
             end = (double) stream.lengthFrames() / stream.sampleRate();
         }
-        double length = end - currentItemStart;
+        double length = end >= 0 ? end - currentItemStart : -1;
+        String key = currentItemKey;
+        if (started && length > 0) {
+            knownLength = length;
+            knownLengthKey = key;
+        } else if (key != null && key.equals(knownLengthKey)) {
+            // the same item restarting at another second (hold to skip, a click on the time bar): its new decoder
+            // is not open yet, so keep the length it had and the bar does not blink away
+            length = knownLength;
+        } else if (!started) {
+            return null;
+        }
         if (length <= 0) return null;
         return new Timeline(Math.clamp(positionSeconds() - currentItemStart, 0, length), length);
+    }
+
+    // the length of the item that played last, kept while that item restarts at another second (see timeline)
+    private static double knownLength = -1;
+    @Nullable
+    private static String knownLengthKey;
+
+    /**
+     * Jumps to this second of the playing track, counted from the track's (or chapter's) start: a click on the
+     * fullscreen view's time bar. Works like {@link #skipSeconds}: ignored while paused, the end counts as finished.
+     */
+    public static void seekTo(double seconds) {
+        Timeline time = timeline();
+        if (time == null || !canSkipSeconds()) return;
+        double delta = Math.clamp(seconds, 0, time.length()) - time.seconds();
+        if (Math.abs(delta) >= 0.25) skipSeconds(delta);
     }
 
     public static Component getNowPlaying() {
