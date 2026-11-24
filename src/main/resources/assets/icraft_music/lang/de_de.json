@@ -173,8 +173,16 @@
   "manual.icraft_music.settings.keys.1": "§l%s§r Play / Pause\n§l%s§r weiter\n§l%s§r zurück\n§l%s§r alles stumm / laut",
   "manual.icraft_music.settings.keys.2": "Sie funktionieren, ohne den iPod zu öffnen. Ändern kannst du sie unter Optionen > Steuerung, bei iCraft.",
   "manual.icraft_music.settings.ipod.title": "iPod-Einstellungen",
-  "manual.icraft_music.settings.ipod.1": "Menü > Einstellungen: Zufall, Wiederholen (aus / Liste / Titel), Bass, Weltgeräusche, Stereo-Lautsprecher, Spielmusik stumm, Geteilte Downloads, Dock-Anzeige und Kopfhörer. Bass und Weltgeräusche ändern nur, was du hörst; Weltgeräusche macht Blöcke, Schritte, Mobs, Wetter, Plattenspieler und andere Docks leiser, während Musik bei dir selbst läuft.",
+  "manual.icraft_music.settings.ipod.1": "Menü > Einstellungen: Zufall, Wiederholen (aus / Liste / Titel), Bass, Weltgeräusche, Stereo-Lautsprecher, Spielmusik stumm, Geteilte Downloads, Dock-Anzeige, Kopfhörer und Hintergrundbild. Bass und Weltgeräusche ändern nur, was du hörst; Weltgeräusche macht Blöcke, Schritte, Mobs, Wetter, Plattenspieler und andere Docks leiser, während Musik bei dir selbst läuft.",
   "manual.icraft_music.settings.ipod.2": "Die letzte Zeile, Auf Standard zurücksetzen, fragt erst nach und stellt dann alles zurück (nicht die Lautstärke).",
   "manual.icraft_music.settings.colours.title": "Farben",
-  "manual.icraft_music.settings.colours.1": "Stelle einen iPod zusammen mit einem Farbstoff her, um seine Farbe zu ändern. Platten, Verbindung und Name bleiben."
+  "manual.icraft_music.settings.colours.1": "Stelle einen iPod zusammen mit einem Farbstoff her, um seine Farbe zu ändern. Platten, Verbindung und Name bleiben.",
+  "screen.icraft_music.ipod.wallpaper": "Hintergrundbild",
+  "screen.icraft_music.fullscreen": "iPod (Vollbild)",
+  "screen.icraft_music.fullscreen.hint": "Doppelklick für Vollbild",
+  "screen.icraft_music.fullscreen.back": "Doppelklick hier oder Esc für zurück",
+  "screen.icraft_music.fullscreen.nothing": "Es läuft nichts",
+  "screen.icraft_music.fullscreen.volume": "Lautstärke",
+  "manual.icraft_music.start.wheel.3": "Doppelklick oben auf den iPod (über dem Bildschirm) öffnet die Vollbildansicht: großes Cover, Zeit, große Tasten und Lautstärke. Leertaste spielt oder pausiert, die Pfeiltasten springen und ändern die Lautstärke, Esc geht zurück.",
+  "manual.icraft_music.settings.ipod.3": "Hintergrundbild zeigt dein eigenes Bild hinter dem Bildschirm des iPods und in der Vollbildansicht: lege eine Datei wallpaper.png oder wallpaper.jpg in den Ordner ipod in deinem Spielordner. Nur du siehst es."
 }

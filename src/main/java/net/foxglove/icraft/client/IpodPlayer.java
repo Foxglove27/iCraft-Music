@@ -106,6 +106,27 @@ public class IpodPlayer {
     // direction of the last skip (-1 = Previous): a broken track then skips further back, not forward
     private static int lastStep = 1;
 
+    /** Where the playing track is and how long it is, both in seconds from the track's own start (B23). */
+    public record Timeline(double seconds, double length) {}
+
+    /**
+     * The position and length of what plays, for the fullscreen time bar, or null when the source does not tell
+     * (nothing plays, it is still loading, or a disc on a held iPod, which the game streams itself).
+     */
+    @Nullable
+    public static Timeline timeline() {
+        if (DockControl.isActive()) return DockControl.timeline(); // the dock plays: the server's clock knows
+        if (!started || !(current instanceof IpodSoundInstance sound) || !sound.isFile()) return null;
+        double end = currentItemEnd; // a chapter inside a longer file ends here; -1 = at the end of the file
+        PcmAudioStream stream = sound.stream();
+        if (end < 0 && stream != null && stream.lengthFrames() > 0) {
+            end = (double) stream.lengthFrames() / stream.sampleRate();
+        }
+        double length = end - currentItemStart;
+        if (length <= 0) return null;
+        return new Timeline(Math.clamp(positionSeconds() - currentItemStart, 0, length), length);
+    }
+
     public static Component getNowPlaying() {
         return DockControl.isActive() ? DockControl.currentName() : currentName;
     }

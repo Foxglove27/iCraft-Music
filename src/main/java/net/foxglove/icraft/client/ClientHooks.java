@@ -51,11 +51,12 @@ public class ClientHooks {
         // the GUI skin depends on the iPod's colour
         IpodColor color = ipod.getItem() instanceof IpodItem item ? item.getColor() : IpodColor.WHITE;
         LibraryCache.refreshIfStale(); // the lists on the screen update themselves when the scan is done
+        if (IpodSettings.wallpaper()) net.foxglove.icraft.client.audio.Wallpaper.refresh(); // a new or changed picture
         Minecraft.getInstance().setScreen(new IpodScreen(
                 IpodItem.getDiscs(ipod),
                 dock,
                 dockOwner,
-                color.guiTexture(),
+                color,
                 ipod.get(ModDataComponents.IPOD_ID.get())));
     }
 

@@ -138,6 +138,29 @@ public final class DockControl {
         return dock.getPlayback().positionTicks(Minecraft.getInstance().level.getGameTime()) / 20.0;
     }
 
+    /** Position and length of the track the dock plays (a shared file or a disc), or null (B23). */
+    @Nullable
+    public static IpodPlayer.Timeline timeline() {
+        DockBlockEntity dock = active();
+        Minecraft mc = Minecraft.getInstance();
+        if (dock == null || mc.level == null) return null;
+        DockPlayback pb = dock.getPlayback();
+        assert pb != null; // active() only returns a dock that plays
+        int index = pb.currentDisc();
+        double length;
+        if (dock.isFilesMode()) {
+            List<QueueEntry> queue = dock.getQueue();
+            if (index < 0 || index >= queue.size()) return null;
+            length = queue.get(index).playTicks() / 20.0;
+        } else { // a disc: its length is part of the disc's song (a data-driven registry entry)
+            length = JukeboxSong.fromStack(mc.level.registryAccess(), currentDiscStack())
+                    .map(song -> (double) song.value().lengthInSeconds()).orElse(-1.0);
+        }
+        if (length <= 0) return null;
+        double seconds = pb.positionTicks(mc.level.getGameTime()) / 20.0;
+        return new IpodPlayer.Timeline(Math.clamp(seconds, 0, length), length);
+    }
+
     public static Component currentSubtitle() {
         FileItem item = currentItem();
         return item != null ? item.album() : Component.translatable("screen.icraft_music.ipod.discs");

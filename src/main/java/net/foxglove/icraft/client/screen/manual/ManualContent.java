@@ -48,7 +48,7 @@ public final class ManualContent {
         list.add(chapter("start",
                 page("start", "welcome", text("start.welcome.1"), text("start.welcome.2")),
                 page("start", "ipod", new ManualBlock.Recipe("ipod"), text("start.ipod.1")),
-                page("start", "wheel", new ManualBlock.Wheel(key("start.wheel.1")), text("start.wheel.2"))));
+                page("start", "wheel", new ManualBlock.Wheel(key("start.wheel.1")), text("start.wheel.2"), text("start.wheel.3"))));
 
         list.add(chapter("music",
                 page("music", "folders", text("music.folders.1"), text("music.folders.2"), text("music.folders.3")),
@@ -80,7 +80,7 @@ public final class ManualContent {
                         ModKeyMappings.PLAY_PAUSE.getTranslatedKeyMessage(), ModKeyMappings.NEXT.getTranslatedKeyMessage(),
                         ModKeyMappings.PREVIOUS.getTranslatedKeyMessage(), ModKeyMappings.MUTE_FOR_ME.getTranslatedKeyMessage()}),
                         text("settings.keys.2")),
-                page("settings", "ipod", text("settings.ipod.1"), text("settings.ipod.2")),
+                page("settings", "ipod", text("settings.ipod.1"), text("settings.ipod.3"), text("settings.ipod.2")),
                 page("settings", "colours", new ManualBlock.Items(() -> Arrays.stream(IpodColor.values())
                         .map(c -> new ItemStack(ModItems.IPODS.get(c).get())).toList()), text("settings.colours.1"))));
 

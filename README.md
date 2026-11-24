@@ -38,6 +38,7 @@ ipod/
     My Book/              chapters as files, or one .m4b with chapter markers
   podcasts/
     My Show/              episodes as files
+  wallpaper.png           optional: your own picture behind the iPod's screen (Settings > Wallpaper; .jpg works too)
 ```
 
 4. Right-click the iPod and pick Music, Audiobooks, Podcasts or Search.
@@ -50,7 +51,7 @@ ipod/
 
 Most players never need these; the in-game manual leaves them out.
 
-- `config/icraft_music-client.toml` (your own game): `volume`, `shuffle`, `repeat` (`OFF`, `LIST`, `ONE`) `bassBoost` (`OFF`, `LOW`, `MEDIUM`, `HIGH`) and `worldSounds` (`NORMAL`, `QUIETER`, `QUIET`, `VERY_QUIET`: how loud the world stays while music plays on you) `stereoSpeakers` (speakers left and right of a dock play the left and right channel, default on), `silenceBackgroundMusic` (the game's own music stops while iCraft plays for you, default on) and `downloadSharedFiles` (see File sharing) and `dockDisplay` (the label above a playing dock, default on) are all also set in the iPod's Settings, which has a "Reset to defaults" row (everything except the volume). The extra folders above are only in the file.
+- `config/icraft_music-client.toml` (your own game): `volume`, `shuffle`, `repeat` (`OFF`, `LIST`, `ONE`) `bassBoost` (`OFF`, `LOW`, `MEDIUM`, `HIGH`) and `worldSounds` (`NORMAL`, `QUIETER`, `QUIET`, `VERY_QUIET`: how loud the world stays while music plays on you) `stereoSpeakers` (speakers left and right of a dock play the left and right channel, default on), `silenceBackgroundMusic` (the game's own music stops while iCraft plays for you, default on) and `downloadSharedFiles` (see File sharing) and `dockDisplay` (the label above a playing dock, default on), `showHeadphones` (headphones on listening players, default on) and `wallpaper` (your own picture `ipod/wallpaper.png` or `.jpg` behind the iPod's screen and in the fullscreen view, default off) are all also set in the iPod's Settings, which has a "Reset to defaults" row (everything except the volume). The extra folders above are only in the file.
 - `serverconfig/icraft_music-server.toml` (in the world folder, set by the server owner): `giveManualOnFirstJoin` (default on) and the file sharing settings below.
 
 ## Controls

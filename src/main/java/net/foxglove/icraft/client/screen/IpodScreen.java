@@ -10,6 +10,8 @@ import net.foxglove.icraft.client.audio.AudiobookProgress;
 import net.foxglove.icraft.client.audio.CoverArt;
 import net.foxglove.icraft.client.audio.LibraryCache;
 import net.foxglove.icraft.client.audio.LocalMusic;
+import net.foxglove.icraft.client.audio.Wallpaper;
+import net.foxglove.icraft.item.IpodColor;
 import net.minecraft.Util;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.GlobalPos;
@@ -76,6 +78,10 @@ public class IpodScreen extends Screen {
     // Two clicks on the middle button closer together than this count as a double-click
     private static final long DOUBLE_CLICK_MS = 350;
 
+    // When the top of the iPod (above the display) was clicked last, for the double-click that opens the
+    // fullscreen view (B23). -1 = no click is waiting.
+    private long lastTopClick = -1;
+
     // When a single click on the middle button is waiting to see if a second one follows,
     // this is the time (in milliseconds) when we give up waiting. -1 means nothing is waiting.
     private long pendingActivateAt = -1;
@@ -126,8 +132,9 @@ public class IpodScreen extends Screen {
     private static final int SETTING_DOWNLOADS = 6;
     private static final int SETTING_DOCK_DISPLAY = 7;
     private static final int SETTING_HEADPHONES = 8;
-    private static final int SETTING_RESET = 9; // opens the confirmation page
-    private static final int SETTING_ROWS = 10;
+    private static final int SETTING_WALLPAPER = 9;
+    private static final int SETTING_RESET = 10; // opens the confirmation page
+    private static final int SETTING_ROWS = 11;
     // the confirmation page for the reset: Cancel first, so a hasty click changes nothing
     private static final int CONFIRM_CANCEL = 0;
     private static final int CONFIRM_RESET_ROW = 1;
@@ -137,6 +144,7 @@ public class IpodScreen extends Screen {
     @Nullable
     private final GlobalPos dock; // the dock this iPod sits in, or null when the player holds it
     private final boolean dockOwner; // only the player who docked the iPod controls the dock
+    private final IpodColor color;       // this iPod's colour (the fullscreen view uses it as its accent)
     private final ResourceLocation skin; // the GUI texture for this iPod's colour
     private final List<AlbumView> albums = new ArrayList<>();
     private final List<AlbumView> nas = new ArrayList<>();
@@ -238,9 +246,10 @@ public class IpodScreen extends Screen {
     private LibraryCache.Snapshot shown = LibraryCache.get(); // the scan the lists were built from
 
     public IpodScreen(List<ItemStack> discs, @Nullable GlobalPos dock, boolean dockOwner,
-                      ResourceLocation skin, @Nullable UUID ipod) {
+                      IpodColor color, @Nullable UUID ipod) {
         super(Component.translatable("screen.icraft_music.ipod"));
-        this.skin = skin;
+        this.color = color;
+        this.skin = color.guiTexture();
         this.dock = dock;
         this.dockOwner = dockOwner;
         this.discs = discs;
@@ -554,6 +563,11 @@ public class IpodScreen extends Screen {
         drawDisplay(g);
 
         g.pose().popPose();
+
+        // 3) a hint while the mouse is over the top of the iPod: double-click there for the fullscreen view
+        if (settled() && onTop(localX(mouseX), localY(mouseY))) {
+            g.renderTooltip(this.font, Component.translatable("screen.icraft_music.fullscreen.hint"), mouseX, mouseY);
+        }
     }
 
     private void drawDisplay(GuiGraphics g) {
@@ -607,6 +621,11 @@ public class IpodScreen extends Screen {
                             : isPodcastSection() ? "screen.icraft_music.ipod.no_podcasts"
                             : "screen.icraft_music.ipod.no_books"),
                     left, LIST_Y + 3, right - left, 0xFFFFFFFF);
+        }
+
+        // Your own picture behind the rows (B22); the header strip stays as it is
+        if (IpodSettings.wallpaper()) {
+            Wallpaper.draw(g, DISPLAY_X + 1, LIST_Y, DISPLAY_W - 2, DISPLAY_Y + DISPLAY_H - LIST_Y, 0x90);
         }
 
         // The rows
@@ -797,16 +816,18 @@ public class IpodScreen extends Screen {
                     Component.translatable("screen.icraft_music.ipod.bass." + IpodSettings.bassBoost().name().toLowerCase(Locale.ROOT)));
         }
         if (index == SETTING_STEREO || index == SETTING_GAME_MUSIC || index == SETTING_DOWNLOADS
-                || index == SETTING_DOCK_DISPLAY || index == SETTING_HEADPHONES) {
+                || index == SETTING_DOCK_DISPLAY || index == SETTING_HEADPHONES || index == SETTING_WALLPAPER) {
             boolean on = index == SETTING_STEREO ? IpodSettings.stereoSpeakers()
                     : index == SETTING_GAME_MUSIC ? IpodSettings.silenceBackgroundMusic()
                     : index == SETTING_DOWNLOADS ? IpodSettings.downloadSharedFiles()
-                    : index == SETTING_HEADPHONES ? IpodSettings.showHeadphones() : IpodSettings.dockDisplay();
+                    : index == SETTING_HEADPHONES ? IpodSettings.showHeadphones()
+                    : index == SETTING_WALLPAPER ? IpodSettings.wallpaper() : IpodSettings.dockDisplay();
             return Component.translatable("screen.icraft_music.ipod.setting",
                     Component.translatable(index == SETTING_STEREO ? "screen.icraft_music.ipod.stereo"
                             : index == SETTING_GAME_MUSIC ? "screen.icraft_music.ipod.game_music"
                             : index == SETTING_DOWNLOADS ? "screen.icraft_music.ipod.downloads"
-                            : index == SETTING_HEADPHONES ? "screen.icraft_music.ipod.headphones" : "screen.icraft_music.ipod.dock_display"),
+                            : index == SETTING_HEADPHONES ? "screen.icraft_music.ipod.headphones"
+                            : index == SETTING_WALLPAPER ? "screen.icraft_music.ipod.wallpaper" : "screen.icraft_music.ipod.dock_display"),
                     Component.translatable(on ? "screen.icraft_music.ipod.on" : "screen.icraft_music.ipod.off"));
         }
         if (index == SETTING_RESET) return Component.translatable("screen.icraft_music.ipod.reset");
@@ -914,6 +935,8 @@ public class IpodScreen extends Screen {
                     IpodSettings.toggleDockDisplay();
                 } else if (selected == SETTING_HEADPHONES) {
                     IpodSettings.toggleShowHeadphones();
+                } else if (selected == SETTING_WALLPAPER) {
+                    IpodSettings.toggleWallpaper();
                 } else if (selected == SETTING_RESET) {
                     goTo(Page.CONFIRM_RESET, CONFIRM_CANCEL); // ask first
                 } else {
@@ -1008,6 +1031,18 @@ public class IpodScreen extends Screen {
         return (mouseY - this.height / 2.0) / fitScale() + BODY_H / 2.0;
     }
 
+    // The iPod's body above the display (in iPod coordinates): double-clicked, it opens the fullscreen view
+    private static boolean onTop(double x, double y) {
+        return x >= 0 && x < BODY_W && y >= 0 && y < DISPLAY_Y;
+    }
+
+    // Opens the fullscreen view. This screen stays the parent, so Esc there comes back here without the
+    // slide-in: the animation only depends on 'animStart', which is set once in the constructor.
+    private void openFullscreen() {
+        assert this.minecraft != null;
+        this.minecraft.setScreen(new IpodFullscreenScreen(this, color));
+    }
+
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
         if (button != 0 || !settled()) {
@@ -1026,6 +1061,19 @@ public class IpodScreen extends Screen {
         if (!onMiddle) {
             pendingActivateAt = -1;
         }
+
+        // The top of the iPod: two clicks within DOUBLE_CLICK_MS open the fullscreen view; one click does nothing
+        if (onTop(x, y)) {
+            long now = Util.getMillis();
+            if (lastTopClick >= 0 && now - lastTopClick <= DOUBLE_CLICK_MS) {
+                lastTopClick = -1;
+                openFullscreen();
+            } else {
+                lastTopClick = now;
+            }
+            return true;
+        }
+        lastTopClick = -1; // a click anywhere else breaks a double-click
 
         // A click on one of the rows
         if (x >= DISPLAY_X && x < DISPLAY_X + DISPLAY_W && y >= LIST_Y && y < LIST_Y + ROWS * ROW_H) {

@@ -173,8 +173,16 @@
   "manual.icraft_music.settings.keys.1": "§l%s§r play / pause\n§l%s§r next\n§l%s§r previous\n§l%s§r mute / unmute everything",
   "manual.icraft_music.settings.keys.2": "They work without opening the iPod. Change them in Options > Controls, under iCraft.",
   "manual.icraft_music.settings.ipod.title": "iPod settings",
-  "manual.icraft_music.settings.ipod.1": "Menu > Settings: Shuffle, Repeat (off / list / one), Bass Boost, World sounds, Stereo speakers, Mute game music, Shared downloads, Dock display and Headphones. Bass Boost and World sounds only change what you hear; World sounds makes blocks, steps, mobs, weather, jukeboxes and other docks quieter while music plays on yourself.",
+  "manual.icraft_music.settings.ipod.1": "Menu > Settings: Shuffle, Repeat (off / list / one), Bass Boost, World sounds, Stereo speakers, Mute game music, Shared downloads, Dock display, Headphones and Wallpaper. Bass Boost and World sounds only change what you hear; World sounds makes blocks, steps, mobs, weather, jukeboxes and other docks quieter while music plays on yourself.",
   "manual.icraft_music.settings.ipod.2": "The last row, Reset to defaults, asks first and then sets every setting back (not the volume).",
   "manual.icraft_music.settings.colours.title": "Colours",
-  "manual.icraft_music.settings.colours.1": "Craft an iPod together with a dye to change its colour. Its discs, link and name stay."
+  "manual.icraft_music.settings.colours.1": "Craft an iPod together with a dye to change its colour. Its discs, link and name stay.",
+  "screen.icraft_music.ipod.wallpaper": "Wallpaper",
+  "screen.icraft_music.fullscreen": "iPod (fullscreen)",
+  "screen.icraft_music.fullscreen.hint": "Double-click for fullscreen",
+  "screen.icraft_music.fullscreen.back": "Double-click here or press Esc to go back",
+  "screen.icraft_music.fullscreen.nothing": "Nothing is playing",
+  "screen.icraft_music.fullscreen.volume": "Volume",
+  "manual.icraft_music.start.wheel.3": "Double-click the top of the iPod (above the screen) for the fullscreen view: a big cover, the time, large buttons and the volume. Space plays or pauses, the arrow keys skip and change the volume, Esc goes back.",
+  "manual.icraft_music.settings.ipod.3": "Wallpaper shows your own picture behind the iPod's screen and in the fullscreen view: put a file called wallpaper.png or wallpaper.jpg into the ipod folder of your game folder. Only you see it."
 }

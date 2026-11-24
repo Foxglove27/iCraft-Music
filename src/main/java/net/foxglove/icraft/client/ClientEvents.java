@@ -38,6 +38,7 @@ public class ClientEvents {
         IpodMute.reset();
         HeadphonesSender.reset();
         net.foxglove.icraft.client.audio.CoverArt.clear();
+        net.foxglove.icraft.client.audio.Wallpaper.clear();
         net.foxglove.icraft.client.share.SharedFiles.reset();
         net.foxglove.icraft.client.share.FileUploader.reset();
         DockControl.forgetWorld();

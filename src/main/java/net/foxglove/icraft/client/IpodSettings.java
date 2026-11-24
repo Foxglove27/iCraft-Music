@@ -126,6 +126,16 @@ public class IpodSettings {
         flip(ClientConfig.SHOW_HEADPHONES);
     }
 
+    /** Your own picture behind the iPod's display (B22). */
+    public static boolean wallpaper() {
+        return flag(ClientConfig.WALLPAPER);
+    }
+
+    public static void toggleWallpaper() {
+        flip(ClientConfig.WALLPAPER);
+        if (wallpaper()) net.foxglove.icraft.client.audio.Wallpaper.refresh(); // read the picture now, not only on the next open
+    }
+
     private static boolean flag(net.neoforged.neoforge.common.ModConfigSpec.BooleanValue value) {
         try {
             return value.get();
@@ -157,6 +167,7 @@ public class IpodSettings {
         ClientConfig.DOWNLOAD_SHARED_FILES.set(ClientConfig.DOWNLOAD_SHARED_FILES.getDefault());
         ClientConfig.DOCK_DISPLAY.set(ClientConfig.DOCK_DISPLAY.getDefault());
         ClientConfig.SHOW_HEADPHONES.set(ClientConfig.SHOW_HEADPHONES.getDefault());
+        ClientConfig.WALLPAPER.set(ClientConfig.WALLPAPER.getDefault());
         changed = true;
         save(); // also writes the four switches above
         if (shuffle != shuffleWas) IpodPlayer.shuffleChanged();

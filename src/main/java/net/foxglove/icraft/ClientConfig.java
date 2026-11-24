@@ -46,6 +46,11 @@ public class ClientConfig {
             .comment("Show headphones on players while music plays on them (also in the iPod's Settings)")
             .define("showHeadphones", true);
 
+    public static final ModConfigSpec.BooleanValue WALLPAPER = BUILDER
+            .comment("Draw your own picture, <game folder>/ipod/wallpaper.png (or .jpg), behind the rows of the iPod's",
+                    "display and in its fullscreen view (also in the iPod's Settings)")
+            .define("wallpaper", false);
+
     public static final ModConfigSpec.ConfigValue<java.util.List<? extends String>> EXTRA_MUSIC_FOLDERS = BUILDER
             .comment("Extra folders to read music from, in addition to <game folder>/ipod/music (for example a mounted",
                     "network share). Absolute paths, or relative to the game folder. A share must be mounted first",
