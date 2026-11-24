@@ -183,6 +183,10 @@
   "screen.icraft_music.fullscreen.back": "Doppelklick hier oder Esc für zurück",
   "screen.icraft_music.fullscreen.nothing": "Es läuft nichts",
   "screen.icraft_music.fullscreen.volume": "Lautstärke",
-  "manual.icraft_music.start.wheel.3": "Doppelklick oben auf den iPod (über dem Bildschirm) öffnet die Vollbildansicht: großes Cover, Zeit, große Tasten und Lautstärke. Leertaste spielt oder pausiert, die Pfeiltasten springen und ändern die Lautstärke, Esc geht zurück.",
-  "manual.icraft_music.settings.ipod.3": "Hintergrundbild zeigt dein eigenes Bild hinter dem Bildschirm des iPods und in der Vollbildansicht: lege eine Datei wallpaper.png oder wallpaper.jpg in den Ordner ipod in deinem Spielordner. Nur du siehst es."
+  "screen.icraft_music.fullscreen.search": "Suchen...",
+  "screen.icraft_music.fullscreen.wallpaper": "Hintergrund",
+  "screen.icraft_music.fullscreen.wallpaper.none": "Keins",
+  "screen.icraft_music.fullscreen.wallpaper.empty": "Bilder in ipod/wallpaper legen",
+  "manual.icraft_music.start.wheel.3": "Doppelklick oben auf den iPod (über dem Bildschirm) öffnet die Vollbildansicht: großes Cover, Zeit, große Tasten und Lautstärke. Leertaste spielt oder pausiert, die Pfeiltasten wechseln den Titel und ändern die Lautstärke, und Gedrückthalten von Zurück oder Weiter (oder der Pfeiltaste) springt 10 Sekunden. Die Tasten links und rechts davon schalten Zufall und Wiederholen. Die Suche oben links spielt, was du anklickst. Esc geht zurück.",
+  "manual.icraft_music.settings.ipod.3": "Hintergrundbild zeigt dein eigenes Bild hinter dem Bildschirm des iPods und in der Vollbildansicht: lege .png- oder .jpg-Bilder in den Ordner wallpaper im Ordner ipod deines Spielordners und wähle eins mit der Taste Hintergrund oben rechts in der Vollbildansicht. Nur du siehst es."
 }

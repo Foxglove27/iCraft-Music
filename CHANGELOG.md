@@ -4,12 +4,14 @@
 
 ### Added
 - **Fullscreen view**: double-click the top of the iPod (above the screen) for a big now-playing view with the cover,
-  title, album, a time bar, large previous / play-pause / next buttons and the volume. Space plays or pauses, the arrow
-  keys skip and change the volume, Esc or a double-click on the top strip goes back. Works for your own music,
-  audiobooks, discs and your dock.
-- **Wallpaper**: put a picture called `wallpaper.png` or `wallpaper.jpg` into the `ipod` folder of your game folder and
-  switch on Settings > Wallpaper: it shows behind the rows of the iPod's screen and in the fullscreen view (cropped to
-  fit, darkened so the text stays readable). Only you see it. Also `wallpaper` in `icraft_music-client.toml`.
+  title, album, a time bar, large shuffle / previous / play-pause / next / repeat buttons and the volume. Hold previous
+  or next (or the arrow keys) to skip 10 seconds. A search bar in the top left plays what you click. Space plays or
+  pauses, Esc or a double-click on the top strip goes back. Works for your own music, audiobooks, discs and your dock.
+- **Wallpaper**: put pictures (.png or .jpg) into the `ipod/wallpaper` folder of your game folder and choose one with
+  the Wallpaper button at the top right of the fullscreen view (or switch it on in Settings > Wallpaper). It fills the
+  iPod's screen, with the header as a see-through strip in your iPod's colour, and the fullscreen view (cropped to fit,
+  darkened so the text stays readable). Only you see it. Also `wallpaper` and `wallpaperFile` in
+  `icraft_music-client.toml`.
 
 ## [0.5.1]
 

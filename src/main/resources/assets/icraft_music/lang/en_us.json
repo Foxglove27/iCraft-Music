@@ -183,6 +183,10 @@
   "screen.icraft_music.fullscreen.back": "Double-click here or press Esc to go back",
   "screen.icraft_music.fullscreen.nothing": "Nothing is playing",
   "screen.icraft_music.fullscreen.volume": "Volume",
-  "manual.icraft_music.start.wheel.3": "Double-click the top of the iPod (above the screen) for the fullscreen view: a big cover, the time, large buttons and the volume. Space plays or pauses, the arrow keys skip and change the volume, Esc goes back.",
-  "manual.icraft_music.settings.ipod.3": "Wallpaper shows your own picture behind the iPod's screen and in the fullscreen view: put a file called wallpaper.png or wallpaper.jpg into the ipod folder of your game folder. Only you see it."
+  "screen.icraft_music.fullscreen.search": "Search...",
+  "screen.icraft_music.fullscreen.wallpaper": "Wallpaper",
+  "screen.icraft_music.fullscreen.wallpaper.none": "None",
+  "screen.icraft_music.fullscreen.wallpaper.empty": "Put pictures into ipod/wallpaper",
+  "manual.icraft_music.start.wheel.3": "Double-click the top of the iPod (above the screen) for the fullscreen view: a big cover, the time, large buttons and the volume. Space plays or pauses, the arrow keys change track and the volume, and holding previous or next (or the arrow key) skips 10 seconds. The buttons left and right of them switch Shuffle and Repeat. Search at the top left plays what you click. Esc goes back.",
+  "manual.icraft_music.settings.ipod.3": "Wallpaper shows your own picture behind the iPod's screen and in the fullscreen view: put .png or .jpg pictures into the folder wallpaper inside the ipod folder of your game folder, then choose one with the Wallpaper button at the top right of the fullscreen view. Only you see it."
 }
