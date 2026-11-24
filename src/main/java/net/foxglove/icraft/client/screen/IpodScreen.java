@@ -81,6 +81,7 @@ public class IpodScreen extends Screen {
     // When the top of the iPod (above the display) was clicked last, for the double-click that opens the
     // fullscreen view (B23). -1 = no click is waiting.
     private long lastTopClick = -1;
+    private boolean wallpaperShown; // the wallpaper was drawn this frame (the header text colour depends on it)
 
     // When a single click on the middle button is waiting to see if a second one follows,
     // this is the time (in milliseconds) when we give up waiting. -1 means nothing is waiting.
@@ -154,10 +155,10 @@ public class IpodScreen extends Screen {
     private AlbumSection albumSection = AlbumSection.MUSIC;
     // ---- search: an index of everything the lists show, filtered by the typed text ----
     // 'row' is -1 for the album/book/show itself, otherwise the track/chapter/episode row inside 'view'.
-    private record SearchEntry(AlbumView view, int row, boolean chapters, String label, String text, String compact,
-                               String tag) {}
+    record SearchEntry(AlbumView view, int row, boolean chapters, String label, String text, String compact,
+                       String tag) {}
     private static final int SEARCH_MAX_RESULTS = 200;
-    private static final int SEARCH_MAX_LENGTH = 32;
+    static final int SEARCH_MAX_LENGTH = 32; // also the fullscreen view's search box
     private final List<SearchEntry> searchIndex = new ArrayList<>();
     private List<SearchEntry> results = List.of();
     private String searchQuery = "";
@@ -338,13 +339,15 @@ public class IpodScreen extends Screen {
         }
     }
 
-    // Finds the entries that contain every typed word (best: every word starts a word); albums before tracks
     private void updateResults() {
-        String q = normalize(searchQuery);
-        if (q.isEmpty()) {
-            results = List.of();
-            return;
-        }
+        results = searchFor(searchQuery);
+    }
+
+    // Finds the entries that contain every typed word (best: every word starts a word); albums before tracks.
+    // Also used by the fullscreen view's search bar (same package).
+    List<SearchEntry> searchFor(String query) {
+        String q = normalize(query);
+        if (q.isEmpty()) return List.of();
         String[] words = q.split(" ");
         String compactQuery = q.replace(" ", "");
         List<SearchEntry> prefix = new ArrayList<>();
@@ -364,7 +367,17 @@ public class IpodScreen extends Screen {
             for (SearchEntry e : group) if (e.row() < 0) all.add(e);
             for (SearchEntry e : group) if (e.row() >= 0) all.add(e);
         }
-        results = all.size() > SEARCH_MAX_RESULTS ? new ArrayList<>(all.subList(0, SEARCH_MAX_RESULTS)) : all;
+        return all.size() > SEARCH_MAX_RESULTS ? new ArrayList<>(all.subList(0, SEARCH_MAX_RESULTS)) : all;
+    }
+
+    // The fullscreen view's search: plays the result. An album, book or show plays from its start (a book from its
+    // resume row); a track or chapter plays from its row. The iPod is left on that list, so going back shows it.
+    void playSearchResult(SearchEntry entry) {
+        cameFromSearch = false;
+        open = entry.view();
+        goTo(entry.chapters() ? Page.CHAPTERS : Page.TRACKS,
+                entry.row() >= 0 ? entry.row() : entry.chapters() ? open.startRow() : 0);
+        playFromOpen();
     }
 
     private void searchChanged() {
@@ -576,6 +589,24 @@ public class IpodScreen extends Screen {
         int count = listSize();
         keepSelectionVisible();
 
+        // Your own picture over the whole screen (B22), under everything else on it
+        wallpaperShown = IpodSettings.wallpaper()
+                && Wallpaper.draw(g, DISPLAY_X, DISPLAY_Y, DISPLAY_W, DISPLAY_H, 0x90);
+        if (wallpaperShown) {
+            // the screen's corners are rounded in the artwork: one artwork pixel of the frame at each corner
+            int frame = 0xFF131316;
+            int r = DISPLAY_X + DISPLAY_W, b = DISPLAY_Y + DISPLAY_H;
+            g.fill(DISPLAY_X, DISPLAY_Y, DISPLAY_X + PX, DISPLAY_Y + PX, frame);
+            g.fill(r - PX, DISPLAY_Y, r, DISPLAY_Y + PX, frame);
+            g.fill(DISPLAY_X, b - PX, DISPLAY_X + PX, b, frame);
+            g.fill(r - PX, b - PX, r, b, frame);
+            // the header strip, see-through in the iPod's colour (between the corners, which stay frame-black)
+            int band = 0xA0000000 | color.tint();
+            g.fill(DISPLAY_X + PX, DISPLAY_Y, r - PX, DISPLAY_Y + PX, band);
+            g.fill(DISPLAY_X, DISPLAY_Y + PX, r, LIST_Y, band);
+        }
+        int headerText = headerTextColor();
+
         // Header: dark text on the light blue strip, plus a play/pause symbol
         Component title = switch (page) {
             case MENU -> Component.translatable(inNas ? "screen.icraft_music.ipod.nas" : "screen.icraft_music.ipod.menu");
@@ -600,14 +631,14 @@ public class IpodScreen extends Screen {
                 ? this.font.plainSubstrByWidth(title.getString(), titleRoom, true) // the end of a long query
                 : fit(title.getString(), titleRoom);
         if (!muted.isEmpty()) {
-            g.drawString(this.font, muted, right - 8 - this.font.width(muted), DISPLAY_Y + (HEADER_H - 8) / 2, 0xFF0A2A66, false);
+            g.drawString(this.font, muted, right - 8 - this.font.width(muted), DISPLAY_Y + (HEADER_H - 8) / 2, headerText, false);
         }
-        g.drawString(this.font, shownTitle, left, DISPLAY_Y + (HEADER_H - 8) / 2, 0xFF0A2A66, false);
+        g.drawString(this.font, shownTitle, left, DISPLAY_Y + (HEADER_H - 8) / 2, headerText, false);
         if (LibraryCache.get().scanning() && page != Page.TRACKS && page != Page.CHAPTERS && page != Page.SETTINGS
                 && page != Page.CONFIRM_RESET) {
             // a library scan is running: animated dots after the title
             String dots = ".".repeat(1 + (int) ((Util.getMillis() / 400) % 3));
-            g.drawString(this.font, dots, left + this.font.width(shownTitle) + 2, DISPLAY_Y + (HEADER_H - 8) / 2, 0xFF0A2A66, false);
+            g.drawString(this.font, dots, left + this.font.width(shownTitle) + 2, DISPLAY_Y + (HEADER_H - 8) / 2, headerText, false);
         }
         drawStatusIcon(g, right - 5);
 
@@ -621,11 +652,6 @@ public class IpodScreen extends Screen {
                             : isPodcastSection() ? "screen.icraft_music.ipod.no_podcasts"
                             : "screen.icraft_music.ipod.no_books"),
                     left, LIST_Y + 3, right - left, 0xFFFFFFFF);
-        }
-
-        // Your own picture behind the rows (B22); the header strip stays as it is
-        if (IpodSettings.wallpaper()) {
-            Wallpaper.draw(g, DISPLAY_X + 1, LIST_Y, DISPLAY_W - 2, DISPLAY_Y + DISPLAY_H - LIST_Y, 0x90);
         }
 
         // The rows
@@ -729,7 +755,7 @@ public class IpodScreen extends Screen {
     // A small triangle while playing, two bars while paused, nothing when idle
     private void drawStatusIcon(GuiGraphics g, int x) {
         if (!IpodPlayer.isPlaying()) return;
-        int color = 0xFF0A2A66;
+        int color = headerTextColor();
         if (IpodPlayer.isPaused()) {
             g.fill(x, STATUS_ICON_Y, x + 2, STATUS_ICON_Y + 5, color);
             g.fill(x + 3, STATUS_ICON_Y, x + 5, STATUS_ICON_Y + 5, color);
@@ -761,6 +787,14 @@ public class IpodScreen extends Screen {
             String initial = name.isEmpty() ? "?" : name.substring(0, 1).toUpperCase(Locale.ROOT);
             g.drawCenteredString(this.font, initial, x + IpodScreen.THUMB / 2, y + IpodScreen.THUMB / 2 - 4, 0xAAAAAA);
         }
+    }
+
+    // The header's text colour: the artwork's dark blue, or white on the strip of a dark iPod over a wallpaper
+    private int headerTextColor() {
+        if (!wallpaperShown) return 0xFF0A2A66;
+        int rgb = color.tint();
+        int r = (rgb >> 16) & 0xFF, gr = (rgb >> 8) & 0xFF, b = rgb & 0xFF;
+        return (r * 299 + gr * 587 + b * 114) / 1000 < 140 ? 0xFFFFFFFF : 0xFF0A2A66; // perceived brightness
     }
 
     // Cuts text short with "..." so it fits in the given width

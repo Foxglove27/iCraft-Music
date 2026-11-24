@@ -47,9 +47,14 @@ public class ClientConfig {
             .define("showHeadphones", true);
 
     public static final ModConfigSpec.BooleanValue WALLPAPER = BUILDER
-            .comment("Draw your own picture, <game folder>/ipod/wallpaper.png (or .jpg), behind the rows of the iPod's",
-                    "display and in its fullscreen view (also in the iPod's Settings)")
+            .comment("Draw your own picture from <game folder>/ipod/wallpaper/ behind the iPod's display and in its",
+                    "fullscreen view (also in the iPod's Settings)")
             .define("wallpaper", false);
+
+    public static final ModConfigSpec.ConfigValue<String> WALLPAPER_FILE = BUILDER
+            .comment("The picture in <game folder>/ipod/wallpaper/ (a file name, .png, .jpg or .jpeg); chosen in the",
+                    "iPod's fullscreen view. Empty or missing = the first picture there")
+            .define("wallpaperFile", "");
 
     public static final ModConfigSpec.ConfigValue<java.util.List<? extends String>> EXTRA_MUSIC_FOLDERS = BUILDER
             .comment("Extra folders to read music from, in addition to <game folder>/ipod/music (for example a mounted",

@@ -136,6 +136,23 @@ public class IpodSettings {
         if (wallpaper()) net.foxglove.icraft.client.audio.Wallpaper.refresh(); // read the picture now, not only on the next open
     }
 
+    /** The chosen picture's file name inside ipod/wallpaper/ ("" = the first one there). */
+    public static String wallpaperFile() {
+        try {
+            return ClientConfig.WALLPAPER_FILE.get();
+        } catch (IllegalStateException e) {
+            return ""; // the config is not loaded yet
+        }
+    }
+
+    /** The fullscreen view's picker: a picture by its file name, or null for "None" (switches the wallpaper off). */
+    public static void chooseWallpaper(@org.jetbrains.annotations.Nullable String name) {
+        ClientConfig.WALLPAPER.set(name != null);
+        if (name != null) ClientConfig.WALLPAPER_FILE.set(name);
+        ClientConfig.SPEC.save();
+        if (name != null) net.foxglove.icraft.client.audio.Wallpaper.refresh();
+    }
+
     private static boolean flag(net.neoforged.neoforge.common.ModConfigSpec.BooleanValue value) {
         try {
             return value.get();

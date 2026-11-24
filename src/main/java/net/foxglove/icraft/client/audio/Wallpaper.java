@@ -17,13 +17,16 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * The player's own picture behind the iPod's display (B22): {@code <game folder>/ipod/wallpaper.png} (or .jpg/.jpeg).
+ * The player's own picture behind the iPod's display (B22): one of the .png/.jpg/.jpeg files in
+ * {@code <game folder>/ipod/wallpaper/}, chosen in the fullscreen view (config {@code wallpaperFile}).
  * Like {@link CoverArt} the file is decoded on a background thread and only turned into a texture on the render
  * thread, but the picture keeps its shape (a cover is squashed into a square), so it can be cropped to fill any
  * rectangle. There is only ever one wallpaper texture.
@@ -32,7 +35,6 @@ public final class Wallpaper {
     private static final Logger LOGGER = LogUtils.getLogger();
     /** A bigger picture is scaled down to this many pixels on its longer side (video memory). */
     private static final int MAX_SIZE = 1024;
-    private static final String[] NAMES = {"wallpaper.png", "wallpaper.jpg", "wallpaper.jpeg"};
     private static final ResourceLocation TEXTURE = ResourceLocation.fromNamespaceAndPath(iCraft.MOD_ID, "wallpaper");
 
     // What the background thread hands to the render thread. 'image' is null when the file could not be read.
@@ -53,6 +55,7 @@ public final class Wallpaper {
     private static int height;
     private static boolean registered;
     private static boolean loading;
+    private static List<Path> pictures = List.of(); // the folder's pictures, as found by the last refresh()
 
     private Wallpaper() {}
 
@@ -61,6 +64,7 @@ public final class Wallpaper {
      * Called when the iPod opens and when the Wallpaper setting is switched on. Render thread.
      */
     public static void refresh() {
+        pictures = scan();
         if (loading) return;
         Path found = find();
         if (found == null) { // the picture was removed
@@ -106,13 +110,43 @@ public final class Wallpaper {
         modified = 0;
     }
 
+    /** The pictures in ipod/wallpaper/, in natural order, as of the last {@link #refresh()} (for the picker). */
+    public static List<Path> pictures() {
+        return pictures;
+    }
+
+    /** The picture that is shown when the wallpaper is on (the chosen one, else the first), or null if there is none. */
     @Nullable
-    private static Path find() {
-        for (String name : NAMES) {
-            Path candidate = LocalMusic.libraryRoot().resolve(name);
-            if (Files.isRegularFile(candidate)) return candidate;
+    public static Path find() {
+        Path folder = folder();
+        String chosen = net.foxglove.icraft.client.IpodSettings.wallpaperFile();
+        if (!chosen.isEmpty()) {
+            Path candidate = folder.resolve(chosen).normalize();
+            // only a file directly in the folder: a hand-edited "../something" in the config is ignored
+            if (folder.equals(candidate.getParent()) && pictures.contains(candidate)) return candidate;
         }
-        return null;
+        return pictures.isEmpty() ? null : pictures.getFirst();
+    }
+
+    private static Path folder() {
+        return LocalMusic.libraryRoot().resolve("wallpaper").normalize();
+    }
+
+    // the pictures directly in the folder (not in subfolders), sorted like the music ("2" before "10")
+    private static List<Path> scan() {
+        Path folder = folder();
+        if (!Files.isDirectory(folder)) return List.of();
+        try (var files = Files.list(folder)) {
+            return files.filter(Files::isRegularFile).filter(Wallpaper::isPicture).sorted(LocalMusic.NATURAL).toList();
+        } catch (IOException e) {
+            LOGGER.warn("Could not list the wallpaper folder {}", folder, e);
+            return List.of();
+        }
+    }
+
+    private static boolean isPicture(Path path) {
+        String name = path.getFileName().toString().toLowerCase(Locale.ROOT);
+        return name.endsWith(".png") || name.endsWith(".jpg") || name.endsWith(".jpeg");
     }
 
     private static long lastModified(Path path) {
