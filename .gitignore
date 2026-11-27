@@ -26,6 +26,7 @@ run-server
 CLAUDE.md
 .claude
 .internal
+.ollamassist
 
 # macOS
 .DS_Store

@@ -164,7 +164,7 @@ public class IpodFullscreenScreen extends Screen {
             drawCover(g, IpodPlayer.getNowPlayingCover(), IpodPlayer.getNowPlayingDisc());
 
             // the title twice as big: the pose (the drawing transform) is scaled, so all its coordinates are halved
-            int textY = coverY + coverSize + 8;
+            int textY = titleY();
             String title = fit(IpodPlayer.getNowPlaying().getString(), (this.width - 20) / 2);
             g.pose().pushPose();
             g.pose().translate(this.width / 2.0F, textY, 0);
@@ -173,9 +173,17 @@ public class IpodFullscreenScreen extends Screen {
             g.pose().popPose();
 
             boolean muted = IpodMute.silences(IpodPlayer.playingIpod());
-            String subtitle = muted ? Component.translatable("screen.icraft_music.ipod.muted").getString()
-                    : IpodPlayer.getNowPlayingSubtitle().getString();
-            g.drawCenteredString(this.font, fit(subtitle, this.width - 20), this.width / 2, textY + 20, muted ? accent : 0xFFAAAAAA);
+            if (muted) {
+                // "Muted" can be clicked to unmute: white and underlined while the mouse is over it
+                boolean hover = onMutedLine(mouseX, mouseY) && !overPanel(mouseX, mouseY);
+                String text = mutedText();
+                int x = this.width / 2 - this.font.width(text) / 2;
+                g.drawString(this.font, text, x, subtitleY(), hover ? 0xFFFFFFFF : accent);
+                if (hover) g.fill(x, subtitleY() + 9, x + this.font.width(text), subtitleY() + 10, 0xFFFFFFFF);
+            } else {
+                g.drawCenteredString(this.font, fit(IpodPlayer.getNowPlayingSubtitle().getString(), this.width - 20),
+                        this.width / 2, subtitleY(), 0xFFAAAAAA);
+            }
 
             drawTimeBar(g, mouseX, mouseY);
             drawButtons(g, mouseX, mouseY);
@@ -190,6 +198,27 @@ public class IpodFullscreenScreen extends Screen {
         g.pose().popPose();
 
         drawButtonTooltip(g, mouseX, mouseY);
+    }
+
+    // the title under the cover, and the album line (or "Muted") under the title
+    private int titleY() {
+        return coverY + coverSize + 8;
+    }
+
+    private int subtitleY() {
+        return titleY() + 20;
+    }
+
+    private String mutedText() {
+        return fit(Component.translatable("screen.icraft_music.ipod.muted").getString(), this.width - 20);
+    }
+
+    // over the "Muted" line (only while the playing iPod is muted for this player): a click there unmutes
+    private boolean onMutedLine(double mouseX, double mouseY) {
+        if (!IpodPlayer.hasTrack() || !IpodMute.silences(IpodPlayer.playingIpod())) return false;
+        int half = this.font.width(mutedText()) / 2;
+        return mouseX >= this.width / 2.0 - half - 2 && mouseX < this.width / 2.0 + half + 2
+                && mouseY >= subtitleY() - 2 && mouseY < subtitleY() + 11;
     }
 
     // the hint "double-click here to go back" (only where it does not touch the search box or the picker button)
@@ -348,6 +377,8 @@ public class IpodFullscreenScreen extends Screen {
             tip = Component.translatable("screen.icraft_music.ipod.setting",
                     Component.translatable("screen.icraft_music.ipod.repeat"),
                     Component.translatable("screen.icraft_music.ipod.repeat." + IpodSettings.repeat().name().toLowerCase(Locale.ROOT)));
+        } else if (onMutedLine(mouseX, mouseY)) {
+            tip = Component.translatable("screen.icraft_music.fullscreen.unmute");
         }
         if (tip != null) g.renderTooltip(this.font, tip, mouseX, mouseY);
     }
@@ -649,6 +680,11 @@ public class IpodFullscreenScreen extends Screen {
             }
             if (onButton(repeatX, mouseX, mouseY)) {
                 IpodSettings.cycleRepeat();
+                return true;
+            }
+            if (onMutedLine(mouseX, mouseY)) {
+                // the same as the double-click on the middle button: unmutes this iPod (or everything if all is muted)
+                IpodMute.toggleIpod(IpodPlayer.playingIpod());
                 return true;
             }
         }

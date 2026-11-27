@@ -187,6 +187,7 @@
   "screen.icraft_music.fullscreen.wallpaper": "Wallpaper",
   "screen.icraft_music.fullscreen.wallpaper.none": "None",
   "screen.icraft_music.fullscreen.wallpaper.empty": "Put pictures into ipod/wallpaper",
-  "manual.icraft_music.start.wheel.3": "Double-click the top of the iPod (above the screen) for the fullscreen view: a big cover, the time, large buttons and the volume. Space plays or pauses, the arrow keys change track and the volume, and holding previous or next (or the arrow key) skips 10 seconds. The buttons left and right of them switch Shuffle and Repeat. Click the time bar to jump to that point. Search at the top left plays what you click. Esc goes back.",
+  "screen.icraft_music.fullscreen.unmute": "Click to unmute",
+  "manual.icraft_music.start.wheel.3": "Double-click the top of the iPod (above the screen) for the fullscreen view: a big cover, the time, large buttons and the volume. Space plays or pauses, the arrow keys change track and the volume, and holding previous or next (or the arrow key) skips 10 seconds. The buttons left and right of them switch Shuffle and Repeat. Click the time bar to jump to that point. Search at the top left plays what you click. While the iPod is muted, click \"Muted\" under the title to unmute. Esc goes back.",
   "manual.icraft_music.settings.ipod.3": "Wallpaper shows your own picture behind the iPod's screen and in the fullscreen view: put .png or .jpg pictures into the folder wallpaper inside the ipod folder of your game folder, then choose one with the Wallpaper button at the top right of the fullscreen view. Only you see it."
 }

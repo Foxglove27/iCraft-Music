@@ -6,7 +6,7 @@
 - **Fullscreen view**: double-click the top of the iPod (above the screen) for a big now-playing view with the cover,
   title, album, a time bar, large shuffle / previous / play-pause / next / repeat buttons and the volume. Hold previous
   or next (or the arrow keys) to skip 10 seconds, or click the time bar to jump to that point. A search bar in the top
-  left plays what you click. Space plays or pauses, Esc or a double-click on the top strip goes back. Works for your
+  left plays what you click. While the iPod is muted, click "Muted" under the title to unmute. Space plays or pauses, Esc or a double-click on the top strip goes back. Works for your
   own music, audiobooks, discs and your dock.
 - **Wallpaper**: put pictures (.png or .jpg) into the `ipod/wallpaper` folder of your game folder and choose one with
   the Wallpaper button at the top right of the fullscreen view (or switch it on in Settings > Wallpaper). It fills the
